@@ -7,6 +7,10 @@
 *.obj
 *.elf
 
+# Logs
+
+*.log
+
 # Linker output
 *.ilk
 *.map
