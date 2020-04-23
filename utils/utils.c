@@ -1,5 +1,6 @@
 #include "utils.h"
 t_log* iniciar_logger(const char * process){
+    strcat(process, ".log")
 	return log_create("gameboy.log",process,1,LOG_LEVEL_INFO);
 }
 
