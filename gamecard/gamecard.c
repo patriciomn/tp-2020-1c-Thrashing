@@ -228,3 +228,27 @@ void crear_archivos_metadata(char *path_metadata) {
     free(path_bitmap_file);
 }
 
+int tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
+	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
+	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
+		return NEW_POKEMON;
+	}
+	else if(strcmp(tipo_mensaje,"CATCH_POKEMON") == 0){
+		return CATCH_POKEMON;
+	}
+	else if(strcmp(tipo_mensaje,"GET_POKEMON") == 0){
+		return GET_POKEMON;
+	}
+	return -1;
+}
+
+//estan con void por las dudas, nada particular
+void new_pokemon(char* pokemon,int posx,int posy,int cant){
+}
+
+void catch_pokemon(char* pokemon,int posx,int posy){
+}
+
+void get_pokemon(char*pokemon){
+}
+
