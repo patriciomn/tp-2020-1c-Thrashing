@@ -8,48 +8,66 @@ int main () {
 
     //creamos el archivo de log, creamos el config y sacamos los datos
     logger = log_create("Tall_Grass_Logger","TG",1,LOG_LEVEL_INFO);
-    config_tall_grass = config_create("/home/utnso/workspace/gamecard/tall_grass.config");
+    config_tall_grass = config_create("/home/utnso/tp-2020-1c-Thrashing/gamecard/tall_grass.config");
 
-    char *pto_de_montaje = config_get_string_value(config_tall_grass,"PUNTO_MONTAJE_TALLGRASS");
-    datos_config->blocks = config_get_int_value(config_tall_grass,"BLOCKS");
-    datos_config->size_block = config_get_int_value(config_tall_grass,"SIZE_BLOCK");
+    obtener_datos_archivo_config();
 
-    //metadataTxt->blocks = config_get_int_value(config_tall_grass,"BLOCKS");
-
-
-    DIR *rta = opendir(pto_de_montaje);
-    if(rta == NULL) {
-        log_warning(logger,"DIRECTORIO %s NO EXISTE",pto_de_montaje);
-        log_info(logger,"CREANDO DIRECTORIO %s",pto_de_montaje);
-        crear_pto_de_montaje(pto_de_montaje);
-    } else {
-        log_info(logger,"DIRECTORIO %s ENCONTRADO",pto_de_montaje);
-        //verificamos el bitmap, el archivo metadata.txt, los archivos pokemones, entre otras cosas.
-        verificar_metadata_txt(pto_de_montaje);
-    }
+    verificar_punto_de_montaje();
 
     log_destroy(logger);
     config_destroy(config_tall_grass);
     free(metadataTxt);
     free(metadataTxt->magic_number);
+    free(datos_config->ip_broker);
+    free(datos_config->pto_de_montaje);
+    free(datos_config);
 
     return 0;
+}
+
+void verificar_punto_de_montaje() {
+	DIR *rta = opendir(datos_config->pto_de_montaje);
+	if(rta == NULL) {
+		log_warning(logger,"DIRECTORIO %s NO EXISTE",datos_config->pto_de_montaje);
+	    log_info(logger,"CREANDO DIRECTORIO %s",datos_config->pto_de_montaje);
+	    crear_pto_de_montaje(datos_config->pto_de_montaje);
+	} else {
+	    log_info(logger,"DIRECTORIO %s ENCONTRADO",datos_config->pto_de_montaje);
+	    //verificamos el bitmap, el archivo metadata.txt, los archivos pokemones, entre otras cosas.
+	    verificar_metadata_txt(datos_config->pto_de_montaje);
+	}
+}
+
+void obtener_datos_archivo_config() {
+	datos_config->tiempo_reintento_conexion = config_get_int_value(config_tall_grass, "TIEMPO_DE_REINTENTO_CONEXION");
+	datos_config->tiempo_reintento_operacion = config_get_int_value(config_tall_grass,"TIEMPO_DE_REINTENTO_OPERACION");
+
+	int size_ip = strlen(config_get_string_value(config_tall_grass, "IP_BROKER")) + 1;
+	datos_config->ip_broker = malloc(size_ip);
+	memcpy(datos_config->ip_broker, config_get_string_value(config_tall_grass, "IP_BROKER"), size_ip);
+
+	int size_pto_montaje = strlen(config_get_string_value(config_tall_grass, "PUNTO_MONTAJE_TALLGRASS")) + 1;
+	datos_config->pto_de_montaje = malloc(size_pto_montaje);
+	memcpy(datos_config->pto_de_montaje, config_get_string_value(config_tall_grass, "PUNTO_MONTAJE_TALLGRASS"), size_pto_montaje);
+
+	datos_config->blocks = config_get_int_value(config_tall_grass, "BLOCKS");
+	datos_config->size_block = config_get_int_value(config_tall_grass, "SIZE_BLOCK");
 }
 
 // Nota: para abrir archivos usar los sgtes permisos: O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
 // Nota2: Revisar memory leaks :-(
 
 void verificar_metadata_txt(char *path_pto_montaje) {
-    t_config *metadata_txt_datos;
+	t_config *metadata_txt_datos;
 
     int size_new_string = strlen(path_pto_montaje) + strlen(METADATA_TXT_PATH) + 1;
     char *path_metadata_txt = malloc(size_new_string);
     strcpy(path_metadata_txt, path_pto_montaje);
     string_append(&path_metadata_txt, METADATA_TXT_PATH);
 
-    int fd_meta_txt = open(path_metadata_txt, O_RDONLY);
-    if(fd_meta_txt == -1) {
-        log_error(logger,"RUTA %s NO EXISTE", path_metadata_txt);
+    FILE *filePointer = fopen(path_metadata_txt,"r");
+    if(filePointer == NULL) {
+        log_error(logger,"ERROR AL ABRIR EL ARCHIVO metadata.txt");
         exit(1);
     }
 
@@ -70,7 +88,7 @@ void verificar_metadata_txt(char *path_pto_montaje) {
     strcpy(path_bitmap_bin, path_pto_montaje);
     string_append(&path_bitmap_bin, BITMAP_PATH);
 
-    int fd_bitmap = open(path_bitmap_bin, O_RDWR);
+    int fd_bitmap = open(path_bitmap_bin, O_RDWR); // unico caso de usar una syscall para facilitar el uso del bitmap
     if(fd_bitmap == -1) {
         log_error(logger,"ERROR CON EL ARCHIVO bitmap.bin");
         exit(1);
@@ -81,7 +99,7 @@ void verificar_metadata_txt(char *path_pto_montaje) {
     printf("Tamaño bitmap (bytes)%li\n",buf->st_size);
 
     log_info(logger,"OBTENER BITARRAY DEL ARCHIVO bitmap.bin");
-    char *bitmap_memory = mmap(NULL , size_file, PROT_READ | PROT_WRITE, MAP_SHARED, fd_bitmap, 0);
+    char *bitmap_memory = mmap(NULL , size_file, PROT_READ | PROT_WRITE, MAP_SHARED, fd_bitmap, 0); // averiguar si hay otro modo de lidiar con el bitmap con fopen
     if(bitmap_memory == NULL) {
         log_error(logger,"ERROR MMAP bitmap.bin");
         exit(1);
@@ -169,15 +187,20 @@ void crear_metadata_tall_grass(char *path_pto_montaje) {
 void crear_archivos_metadata(char *path_metadata) {
     //creamos el archivo metadata.txt
     //creamos un nuevo string que va a ser el path del metadata.txt
-    int size_new_string = strlen(path_metadata) + strlen(METADATA_FILE) + 1;
+    FILE *metadataPointerFile;
+	int size_new_string = strlen(path_metadata) + strlen(METADATA_FILE) + 1;
     char *path_metadata_file = malloc(size_new_string);
     strcpy(path_metadata_file, path_metadata);
     string_append(&path_metadata_file, METADATA_FILE);
 
     t_config *metadata_info = config_create(path_metadata_file);
 
-    int fd = open(path_metadata_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    if(fd >= 0) {
+    //int fd = open(path_metadata_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    metadataPointerFile = fopen(path_metadata_file,"a");
+    if(metadataPointerFile == NULL) {
+    	log_error(logger,"ERROR AL CREAR EL ARCHIVO metadata.txt");
+    	exit(1);
+    } else {
         metadata_info = config_create(path_metadata_file);
 
         config_set_value(metadata_info, "BLOCK_SIZE", string_itoa(datos_config->size_block));
@@ -222,7 +245,9 @@ void crear_archivos_metadata(char *path_metadata) {
     bitarray_set_bit(bitarray,0);
     bitarray_set_bit(bitarray,1);
 
-    close(fd);
+    fclose(metadataPointerFile);
+    //close(fd_bitmap);
+    //munmap(file_memory, size_bytes);
     config_destroy(metadata_info);
     free(path_metadata_file);
     free(path_bitmap_file);
@@ -252,3 +277,4 @@ void catch_pokemon(char* pokemon,int posx,int posy){
 void get_pokemon(char*pokemon){
 }
 
+//metadataTxt->blocks = config_get_int_value(config_tall_grass,"BLOCKS");
