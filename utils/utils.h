@@ -6,16 +6,15 @@ enum TIPO{
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
 	SUSCRITO = 7,
+	ACK = 8,
 };
-typedef struct
-{
+typedef struct{
 	int size;
 	void* stream;
 } t_buffer;
 
-typedef struct
-{
-	enum TIPO codigo_operacion;
+typedef struct{
+	enum TIPO queue_id;
 	t_buffer* buffer;
 } t_paquete;
 
@@ -54,10 +53,3 @@ typedef struct{
 typedef struct{
 	int caught; // 1 o 0 en funcion de si se atrapo o no (respectivamente)
 }caught_pokemon;
-
-struct Message_queue {
-    int id;
-    int correlation_id;
-    void* message;
-    struct Message_queue *sig;
-}
