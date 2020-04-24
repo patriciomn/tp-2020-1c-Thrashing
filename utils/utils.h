@@ -1,20 +1,12 @@
-
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<commons/log.h>
-#include<math.h>
-#include<sys/socket.h>
-#include<unistd.h>
-#include<netdb.h>
-#include<commons/collections/list.h>
-#include<commons/collections/queue.h>
-#include<commons/config.h>
-#include<commons/string.h>
-#include<pthread.h>
-#include<assert.h>
-#include<signal.h>
-
+enum TIPO{
+	NEW_POKEMON = 1,
+	APPEARED_POKEMON = 2,{}
+	CATCH_POKEMON = 3,
+	CAUGHT_POKEMON = 4,
+	GET_POKEMON = 5,
+	LOCALIZED_POKEMON = 6,
+	SUSCRITO = 7,
+};
 typedef struct
 {
 	int size;
@@ -34,12 +26,7 @@ typedef struct{
 	int posy;
 }pokemon;
 
-enum TIPO{
-	NEW_POKEMON = 1,
-	APPEARED_POKEMON = 2,
-	CATCH_POKEMON = 3,
-	CAUGHT_POKEMON = 4,
-	GET_POKEMON = 5,
-	LOCALIZED_POKEMON = 6,
-	SUSCRITO = 7,
-};
+
+typedef struct{
+	char* name;
+}get_pokemon;
