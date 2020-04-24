@@ -50,12 +50,44 @@ struct config_tallGrass {
     int tiempo_reintento_conexion;
     int tiempo_reintento_operacion;
     char *ip_broker;
+    char *pto_de_montaje;
     int puerto_broker;
     int size_block;
     int blocks;
 };
 
+struct mensaje {
+    int id;
+    void* message;
+} ; // Tiene sentido plantear algo asi para despues responder con el id??
+
+enum TIPO{
+	NEW_POKEMON = 1,
+	CATCH_POKEMON = 2,
+	GET_POKEMON = 3,
+	};
+
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
+
+
+//FUNCIONES
+
+int main ();
+void obtener_datos_archivo_config();
+void verificar_punto_de_montaje();
+void verificar_metadata_txt(char *path_pto_montaje);
+void crear_pto_de_montaje(char *path_pto_montaje);
+void crear_directorio_files(char *path_pto_montaje);
+void crear_directorio_blocks(char *path_pto_montaje);
+void crear_metadata_tall_grass(char *path_pto_montaje);
+void crear_archivos_metadata(char *path_metadata);
+
+int tipo_mensaje(char* tipo_mensaje);
+void new_pokemon(char* pokemon,int posx,int posy,int cant);
+void catch_pokemon(char* pokemon,int posx,int posy);
+void get_pokemon(char*pokemon);
+
+
 
 #endif /* GAMECARD_H_ */
