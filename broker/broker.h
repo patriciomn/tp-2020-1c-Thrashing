@@ -20,6 +20,8 @@
 t_log* logger;
 t_config* config;
 int conexion;
+pthread_t thread;
 
-void terminar_broker(int conexion, t_log* logger, t_config* config);
+void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
+void* serializar_paquete(t_paquete* paquete, int * bytes);

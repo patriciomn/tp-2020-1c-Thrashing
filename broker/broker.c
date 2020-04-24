@@ -2,17 +2,7 @@
 
 int main(){	
     iniciar_broker();
-
-	t_queue * new_pokemon;
-	t_queue * appeared_pokemon;
-
-	t_queue * catch_pokemon;
-	t_queue * caught_pokemon;
-
-	t_queue * get_pokemon;
-	t_queue * localized_pokemon;
-
-
+	iniciar_servidor();
 
 	terminar_broker( conexion, logger, config);
 }
@@ -71,21 +61,79 @@ void serve_client(int* socket)
 	process_request(cod_op, *socket);
 }
 
+
+//ESTO HAY QUE CODEARLO
 void process_request(int cod_op, int cliente_fd) {
 	int size;
 	void* msg;
 		switch (cod_op) {
-		case MENSAJE:
-			msg = recibir_mensaje(cliente_fd, &size);
-			devolver_mensaje(msg, size, cliente_fd);
+		case NEW_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size); //Aca abria que deserializar el paquete
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de NEW con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
 			free(msg);
 			break;
+		case APPEARED_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size); //Aca abria que deserializar el paquete
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de APPEARED con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
+			
+			free(msg);
+			break;
+		case CATCH_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size);
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de CATCH con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
+			
+			free(msg);
+			break;
+		case CAUGHT_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size);
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de CAUGHT con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
+			
+			free(msg);
+			break;
+		case GET_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size);
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de GET con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
+			
+			free(msg);
+			break;
+		case LOCALIZED_POKEMON:
+			msg = recibir_mensaje(cliente_fd, &size);
+			//Responder correlation_id al que me envio el req (cliente_fd)
+			//Pushear en la cola de LOCALIZED con id, correlationId 
+			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
+			
+			free(msg);
+			break;
+		
 		case 0:
 			pthread_exit(NULL);
 		case -1:
 			pthread_exit(NULL);
 		}
 }
+
+//ESTO TAMBIEN HAY QUE CODEARLO
+void* recibir_mensaje(int socket_cliente, int* size)
+{
+	void * buffer;
+
+	recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
+	buffer = malloc(*size);
+	recv(socket_cliente, buffer, *size, MSG_WAITALL);
+
+	return buffer;
+}
+
 
 void iniciar_broker(void){
 	logger = log_create("broker.log","broker",1,LOG_LEVEL_INFO);
@@ -94,8 +142,8 @@ void iniciar_broker(void){
 	
 }
 
-void terminar_broker(int conexion, t_log* logger, t_config* config){
+void terminar_broker( t_log* logger, t_config* config){
 	log_destroy(logger);
 	config_destroy(config);
-	close(conexion);
 }
+
