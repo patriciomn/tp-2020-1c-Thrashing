@@ -35,6 +35,7 @@ char *crear_nuevo_path(char* path_anterior, char *archivo);
 void crear_directorio_files(char *path_pto_montaje);
 void verificar_metadata_txt(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
+void iniciar_logger_config();
 
 t_log *logger;
 t_bitarray *bitarray;
@@ -43,7 +44,6 @@ t_config *config_tall_grass;
 struct metadata_info {
     int block_size;
     int blocks;
-    char *magic_number;
 };
 
 struct config_tallGrass {
