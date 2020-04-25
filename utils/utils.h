@@ -51,5 +51,12 @@ typedef struct{
 }appeared_pokemon;
 
 typedef struct{
+	int name_size;
+	char* name;
+	position pos;
+
+}catch_pokemon;
+
+typedef struct{
 	int caught; // 1 o 0 en funcion de si se atrapo o no (respectivamente)
 }caught_pokemon;

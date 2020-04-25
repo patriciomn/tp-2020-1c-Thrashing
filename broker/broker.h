@@ -16,8 +16,13 @@
 #include<signal.h>
 
 typedef struct{
+	bool ack;
+	int id;
+}sent;
+
+typedef struct{
 	int cliente_fd;
-	int * ids_ack;
+	sent * sended;
 }suscriber;
 
 typedef struct{
@@ -28,7 +33,7 @@ typedef struct{
 
 t_queue * queues[6];
 
-suscriber message[6];
+suscriber * suscribers[6];
 t_log* logger;
 t_config* config;
 pthread_t thread;
@@ -39,5 +44,6 @@ void* serializar_paquete(t_paquete* paquete, int * bytes);
 int get_id(void);
 int get_correlation_id(void);
 void build_queues(void);
-
-
+void build_suscribers(void);
+void start_sender_thread(void);
+void sender_thread(void);
