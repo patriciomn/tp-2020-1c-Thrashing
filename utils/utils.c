@@ -2,12 +2,12 @@
 
 void* serializar_paquete(t_paquete* paquete, int * bytes){
 
-	int size_serializado = sizeof(paquete->codigo_operacion) + sizeof(paquete->buffer->size) + paquete->buffer->size;
+	int size_serializado = sizeof(paquete->queue_id) + sizeof(paquete->buffer->size) + paquete->buffer->size;
 
 	void * magic = malloc(size_serializado );
 	int desplazamiento = 0;
 
-	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
+	memcpy(magic + desplazamiento, &(paquete->queue_id), sizeof(int));
 	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
 	desplazamiento+= sizeof(int);
