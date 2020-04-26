@@ -32,23 +32,12 @@ typedef struct{
 	int cantidad;
 }new_pokemon;
 
-typedef struct{ //Este no lo entendi
-	int name_size;
-	char* name;
-	position pos;
-	int cantidad_posiciones;
-}localized_pokemon;
-
-typedef struct{
-	int name_size;
-	char* name;
-}get_pokemon;
-
 typedef struct{
 	int name_size;
 	char* name;
 	position pos;
 }appeared_pokemon;
+
 
 typedef struct{
 	int name_size;
@@ -60,3 +49,17 @@ typedef struct{
 typedef struct{
 	int caught; // 1 o 0 en funcion de si se atrapo o no (respectivamente)
 }caught_pokemon;
+
+typedef struct{
+	int name_size;
+	char* name;
+}get_pokemon;
+
+typedef struct{ //Este no lo entendi
+	int name_size;
+	char* name;
+	position pos;
+	int cantidad_posiciones;
+}localized_pokemon;
+
+
