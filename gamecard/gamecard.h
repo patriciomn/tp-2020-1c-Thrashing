@@ -26,6 +26,7 @@
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
+#define POKEMON_FILE ".txt" //no se bien que extension deberia ser
 
 void crear_pto_de_montaje(char *path);
 void crear_metadata_tall_grass(char *path);
@@ -82,6 +83,7 @@ void crear_directorio_files(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
 void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
+void crear_archivos_pokemon(char *path_pokefile);
 
 int tipo_mensaje(char* tipo_mensaje);
 void new_pokemon(char* pokemon,int posx,int posy,int cant);
