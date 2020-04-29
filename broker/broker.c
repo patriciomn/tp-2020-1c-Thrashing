@@ -68,7 +68,6 @@ void process_request(int cod_op, int cliente_fd) {
 	void* msg;
 	switch (cod_op) {
 		//CADA VEZ QUE SE PUSHEA EN queues[i] HAY QUE DUMPEAR EN MEMORIA
-		
 		case NEW_POKEMON:
 			msg = recibir_mensaje(cliente_fd, &size); //Aca abria que deserializar el paquete
 			//Responder correlation_id al que me envio el req (cliente_fd)
@@ -81,7 +80,6 @@ void process_request(int cod_op, int cliente_fd) {
 			//Responder correlation_id al que me envio el req (cliente_fd)
 			//Pushear en la cola de APPEARED con id, correlationId 
 			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
-			
 			free(msg);
 			break;
 		case CATCH_POKEMON:
@@ -89,7 +87,6 @@ void process_request(int cod_op, int cliente_fd) {
 			//Responder correlation_id al que me envio el req (cliente_fd)
 			//Pushear en la cola de CATCH con id, correlationId 
 			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
-			
 			free(msg);
 			break;
 		case CAUGHT_POKEMON:
@@ -97,7 +94,6 @@ void process_request(int cod_op, int cliente_fd) {
 			//Responder correlation_id al que me envio el req (cliente_fd)
 			//Pushear en la cola de CAUGHT con id, correlationId 
 			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
-			
 			free(msg);
 			break;
 		case GET_POKEMON:
@@ -105,13 +101,12 @@ void process_request(int cod_op, int cliente_fd) {
 			//Responder correlation_id al que me envio el req (cliente_fd)
 			//Pushear en la cola de GET con id, correlationId 
 			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
-			
 			free(msg);
 			break;
 		case LOCALIZED_POKEMON:
 			msg = recibir_mensaje(cliente_fd, &size);
 			//Responder correlation_id al que me envio el req (cliente_fd)
-			//Pushear en la cola de LOCALIZED con id, correlationId 
+			//Pushear en la cola de LOCALIZED con id, correlationId
 			//Salir, luego otro hilo vendra a recoger de la cola donde lo deje y enviara a los suscribers. NO ENVIO ACA
 			
 			free(msg);
@@ -147,6 +142,7 @@ void process_request(int cod_op, int cliente_fd) {
 int get_id(){
 	//PROGRAMAME
 }
+
 int get_correlation_id(){
 	//PROGRAMAME
 }
