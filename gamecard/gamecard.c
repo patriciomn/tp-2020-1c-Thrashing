@@ -168,7 +168,7 @@ void crear_directorio_blocks(char *path_pto_montaje) {
     free(path_blocks);
 }
 
-void crear_metadata_tall_grass(char *path_pto_montaje) {
+void crear_metadata_tall_grass(char *path_pto_montaje) { //incluir en bitmap, supongo que en el primer bit
     int size_new_string = strlen(path_pto_montaje) + strlen(METADATA_DIR) + 1;
     char *path_metadata = malloc(size_new_string);
     strcpy(path_metadata, path_pto_montaje);
@@ -254,6 +254,42 @@ void crear_archivos_metadata(char *path_metadata) {
     free(path_bitmap_file);
 }
 
+void crear_archivos_pokemon(char *path_pokefile) {
+
+	int size_new_string = strlen(path_pokefile) + strlen(POKEMON_FILE) + 1;
+    char *path_poke_file = malloc(size_new_string);
+    strcpy(path_poke_file, path_pokefile);
+    string_append(&path_poke_file, POKEMON_FILE);
+
+    FILE *pointerFile = fopen(path_poke_file,"r");//con leer alcanza y sobra. porque la parte de poner posiciones las hacemos con NEW
+    if(pointerFile == NULL) {
+    	log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
+    	exit(1);
+    }
+    fclose(pointerFile);
+
+ /*   //ahora agregarlo al bitmap
+    size_new_string = strlen(path_pokefile) + strlen(BITMAP_FILE) + 1;
+    char *path_bitmap_file = malloc(size_new_string);
+    strcpy(path_bitmap_file, path_pokefile);
+    string_append(&path_bitmap_file, BITMAP_FILE);
+    }
+¿Como llego al bit que representa al archivo?
+    bitarray_set_bit(bitArray,indice que representa al archivo);
+
+    //escribimos el bitarray en el archivo
+    if(fwrite(bitArray->bitarray, sizeof(char), size_bytes_bitmap, bitmapFilePointer) == 0) {
+    	log_error(logger, "NO SE PUDO ESCRIBIR EL BITARRAY EN EL ARCHIVO bitmap.bin");
+    	exit(1);
+    }
+
+    fclose(bitmapFilePointer);
+    bitarray_destroy(bitArray);
+
+    free(path_pokefile_file);
+    free(path_bitmap_file);*/
+}
+
 int tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
 	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
@@ -268,13 +304,10 @@ int tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 	return -1;
 }
 
-//estan con void por las dudas, nada particular
-void new_pokemon(char* pokemon,int posx,int posy,int cant){
-}
 
-void catch_pokemon(char* pokemon,int posx,int posy){
-}
+void new_pokemon(char* pokemon,int posx,int posy,int cant){}
 
-void get_pokemon(char*pokemon){
-}
+void catch_pokemon(char* pokemon,int posx,int posy){}
+
+void get_pokemon(char*pokemon){}
 
