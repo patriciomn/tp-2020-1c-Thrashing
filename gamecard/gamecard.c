@@ -290,8 +290,31 @@ void crear_archivos_pokemon(char *path_pokefile) {
     free(path_bitmap_file);*/
 }
 
-int tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
+void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
+
+	switch(/*variable a definir*/){
+		case NEW_POKEMON:
+			// se procesa el mensaje new_pokemon
+			// new_pokemon(char* pokemon,int posx,int posy,int cant)
+		break;
+
+		case CATCH_POKEMON:
+			// se procesa el mensaje new_pokemon
+			// catch_pokemon(char* pokemon,int posx,int posy)
+		break;
+
+		case GET_POKEMON:
+			// se procesa el mensaje new_pokemon
+		break;
+
+		default:
+			// en caso de que no sea ninguna (ver que hacer)
+			// get_pokemon(char*pokemon)
+		break;
+	}
+
+	/*
 	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
 		return NEW_POKEMON;
 	}
@@ -302,6 +325,7 @@ int tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 		return GET_POKEMON;
 	}
 	return -1;
+	*/
 }
 
 
@@ -311,3 +335,116 @@ void catch_pokemon(char* pokemon,int posx,int posy){}
 
 void get_pokemon(char*pokemon){}
 
+// Funciones para la conexion ----------------------------------------------------------
+
+void reintentar_conexion_broker() {
+}
+
+
+int crear_conexion(char *ip, char* puerto) {
+	struct addrinfo hints;
+	struct addrinfo *server_info;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	getaddrinfo(ip, puerto, &hints, &server_info);
+
+	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+
+	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1)
+		return -1;
+
+	freeaddrinfo(server_info);
+
+	return socket_cliente;
+}
+
+void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+
+	paquete->queue_id = SUSCRIPCION;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream, cola, paquete->buffer->size);
+
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* info_a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, info_a_enviar, bytes, 0);
+
+	free(info_a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void* serializar_paquete(t_paquete* paquete, int bytes) {
+	void *magic = malloc(bytes);
+	int desplazamiento = 0;
+
+	memcpy(magic + desplazamiento, &(paquete->queue_id), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
+	desplazamiento+= paquete->buffer->size;
+
+	return magic;
+}
+
+void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
+	int socket_servidor;
+
+    struct addrinfo hints, *servinfo, *p;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    getaddrinfo(ip_gamecard, puerto_gamecard, &hints, &servinfo);
+
+    for (p=servinfo; p != NULL; p = p->ai_next)
+    {
+        if ((socket_servidor = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+            continue;
+
+        if (bind(socket_servidor, p->ai_addr, p->ai_addrlen) == -1) {
+            close(socket_servidor);
+            continue;
+        }
+        break;
+    }
+
+	listen(socket_servidor, SOMAXCONN);
+
+    freeaddrinfo(servinfo);
+
+    while(1)
+    	esperar_cliente(socket_servidor);
+}
+
+void esperar_cliente(int socket_servidor) {
+	struct sockaddr_in dir_cliente;
+	pthread_t thread; //ver si es global o local (teniendo en cuenta que nos van a llover 10000 peticiones por segundo)
+
+	int tam_direccion = sizeof(struct sockaddr_in);
+
+	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
+
+	pthread_create(&thread,NULL,(void*)serve_client,&socket_cliente);
+	pthread_detach(thread);
+
+}
+
+void serve_client(int* socket) {
+	int cod_op;
+	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1)
+		cod_op = -1;
+	process_request(cod_op, *socket);
+}

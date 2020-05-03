@@ -15,6 +15,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <pthread.h>
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -62,11 +65,23 @@ struct mensaje {
     void* message;
 } ; // Tiene sentido plantear algo asi para despues responder con el id??
 
+//cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
 enum TIPO{
 	NEW_POKEMON = 1,
-	CATCH_POKEMON = 2,
-	GET_POKEMON = 3,
-	};
+	CATCH_POKEMON = 3,
+	GET_POKEMON = 5,
+	SUSCRIPCION = 7,
+};
+
+typedef struct{
+	int size;
+	void* stream;
+} t_buffer;
+
+typedef struct{
+	enum TIPO queue_id;
+	t_buffer* buffer;
+} t_paquete;
 
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
@@ -90,6 +105,10 @@ void new_pokemon(char* pokemon,int posx,int posy,int cant);
 void catch_pokemon(char* pokemon,int posx,int posy);
 void get_pokemon(char*pokemon);
 
+// Funciones Sockets
 
+int crear_conexion_broker(char *ip, char* puerto);
+void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
+void* serializar_paquete(t_paquete* paquete, int bytes);
 
 #endif /* GAMECARD_H_ */
