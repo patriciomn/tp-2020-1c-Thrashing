@@ -1,10 +1,10 @@
 #include"broker.h"
 
 int main(){	
-    iniciar_broker();
+    // iniciar_broker();
 	iniciar_servidor();
 
-	terminar_broker( logger, config);
+	// terminar_broker( logger, config);
 }
 
 void iniciar_servidor(void)
@@ -18,7 +18,8 @@ void iniciar_servidor(void)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    getaddrinfo(IP, PUERTO, &hints, &servinfo);
+
+    getaddrinfo("127.0.0.1", "4444", &hints, &servinfo);
 
     for (p=servinfo; p != NULL; p = p->ai_next)
     {
@@ -45,17 +46,20 @@ void esperar_cliente(int socket_servidor)
 	struct sockaddr_in dir_cliente;
 
 	int tam_direccion = sizeof(struct sockaddr_in);
-
+	log_info(logger,"Waiting Client");
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
-
+	log_debug(logger,"Client received");
 	pthread_create(&thread,NULL,(void*)serve_client,&socket_cliente);
 	pthread_detach(thread);
 
 }
 
+
 void serve_client(int* socket)
 {
 	int cod_op;
+	
+
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
 	process_request(cod_op, *socket);
@@ -139,13 +143,13 @@ void process_request(int cod_op, int cliente_fd) {
 
 
 
-int get_id(){
-	//PROGRAMAME
-}
+// int get_id(){
+// 	//PROGRAMAME
+// }
 
-int get_correlation_id(){
-	//PROGRAMAME
-}
+// int get_correlation_id(){
+// 	//PROGRAMAME
+// }
 
 //ESTO TAMBIEN HAY QUE CODEARLO
 void* recibir_mensaje(int socket_cliente, int* size)

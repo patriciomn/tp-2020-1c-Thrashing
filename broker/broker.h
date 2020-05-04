@@ -1,3 +1,7 @@
+
+#ifndef CONEXIONES_H_
+#define CONEXIONES_H_
+
 #include"../utils/utils.h"
 #include<stdio.h>
 #include<stdlib.h>
@@ -15,8 +19,7 @@
 #include<assert.h>
 #include<signal.h>
 
-#define IP "127.0.0.1"
-#define PUERTO "4444"
+
 
 typedef struct{
 	bool ack;
@@ -41,12 +44,21 @@ t_log* logger;
 t_config* config;
 pthread_t thread;
 
+
+
+
 void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
 void* serializar_paquete(t_paquete* paquete, int * bytes);
-int get_id(void);
-int get_correlation_id(void);
+// int get_id(void);
+// int get_correlation_id(void);
 void build_queues(void);
 void build_suscribers(void);
 void start_sender_thread(void);
 void sender_thread(void);
+void iniciar_servidor(void);
+void esperar_cliente(int socket_servidor);
+void serve_client(int* socket);
+void process_request(int cod_op, int cliente_fd);
+void * recibir_mensaje(int socket_cliente, int* size);
+#endif /* CONEXIONES_H_ */
