@@ -8,6 +8,8 @@ int main () {
 
     verificar_punto_de_montaje();
 
+    crear_archivos_pokemon("/home/utnso/Escritorio/tall_grass/files"); // en realidad se pasa el nombre del pokemon
+
     bitarray_destroy(bitarray);
     log_destroy(logger);
     config_destroy(config_tall_grass);
@@ -231,27 +233,29 @@ void crear_archivos_metadata(char *path_metadata) {
 
     int size_bytes_bitmap = (datos_config->blocks / BITS);
     void *newArrayBit = malloc(size_bytes_bitmap);
-    t_bitarray *bitArray = bitarray_create_with_mode(newArrayBit, size_bytes_bitmap, LSB_FIRST);
+    bitarray = bitarray_create_with_mode(newArrayBit, size_bytes_bitmap, LSB_FIRST);
 
-    for(int i = 0 ; i < bitarray_get_max_bit(bitArray) ; i++) {
-    	bitarray_clean_bit(bitArray,i);
+    for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++) {
+    	bitarray_clean_bit(bitarray,i);
     }
 
     //solo seteo dos bloques a modo de prueba, despues lo borro
-    bitarray_set_bit(bitArray,0);
-    bitarray_set_bit(bitArray,1);
+    //bitarray_set_bit(bitArray,0);
+    //bitarray_set_bit(bitArray,1);
 
     //escribimos el bitarray en el archivo
-    if(fwrite(bitArray->bitarray, sizeof(char), size_bytes_bitmap, bitmapFilePointer) == 0) {
+    if(fwrite(bitarray->bitarray, sizeof(char), size_bytes_bitmap, bitmapFilePointer) == 0) {
     	log_error(logger, "NO SE PUDO ESCRIBIR EL BITARRAY EN EL ARCHIVO bitmap.bin");
     	exit(1);
     }
 
-    fclose(bitmapFilePointer);
-    bitarray_destroy(bitArray);
+    //fclose(bitmapFilePointer);
 
     free(path_metadata_file);
     free(path_bitmap_file);
+}
+
+int existe_archivo_pokemon(char *path) { // hacer despues una funcion que verifique si existe o no el archivo. Si no existe, crearlo. Si existe, leerlo/escribirlo
 }
 
 void crear_archivos_pokemon(char *path_pokefile) {
@@ -261,39 +265,75 @@ void crear_archivos_pokemon(char *path_pokefile) {
     strcpy(path_poke_file, path_pokefile);
     string_append(&path_poke_file, POKEMON_FILE);
 
-    FILE *pointerFile = fopen(path_poke_file,"r");//con leer alcanza y sobra. porque la parte de poner posiciones las hacemos con NEW
+    FILE *pointerFile = fopen(path_poke_file,"w+");//con leer alcanza y sobra. porque la parte de poner posiciones las hacemos con NEW
     if(pointerFile == NULL) {
     	log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
     	exit(1);
     }
-    fclose(pointerFile);
+    //fclose(pointerFile);
 
- /*   //ahora agregarlo al bitmap
-    size_new_string = strlen(path_pokefile) + strlen(BITMAP_FILE) + 1;
-    char *path_bitmap_file = malloc(size_new_string);
-    strcpy(path_bitmap_file, path_pokefile);
-    string_append(&path_bitmap_file, BITMAP_FILE);
-    }
-¿Como llego al bit que representa al archivo?
-    bitarray_set_bit(bitArray,indice que representa al archivo);
+    //ahora agregarlo al bitmap
+    //size_new_string = strlen(path_pokefile) + strlen(BITMAP_FILE) + 1;
+    //char *path_bitmap_file = malloc(size_new_string);
+    //strcpy(path_bitmap_file, path_pokefile);
+    //string_append(&path_bitmap_file, BITMAP_FILE);
+    //}
+
+//¿Como llego al bit que representa al archivo?
+    int resultado = hay_espacio();
+	if(resultado == -1) {
+		log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP"); // agregar algo para que salte la parte de escritura
+		exit(1); // solo por ahora
+	}
+
+	bitarray_set_bit(bitarray,resultado);
+
+	int x = 10;
+	char *xs = string_new();
+	xs = string_itoa(x);
+	int y = 5;
+	char *ys = string_new();
+	ys = string_itoa(y);
+	int cantidadDePokemon = 2;
+	char *cps = string_new(); //cps = cantidadDePokemon en string
+	cps = string_itoa(cantidadDePokemon);
+
+	string_append_with_format(&xs, "%s%s%s%s", GUION, ys, IGUAL, cps);
+
+	printf("%s\n",xs);
 
     //escribimos el bitarray en el archivo
-    if(fwrite(bitArray->bitarray, sizeof(char), size_bytes_bitmap, bitmapFilePointer) == 0) {
+    if(fwrite(xs, strlen(xs)+1, 1, pointerFile) == 0) {
     	log_error(logger, "NO SE PUDO ESCRIBIR EL BITARRAY EN EL ARCHIVO bitmap.bin");
     	exit(1);
+    } else {
+    	log_info(logger, "SE ESCRIBIO EN EL ARCHIVO %s:%s",POKEMON_FILE,xs);
     }
 
-    fclose(bitmapFilePointer);
-    bitarray_destroy(bitArray);
+    fclose(pointerFile);
 
-    free(path_pokefile_file);
-    free(path_bitmap_file);*/
+    free(xs);
+    free(ys);
+    free(cps);
+    free(path_poke_file);
 }
 
+int hay_espacio() {
+	int resul = -1;
+	for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++ ) {
+		if(bitarray_test_bit(bitarray, i) == 0) {
+			log_info(logger, "NUMERO DE BLOQUE LIBRE:%d",i);
+			return i;
+		}
+	}
+	return resul;
+}
+
+/*
 void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
 
-	switch(/*variable a definir*/){
+	switch(variable a definir){
 		case NEW_POKEMON:
 			// se procesa el mensaje new_pokemon
 			// new_pokemon(char* pokemon,int posx,int posy,int cant)
@@ -313,7 +353,7 @@ void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 			// get_pokemon(char*pokemon)
 		break;
 	}
-
+	*/
 	/*
 	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
 		return NEW_POKEMON;
@@ -325,9 +365,9 @@ void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 		return GET_POKEMON;
 	}
 	return -1;
-	*/
-}
 
+}
+*/
 
 void new_pokemon(char* pokemon,int posx,int posy,int cant){}
 
@@ -336,7 +376,7 @@ void catch_pokemon(char* pokemon,int posx,int posy){}
 void get_pokemon(char*pokemon){}
 
 // Funciones para la conexion ----------------------------------------------------------
-
+/*
 void reintentar_conexion_broker() {
 }
 
@@ -369,7 +409,7 @@ void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream, cola, paquete->buffer->size);
+	//memcpy(paquete->buffer->stream, cola, paquete->buffer->size);
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
@@ -437,7 +477,7 @@ void esperar_cliente(int socket_servidor) {
 
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
 
-	pthread_create(&thread,NULL,(void*)serve_client,&socket_cliente);
+	//pthread_create(&thread,NULL,(void*)serve_client,&socket_cliente);
 	pthread_detach(thread);
 
 }
@@ -448,3 +488,4 @@ void serve_client(int* socket) {
 		cod_op = -1;
 	process_request(cod_op, *socket);
 }
+*/

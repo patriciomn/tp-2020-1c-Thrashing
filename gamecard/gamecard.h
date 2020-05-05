@@ -29,7 +29,12 @@
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
-#define POKEMON_FILE ".txt" //no se bien que extension deberia ser
+#define POKEMON_FILE "PIKACHU.txt" //no se bien que extension deberia ser
+
+#define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
+
+#define GUION "-"
+#define IGUAL "="
 
 void crear_pto_de_montaje(char *path);
 void crear_metadata_tall_grass(char *path);
@@ -40,9 +45,11 @@ void crear_directorio_files(char *path_pto_montaje);
 void verificar_metadata_txt(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
 void iniciar_logger_config();
+void crear_archivos_pokemon(char *path_pokefile);
+int hay_espacio();
 
 t_log *logger;
-t_bitarray *bitarray;
+t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
 t_config *config_tall_grass;
 
 struct metadata_info {
