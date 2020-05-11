@@ -18,6 +18,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+//#include "utils.h"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -29,24 +30,13 @@
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
-#define POKEMON_FILE "PIKACHU.txt" //no se bien que extension deberia ser
+#define POKEMON_FILE ".txt" //no se bien que extension deberia ser
 
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 
 #define GUION "-"
 #define IGUAL "="
 
-void crear_pto_de_montaje(char *path);
-void crear_metadata_tall_grass(char *path);
-void crear_archivos_metadata(char *path);
-void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
-char *crear_nuevo_path(char* path_anterior, char *archivo);
-void crear_directorio_files(char *path_pto_montaje);
-void verificar_metadata_txt(char *path_pto_montaje);
-void crear_directorio_blocks(char *path_pto_montaje);
-void iniciar_logger_config();
-void crear_archivos_pokemon(char *path_pokefile);
-int hay_espacio();
 
 t_log *logger;
 t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
@@ -97,15 +87,30 @@ struct config_tallGrass *datos_config; // este struct es para almacenar los dato
 //FUNCIONES
 
 int main ();
-void obtener_datos_archivo_config();
+
 void verificar_punto_de_montaje();
+void iniciar_logger_config();
+void obtener_datos_archivo_config();
 void verificar_metadata_txt(char *path_pto_montaje);
 void crear_pto_de_montaje(char *path_pto_montaje);
 void crear_directorio_files(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
 void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
+int existe_archivo_pokemon(char *path);
 void crear_archivos_pokemon(char *path_pokefile);
+int hay_espacio();
+void crear_metadata_pokemon(char *path_pokeflie);
+int filesize (FILE* archivo );
+
+void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
+char *crear_nuevo_path(char* path_anterior, char *archivo);
+
+
+
+
+
+
 
 int tipo_mensaje(char* tipo_mensaje);
 void new_pokemon(char* pokemon,int posx,int posy,int cant);

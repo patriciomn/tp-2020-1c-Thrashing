@@ -8,7 +8,7 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("/home/utnso/Escritorio/tall_grass/files"); // en realidad se pasa el nombre del pokemon
+    crear_archivos_pokemon("/home/utnso/Escritorio/tall_grass/files/pokemon/Pikachu"); // en realidad se pasa el nombre del pokemon
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -265,33 +265,28 @@ void crear_archivos_pokemon(char *path_pokefile) {
     strcpy(path_poke_file, path_pokefile);
     string_append(&path_poke_file, POKEMON_FILE);
 
+
     FILE *pointerFile = fopen(path_poke_file,"w+");//con leer alcanza y sobra. porque la parte de poner posiciones las hacemos con NEW
     if(pointerFile == NULL) {
     	log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
     	exit(1);
     }
-    //fclose(pointerFile);
 
-    //ahora agregarlo al bitmap
-    //size_new_string = strlen(path_pokefile) + strlen(BITMAP_FILE) + 1;
-    //char *path_bitmap_file = malloc(size_new_string);
-    //strcpy(path_bitmap_file, path_pokefile);
-    //string_append(&path_bitmap_file, BITMAP_FILE);
-    //}
-
-//¿Como llego al bit que representa al archivo?
+//agregar en el bitmap
     int resultado = hay_espacio();
 	if(resultado == -1) {
 		log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP"); // agregar algo para que salte la parte de escritura
 		exit(1); // solo por ahora
 	}
-
 	bitarray_set_bit(bitarray,resultado);
+	crear_metadata_pokemon(path_pokefile);
 
+//ECRIBIR EL ARCHIVO POKEMON. Al menos es para probar
+	//habria que modificar el metadata para indicar que esta abierto
 	int x = 10;
 	char *xs = string_new();
 	xs = string_itoa(x);
-	int y = 5;
+	int y = 6;
 	char *ys = string_new();
 	ys = string_itoa(y);
 	int cantidadDePokemon = 2;
@@ -310,6 +305,7 @@ void crear_archivos_pokemon(char *path_pokefile) {
     	log_info(logger, "SE ESCRIBIO EN EL ARCHIVO %s:%s",POKEMON_FILE,xs);
     }
 
+
     fclose(pointerFile);
 
     free(xs);
@@ -327,6 +323,58 @@ int hay_espacio() {
 		}
 	}
 	return resul;
+}
+
+void crear_metadata_pokemon(char *path_pokefile) {
+
+    //creamos un nuevo string que va a ser el path del metadata.txt
+	int size_new_string = strlen(path_pokefile) + strlen(METADATA_FILE) + 1;
+    char *path_metadata_file = malloc(size_new_string);
+    strcpy(path_metadata_file, path_pokefile);
+    string_append(&path_metadata_file, METADATA_FILE);
+
+    FILE *metadataPointerFile = fopen(path_metadata_file,"w+");
+    if(metadataPointerFile == NULL) {
+    	log_error(logger, "ERROR AL CREAR EL ARCHIVO metadata del Pokemon");
+    	exit(1);
+    }
+
+    char *info_metadataTxt = string_new();
+    string_append(&info_metadataTxt, "DIRECTORY=");
+    string_append(&info_metadataTxt, "N");//es un archivo, no un directorio
+    string_append(&info_metadataTxt, "\n");
+    string_append(&info_metadataTxt, "SIZE=");
+    string_append(&info_metadataTxt, "cantidad bytes"); //TODO UN FUNC QUE NOS DIGA LA CANT
+    string_append(&info_metadataTxt, "\n");
+    string_append(&info_metadataTxt, "BLOCKS=");
+    string_append(&info_metadataTxt, "\n");
+    string_append(&info_metadataTxt, "[Bloques donde esta]"); //TODO saber en que bloque esta
+    string_append(&info_metadataTxt, "OPEN= Y");
+    string_append(&info_metadataTxt, "\n");
+
+    if(fwrite(info_metadataTxt, string_length(info_metadataTxt), 1, metadataPointerFile) == 0) {
+    	log_error(logger, "ERROR AL ESCRIBIR EL ARCHIVO metadata.txt");
+    	exit(1);	// despues ver de implementar un goto en vez de exit()
+    }
+
+    free(info_metadataTxt);
+    fclose(metadataPointerFile);
+
+    int resultado = hay_espacio();
+  	if(resultado == -1) {
+  		log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP"); // agregar algo para que salte la parte de escritura
+  		exit(1); // solo por ahora
+  	}
+  	bitarray_set_bit(bitarray,resultado);
+
+
+    free(path_metadata_file);
+
+}
+int filesize (FILE* archivo ){
+	fseek(archivo,0,SEEK_END);
+	int ultimo = ftell(archivo);
+	return ultimo/8;
 }
 
 /*
