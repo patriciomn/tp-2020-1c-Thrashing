@@ -15,6 +15,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <pthread.h>
+//#include "utils.h"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -28,18 +32,14 @@
 #define BITS 8
 #define POKEMON_FILE ".txt" //no se bien que extension deberia ser
 
-void crear_pto_de_montaje(char *path);
-void crear_metadata_tall_grass(char *path);
-void crear_archivos_metadata(char *path);
-void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
-char *crear_nuevo_path(char* path_anterior, char *archivo);
-void crear_directorio_files(char *path_pto_montaje);
-void verificar_metadata_txt(char *path_pto_montaje);
-void crear_directorio_blocks(char *path_pto_montaje);
-void iniciar_logger_config();
+#define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
+
+#define GUION "-"
+#define IGUAL "="
+
 
 t_log *logger;
-t_bitarray *bitarray;
+t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
 t_config *config_tall_grass;
 
 struct metadata_info {
@@ -62,11 +62,23 @@ struct mensaje {
     void* message;
 } ; // Tiene sentido plantear algo asi para despues responder con el id??
 
+//cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
 enum TIPO{
 	NEW_POKEMON = 1,
-	CATCH_POKEMON = 2,
-	GET_POKEMON = 3,
-	};
+	CATCH_POKEMON = 3,
+	GET_POKEMON = 5,
+	SUSCRIPCION = 7,
+};
+
+typedef struct{
+	int size;
+	void* stream;
+} t_buffer;
+
+typedef struct{
+	enum TIPO queue_id;
+	t_buffer* buffer;
+} t_paquete;
 
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
@@ -75,21 +87,40 @@ struct config_tallGrass *datos_config; // este struct es para almacenar los dato
 //FUNCIONES
 
 int main ();
-void obtener_datos_archivo_config();
+
 void verificar_punto_de_montaje();
+void iniciar_logger_config();
+void obtener_datos_archivo_config();
 void verificar_metadata_txt(char *path_pto_montaje);
 void crear_pto_de_montaje(char *path_pto_montaje);
 void crear_directorio_files(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
 void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
+int existe_archivo_pokemon(char *path);
 void crear_archivos_pokemon(char *path_pokefile);
+int hay_espacio();
+void crear_metadata_pokemon(char *path_pokeflie);
+int filesize (FILE* archivo );
+
+void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
+char *crear_nuevo_path(char* path_anterior, char *archivo);
+
+
+
+
+
+
 
 int tipo_mensaje(char* tipo_mensaje);
 void new_pokemon(char* pokemon,int posx,int posy,int cant);
 void catch_pokemon(char* pokemon,int posx,int posy);
 void get_pokemon(char*pokemon);
 
+// Funciones Sockets
 
+int crear_conexion_broker(char *ip, char* puerto);
+void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
+void* serializar_paquete(t_paquete* paquete, int bytes);
 
 #endif /* GAMECARD_H_ */

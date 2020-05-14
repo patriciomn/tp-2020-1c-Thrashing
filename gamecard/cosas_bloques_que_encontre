@@ -1,0 +1,180 @@
+/*
+void inicializarBloques(){
+	logInfo("Filesystem: se procede a inicializar los bloques");
+	DIR *directorio;
+	char* direccionDirectorio = obtenerDireccionDirectorio("Bloques");
+	if ((directorio = opendir(direccionDirectorio)) == NULL){
+		mkdir(direccionDirectorio, 0777 );
+	}else{
+		closedir(directorio);
+	}
+	t_config* metadataLFS = obtenerMetadataDeFS();
+	size_t cantidadDeBloques = config_get_int_value(metadataLFS, "BLOCKS");
+	char* direccion = direccionDeBloqueConInt(cantidadDeBloques - 1);
+	FILE* bloque;
+	char* direccionDeUnBloque;
+
+	if(bloque = fopen(direccion, "r")){
+		fclose(bloque);
+		//printf("Los bloques estaban cargados.\n");
+
+	}
+	else{
+		for(int i=0; i<cantidadDeBloques; i++){
+			direccionDeUnBloque = direccionDeBloqueConInt(i);
+			bloque = fopen(direccionDeUnBloque, "w");
+			fclose(bloque);
+			free(direccionDeUnBloque);
+		}
+		printf("Los bloques < %i >fueron cargados correctamente.\n", cantidadDeBloques);
+	}
+	logInfo("Filesystem: se inicializaron los bloques");
+	config_destroy(metadataLFS);
+	free(direccion);
+	free(direccionDirectorio);
+	return;
+}
+
+char* direccionDeBloqueConInt(int numeroDeBloque){
+	int length2 = strlen(string_itoa(numeroDeBloque));
+	char* numeroDeBloqueEnChar = malloc(length2 + 1);
+	strcpy(numeroDeBloqueEnChar, string_itoa(numeroDeBloque));
+
+	char* nombreDeArchivo = malloc(string_length(numeroDeBloqueEnChar) + 5);
+	strcpy(nombreDeArchivo, numeroDeBloqueEnChar);
+	strcpy(nombreDeArchivo + strlen(numeroDeBloqueEnChar), ".bin");
+
+	char* direccionDeBloques = obtenerDireccionDirectorio("Bloques");
+
+	int length = strlen(direccionDeBloques) + strlen("/") + strlen(nombreDeArchivo) + 1;
+	char* direccion = malloc(length);
+	int posicion = 0;
+	strcpy(direccion, direccionDeBloques);
+	posicion += strlen(direccionDeBloques);
+	strcpy(direccion + posicion, "/");
+	posicion += 1;
+	strcpy(direccion + posicion, nombreDeArchivo);
+
+	free(numeroDeBloqueEnChar);
+	free(nombreDeArchivo);
+	free(direccionDeBloques);
+	return direccion;
+}
+
+void crearArchivoPuntoBin(char* direccionDeLaTabla, char* nombreDeArchivo){
+	char* direccionDelArchivo = direccionDeArchivo(direccionDeLaTabla, nombreDeArchivo);
+	FILE* archivo = fopen(direccionDelArchivo, "w");
+	fprintf(archivo, "SIZE=0\nBLOCKS=[]\n");
+	fclose(archivo);
+	asignarBloque(direccionDelArchivo);
+	free(direccionDelArchivo);
+	return;
+}
+
+void asignarBloque(char* direccionDelArchivo){
+	// buscar primer bloque libre en el bitarray
+	// pasar numero a string
+	char* bloqueLibre = string_itoa(primerBloqueLibre());
+	// calcular longitud del string
+	int longitudBloqueLibre = strlen(bloqueLibre);
+
+	// vaciamos el contenido que podria tener el bloque previo a la asignacion
+	char* direccionBloque = direccionDeBloque(bloqueLibre);
+	FILE* nuevoBloque = fopen(direccionBloque, "w");
+	fclose(nuevoBloque);
+	// es necesario verificar si el archivo se creo correctamente?
+
+	t_config* archivo = config_create(direccionDelArchivo);
+
+	char* bloques = config_get_string_value(archivo, "BLOCKS");
+
+	int length = string_length(bloques);
+
+	if(length == 2){ // No tengo bloques
+		length += longitudBloqueLibre;
+	}
+	else{
+		length += longitudBloqueLibre + 1;
+	}
+
+	char* nuevoValue = malloc(length); // recordar acortar
+
+	int posicion = 0;
+
+	if(strlen(bloques) < 3){
+		strcpy(nuevoValue, "[");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, bloqueLibre);
+		posicion += longitudBloqueLibre;
+		strcpy(nuevoValue + posicion, "]");
+	}else{
+		char* auxiliar = strdup(string_substring(bloques, 1, strlen(bloques)-2));
+		strcpy(nuevoValue, "[");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, auxiliar);
+		posicion += strlen(auxiliar);
+		strcpy(nuevoValue + posicion, ",");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, bloqueLibre);
+		posicion += strlen(bloqueLibre);
+		strcpy(nuevoValue + posicion, "]");
+		free(auxiliar);
+	}
+
+	free(direccionBloque);
+	free(bloqueLibre);
+
+	config_set_value(archivo, "BLOCKS", nuevoValue);
+	config_save(archivo);
+	config_destroy(archivo);
+
+	return;
+}
+
+void asignarBloqueAConfig(t_config* archivo){
+	char* bloqueLibre = string_itoa(primerBloqueLibre());
+	int longitudBloqueLibre = string_length(bloqueLibre);
+
+	char* direccionBloque = direccionDeBloque(bloqueLibre);
+	FILE* nuevoBloque = fopen(direccionBloque, "w");
+	fclose(nuevoBloque);
+
+	char* bloques = config_get_string_value(archivo, "BLOCKS");
+
+	int length = string_length(bloques);
+
+	char* nuevoValue = malloc(length + longitudBloqueLibre + 4); // recordar acortar
+
+
+	int posicion = 0;
+	/*
+	strcpy(nuevoValue, string_substring_until(bloques, length - 1));
+	posicion += length - 1;
+	strcpy(nuevoValue, ",");
+	posicion += 1;
+	strcpy(nuevoValue, bloqueLibre);
+	posicion += strlen(bloqueLibre);
+	strcpy(nuevoValue, "]");
+	*/
+
+	if(strlen(bloques) < 3){
+		strcpy(nuevoValue, "[");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, bloqueLibre);
+		posicion += longitudBloqueLibre;
+		strcpy(nuevoValue + posicion, "]");
+	}else{
+		char* auxiliar = strdup(string_substring(bloques, 1, strlen(bloques)-2));
+		strcpy(nuevoValue, "[");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, auxiliar);
+		posicion += strlen(auxiliar);
+		strcpy(nuevoValue + posicion, ",");
+		posicion += 1;
+		strcpy(nuevoValue + posicion, bloqueLibre);
+		posicion += strlen(bloqueLibre);
+		strcpy(nuevoValue + posicion, "]");
+		free(auxiliar);
+	}
+}
+*/

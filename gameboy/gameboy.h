@@ -7,17 +7,13 @@
 #include<commons/string.h>
 #include<commons/config.h>
 #include<readline/readline.h>
-
-
+#include<commons/collections/list.h>
 #include<signal.h>
 #include<unistd.h>
 #include<sys/socket.h>
 #include<netdb.h>
 #include<string.h>
-
-# define no_argument        0    //不需要参数
-# define required_argument  1    //必须指定参数
-# define optional_argument  2	//参数可选
+#include<sys/time.h>
 
 enum TIPO{
 	NEW_POKEMON = 1,
@@ -26,18 +22,22 @@ enum TIPO{
 	CAUGHT_POKEMON = 4,
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
-	SUSCRITO = 7,
+	SUSCRIPTOR = 7,
+};
+
+enum OPERACION{
+	SUSCRIPCION = 8,
+	MENSAJE = 9,
 };
 
 enum TIPO_PROCESO{
-	TEAM = 8,
-	GAMECARD = 9,
-	GAMEBOY = 10,
+	TEAM = 10,
+	GAMECARD = 11,
+	GAMEBOY = 12,
 	BROKER,
 };
 
-typedef struct
-{
+typedef struct{
 	int size;
 	void* stream;
 } t_buffer;
@@ -60,28 +60,37 @@ int conexion;
 
 t_log* iniciar_logger(void);
 t_config* leer_config(void);
-void iniciar_gameboy();
+void iniciar_gameboy(int argc,char* argv[]);
 int getopt_long_only (int argc, char *const *argv, const char *shortopts, const struct option *longopts, int *indexptr);
 void conectar_proceso(int proceso);
 int proceso(char* proceso);
 int tipo_mensaje(char* tipo_mensaje);
 void terminar_gameboy(int, t_log*, t_config*);
-void new_pokemon(char* pokemon,int posx,int posy,int cant);
-void catch_pokemon(char* pokemon,int posx,int posy);
-void appeared_pokemon(enum TIPO_PROCESO pro,char* pokemon,int posx,int posy,int id_mensaje);
-void caught_pokemon(int id_mensaje,int ok_fail);
-void get_pokemon(char*pokemon);
-
+void suscriptor(int tipo);
 int crear_conexion(char* ip, char* puerto);
-void enviar_mensaje_new_pokemon(char* pokemon,int posx,int posy,int cant, int socket_cliente);
-void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cliente);
-void enviar_mensaje_appeared_pokemon(enum TIPO_PROCESO pro,char* pokemon,int posx,int posy,int id_mensaje, int socket_cliente);
+void enviar_mensaje_new_pokemon(char* pokemon,int posx,int posy,int cant,int,int socket_cliente);
+void enviar_mensaje_new_pokemon_broker(char* pokemon,int posx,int posy,int cant,int socket_cliente);
+void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int,int socket_cliente);
+void enviar_mensaje_appeared_pokemon(char* pokemon,int posx,int posy,int socket_cliente);
+void enviar_mensaje_appeared_pokemon_broker(char* pokemon,int posx,int posy,int id_correlacional, int socket_cliente);
 void enviar_mensaje_caught_pokemon(int id_mensaje,int ok_fail,int socket_cliente);
-void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente);
-char* recibir_mensaje(int socket_cliente);
+void enviar_mensaje_get_pokemon(char* pokemon,int,int socket_cliente);
+void enviar_mensaje_get_pokemon_broker(char* pokemon,int socket_cliente);
+void enviar_mensaje_catch_pokemon_broker(char* pokemon,int posx,int posy,int socket_cliente);
+void enviar_info_suscripcion(int tipo,int socket_cliente);
 void eliminar_paquete(t_paquete* paquete);
 void liberar_conexion(int socket_cliente);
 void* serializar_paquete(t_paquete* paquete, int bytes);
-void delChar(char* s,char c);
+void recibir_confirmacion_suscripcion(int cliente_fd);
+void* recibir_buffer(int socket_cliente, uint32_t* size);
+void enviar_confirmacion(int socket_cliente);
+t_paquete* crear_paquete(int accion);
+t_list* recibir_paquete(int socket_cliente);
+void recibir_get_pokemon();
+void recibir_new_pokemon();
+void recibir_appeared_pokemon();
+void recibir_catch_pokemon();
+void recibir_caught_pokemon();
+void recibir_mensajes(int);
 
 #endif /* GAMEBOY_H_ */
