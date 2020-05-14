@@ -2,7 +2,7 @@
 #ifndef CONEXIONES_H_
 #define CONEXIONES_H_
 
-#include"../utils/utils.h"
+#include"../utils/utils.c"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -50,8 +50,8 @@ pthread_t thread;
 void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
 void* serializar_paquete(t_paquete* paquete, int * bytes);
-// int get_id(void);
-// int get_correlation_id(void);
+int get_id(void);
+int get_correlation_id(void);
 void build_queues(void);
 void build_suscribers(void);
 void start_sender_thread(void);

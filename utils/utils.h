@@ -1,3 +1,8 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+
+
 enum TIPO{
 	NEW_POKEMON = 1,
 	APPEARED_POKEMON = 2,
@@ -18,7 +23,6 @@ typedef struct{
 	t_buffer* buffer;
 } t_paquete;
 
-//LOS INT HAY QUE CAMBIARLOS POR UINT_32
 
 typedef struct{
 	int posx;
@@ -62,4 +66,16 @@ typedef struct{ //Este no lo entendi
 	int cantidad_posiciones;
 }localized_pokemon;
 
-
+void* serializar_paquete(t_paquete* paquete, int * bytes);
+void* serializar_new(new_pokemon* paquete, int * bytes);
+void* serializar_appeared(appeared_pokemon* paquete, int * bytes);
+void* serializar_catch(catch_pokemon* paquete, int * bytes);
+void* serializar_caught(caught_pokemon* paquete, int * bytes);
+void* serializar_get(get_pokemon* paquete, int * bytes);
+void* serializar_localized(localized_pokemon* paquete, int * bytes);
+new_pokemon* deserializar_new(void* buffer) ;
+appeared_pokemon* deserializar_appeared(void* buffer) ;
+catch_pokemon* deserializar_catch(void* buffer);
+caught_pokemon* deserializar_caught(void* buffer);
+get_pokemon* deserializar_get(void* buffer) ;
+localized_pokemon* deserializar_localized(void* buffer) ;
