@@ -1,28 +1,43 @@
 #include"utils.h"
 
-// void* serializar_paquete(t_paquete* paquete, int * bytes){
-//     int size_serializado;
-//     void* (*array[]) (void* paquete, int * bytes) = {serializar_new, serializar_appeared, serializar_catch, serializar_caught,serializar_get, serializar_localized };
 
-//     void * stream = array[paquete->queue_id -1] (paquete, & size_serializado );
-//     paquete->buffer->size = size_serializado;
+void* serializar_paquete(t_paquete* paquete, int * bytes){
+	int size_serializado = sizeof(paquete->codigo_operacion) + sizeof(paquete->buffer->id) + sizeof(paquete->buffer->correlation_id);
+    
+	paquete->buffer->stream = serializar_any(paquete, & paquete->buffer->size, paquete->codigo_operacion);
 
-//     size_serializado = sizeof(paquete->queue_id) + sizeof(paquete->buffer->size) + size_serializado;
+    size_serializado += paquete->buffer->size + sizeof(paquete->buffer->size);
 
-// 	void * magic = malloc(size_serializado );
-// 	int desplazamiento = 0;
+	void * magic = malloc(size_serializado );
+	int desplazamiento = 0;
 
-// 	memcpy(magic + desplazamiento, &(paquete->queue_id), sizeof(int));
-// 	desplazamiento+= sizeof(int);
-// 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-// 	desplazamiento+= sizeof(int);
-// 	memcpy(magic + desplazamiento, stream, size_serializado);
-// 	desplazamiento+= size_serializado;
+	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, &(paquete->buffer->id), sizeof(int));
+	desplazamiento+= sizeof(int);
 
-// 	(*bytes) = size_serializado;
+	memcpy(magic + desplazamiento, &(paquete->buffer->correlation_id), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
 
-// 	return magic;
-// }
+	(*bytes) = size_serializado;
+
+	return magic;
+}
+
+void* serializar_any(void* paquete, int * bytes, int cod_op){
+	if (cod_op == NEW_POKEMON)				return serializar_new(paquete, bytes);
+	else if (cod_op == APPEARED_POKEMON)	return serializar_appeared(paquete, bytes);
+	else if (cod_op == CATCH_POKEMON)		return serializar_catch(paquete, bytes);
+	else if (cod_op == CAUGHT_POKEMON)		return serializar_caught(paquete, bytes);
+	else if (cod_op == GET_POKEMON)			return serializar_get(paquete, bytes);
+	else if (cod_op == LOCALIZED_POKEMON)	return serializar_localized(paquete, bytes);
+	else return paquete;
+}
+
+
 
 void* serializar_new(new_pokemon* paquete, int * bytes){
 
@@ -59,7 +74,7 @@ void* serializar_appeared(appeared_pokemon* paquete, int * bytes){
 	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
 	desplazamiento+= sizeof(paquete->name_size);
 
-    ;memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
+    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
 	desplazamiento+= paquete->name_size;
 
 	memcpy(magic + desplazamiento, &(paquete->pos), sizeof(position));
@@ -166,7 +181,8 @@ new_pokemon* deserializar_new(void* buffer) {
 	new->name = malloc(new->name_size);
 
 	memcpy(new->name, stream, new->name_size);
-
+	stream += sizeof(new->name_size);
+	
     memcpy(&(new->pos), stream, sizeof(position));
     stream += sizeof(position);
 
@@ -183,6 +199,7 @@ appeared_pokemon* deserializar_appeared(void* buffer) {
     stream += sizeof(int);
 	appeared->name = malloc(appeared->name_size);
 	memcpy(appeared->name, stream, appeared->name_size);
+	stream += sizeof(appeared->name_size);
 
     memcpy(&(appeared->pos), stream, sizeof(position));
     stream += sizeof(position);
@@ -198,6 +215,7 @@ catch_pokemon* deserializar_catch(void* buffer) {
     stream += sizeof(int);
 	catch->name = malloc(catch->name_size);
 	memcpy(catch->name, stream, catch->name_size);
+	stream += sizeof(catch->name_size);
     memcpy(&(catch->pos), stream, sizeof(position));
     stream += sizeof(position);
 		
@@ -234,7 +252,7 @@ localized_pokemon* deserializar_localized(void* buffer) {
 	localized->name = malloc(localized->name_size);
 
 	memcpy(localized->name, stream, localized->name_size);
-
+	stream += sizeof(localized->name_size);
     memcpy(&(localized->pos), stream, sizeof(position));
     stream += sizeof(position);
 

@@ -28,18 +28,18 @@ typedef struct{
 
 typedef struct{
 	int cliente_fd;
-	sent * sended;
+	t_list* sended;
 }suscriber;
 
 typedef struct{
     int id;
     int correlation_id;
-    void* message;
+    void* message;	
 }queue_item;
 
-t_queue * queues[6];
+t_list* queues[6];
+t_list* suscribers[6];
 
-suscriber * suscribers[6];
 t_log* logger;
 t_config* config;
 pthread_t thread;
@@ -49,9 +49,7 @@ pthread_t thread;
 
 void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
-void* serializar_paquete(t_paquete* paquete, int * bytes);
 int get_id(void);
-int get_correlation_id(void);
 void build_queues(void);
 void build_suscribers(void);
 void start_sender_thread(void);
@@ -61,4 +59,9 @@ void esperar_cliente(int socket_servidor);
 void serve_client(int* socket);
 void process_request(int cod_op, int cliente_fd);
 void * recibir_mensaje(int socket_cliente, int* size);
+void atender_suscripcion(void * msg, int cliente_fd );
+void atender_ack(void *msg);
+void enviar_cacheados(int cliente_fd, int tipo);
+t_paquete* crear_paquete(int op);
+void atender_ack(void *msg);
 #endif /* CONEXIONES_H_ */
