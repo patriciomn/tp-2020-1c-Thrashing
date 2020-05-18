@@ -8,7 +8,7 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("Pikachu", 1, 1, 10); // en realidad se pasa el nombre del pokemon
+    crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000); // en realidad se pasa el nombre del pokemon
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -408,11 +408,12 @@ void agregar_bloque_metadata_pokemon(char *path_pokemon_file, int nro_bloque) {
 		posicion += size_nro_bloque;
 		strcpy(newBlocks + posicion, "]");
 	} else {
-		char *auxiliar = strdup(string_substring(blocks,1, sizeBlocks - 2));
+		//[10] --->
+		char *auxiliar = strdup(string_substring(blocks,1, strlen(blocks)-2));
 		strcpy(newBlocks + posicion, "[");
 		posicion ++;
 		strcpy(newBlocks + posicion, auxiliar);
-		posicion += strlen(auxiliar);
+		posicion += strlen(auxiliar); // revisar esta linea
 		strcpy(newBlocks + posicion, ",");
 		posicion ++;
 		strcpy(newBlocks + posicion, string_itoa(nro_bloque));
