@@ -8,14 +8,14 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("/home/utnso/Escritorio/tall_grass/files/pokemon/Pikachu"); // en realidad se pasa el nombre del pokemon
+    crear_archivos_pokemon("Pikachu", 1, 1, 10); // en realidad se pasa el nombre del pokemon
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
     config_destroy(config_tall_grass);
     free(metadataTxt);
-    //free(datos_config->ip_broker);
-    //free(datos_config->pto_de_montaje);
+    free(datos_config->ip_broker);
+    free(datos_config->pto_de_montaje);
     free(datos_config);
 
     return 0;
@@ -255,66 +255,65 @@ void crear_archivos_metadata(char *path_metadata) {
     free(path_bitmap_file);
 }
 
-int existe_archivo_pokemon(char *path) { // hacer despues una funcion que verifique si existe o no el archivo. Si no existe, crearlo. Si existe, leerlo/escribirlo
-}
+void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 
-void crear_archivos_pokemon(char *path_pokefile) {
+	char *path_file = string_new();
+	string_append_with_format(&path_file, "%s%s%s", datos_config->pto_de_montaje, FILES_DIR, "/");
+	//string_capitalized(pokemon);
 
-	int size_new_string = strlen(path_pokefile) + strlen(POKEMON_FILE) + 1;
-    char *path_poke_file = malloc(size_new_string);
-    strcpy(path_poke_file, path_pokefile);
-    string_append(&path_poke_file, POKEMON_FILE);
+	char *pokemon_file = string_new();
+	string_append_with_format(&pokemon_file, "%s%s", pokemon, POKEMON_FILE_EXT);
 
+	char *path_pokemon_file = string_new();
+	string_append(&path_pokemon_file, path_file);
+	string_append(&path_pokemon_file, pokemon_file);
 
-    FILE *pointerFile = fopen(path_poke_file,"w+");//con leer alcanza y sobra. porque la parte de poner posiciones las hacemos con NEW
+	log_info(logger, "CREANDO ARCHIVO %s", pokemon_file);
+    FILE *pointerFile = fopen(path_pokemon_file,"w");
     if(pointerFile == NULL) {
-    	log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
+    	log_error(logger, "ERROR AL CREAR EL ARCHIVO %s", path_pokemon_file);
     	exit(1);
     }
 
-//agregar en el bitmap
-    int resultado = hay_espacio();
-	if(resultado == -1) {
-		log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP"); // agregar algo para que salte la parte de escritura
-		exit(1); // solo por ahora
-	}
-	bitarray_set_bit(bitarray,resultado);
-	crear_metadata_pokemon(path_pokefile);
+    crear_metadata_pokemon(path_file); // creamos la metadata del archivo pokemon y solo rellenamos el campo DIRECTORY y OPEN
 
-//ECRIBIR EL ARCHIVO POKEMON. Al menos es para probar
+	//ECRIBIR EL ARCHIVO POKEMON. Al menos es para probar
 	//habria que modificar el metadata para indicar que esta abierto
-	int x = 10;
-	char *xs = string_new();
-	xs = string_itoa(x);
-	int y = 6;
-	char *ys = string_new();
-	ys = string_itoa(y);
-	int cantidadDePokemon = 2;
-	char *cps = string_new(); //cps = cantidadDePokemon en string
-	cps = string_itoa(cantidadDePokemon);
+	char *coordenadas = string_new();
+	string_append_with_format(&coordenadas, "%s%s%s%s%s", string_itoa(posX), "-", string_itoa(posY), "=", string_itoa(cantidad));
 
-	string_append_with_format(&xs, "%s%s%s%s", GUION, ys, IGUAL, cps);
 
-	printf("%s\n",xs);
+	int coordenadas_size = strlen(coordenadas);
+	int cant_blocks = (int) ceil((double)coordenadas_size / datos_config->size_block); // aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
+
+
+	for(int i = 0 ; i < cant_blocks ; i++) {
+		int bloque = obtener_bloque_libre();
+		if(bloque == -1) {
+			log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP");
+			break;
+		}
+		bitarray_set_bit(bitarray, bloque);
+		agregar_bloque_metadata_pokemon(path_file, bloque);
+		// crear el bloque en el directorio BLOCKS, crear el archivo y escribir la info
+	}
 
     //escribimos el bitarray en el archivo
-    if(fwrite(xs, strlen(xs)+1, 1, pointerFile) == 0) {
-    	log_error(logger, "NO SE PUDO ESCRIBIR EL BITARRAY EN EL ARCHIVO bitmap.bin");
-    	exit(1);
-    } else {
-    	log_info(logger, "SE ESCRIBIO EN EL ARCHIVO %s:%s",POKEMON_FILE,xs);
-    }
+    //if(fwrite(coordenadas, strlen(coordenadas) + 1, 1, pointerFile) == 0) {
+    	//log_error(logger, "NO SE PUDO ESCRIBIR LAS COORDENADAS EN EL ARCHIVO %s", pokemon_file);
+    	//exit(1);
+    //} else {
+    	//log_info(logger, "SE ESCRIBIO EN EL ARCHIVO %s:%s", pokemon_file, coordenadas);
+    //}
 
-
+	free(coordenadas);
     fclose(pointerFile);
-
-    free(xs);
-    free(ys);
-    free(cps);
-    free(path_poke_file);
+    free(path_pokemon_file);
+    free(pokemon_file);
+    free(path_file);
 }
 
-int hay_espacio() {
+int obtener_bloque_libre() {
 	int resul = -1;
 	for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++ ) {
 		if(bitarray_test_bit(bitarray, i) == 0) {
@@ -324,31 +323,132 @@ int hay_espacio() {
 	}
 	return resul;
 }
+/*
+void verificar_espacio_bloque_de_datos(char *path_metadata_pokemon, char *datos_a_agregar) { // chequea que haya espacio en el bloque , si supera el maximo se tiene que crear otro archivo
 
-void crear_metadata_pokemon(char *path_pokefile) {
+	char *path_block = string_new();
+	string_append(&path_block, datos_config->pto_de_montaje);
+	string_append(&path_block, BLOCKS_DIR);
+	string_append(&path_block, "/");
+
+	int size_new_string = strlen(path_metadata_pokemon) + strlen(METADATA_FILE) + 1;
+	char *path_metadata_file = malloc(size_new_string);
+	strcpy(path_metadata_file, path_metadata_pokemon);
+	string_append(&path_metadata_file, METADATA_FILE);
+
+	t_config *metadata_pokemon = config_create(path_metadata_file);
+	char **array_blocks = config_get_array_values(metadata_pokemon, "BLOCKS");
+
+	int data_size = strlen(datos_a_agregar);
+	int cant_blocks = (int) ceil((double)data_size / datos_config->size_block);
+
+	if(array_blocks == NULL) {
+		for(int i = 0 ; i < cant_blocks ; i++) {
+			int nro_bloque = obtener_bloque_libre();
+			if(nro_bloque == -1)
+				log_warning(logger, "NO HAY BLOQUE DE DATOS DISPONIBLE");
+				break;
+			int size_to_write = data_size - datos_config->size_block;
+			if(size_to_write < 0) { // este if es para escribir datos con lengitud menor al tamaño del bloque de datos
+				escribir_datos_bloque(path_block, datos_a_agregar, nro_bloque);
+			}
+			escribir_datos_bloque();
+		}
+
+	}
+}
+*/
+void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque) {
+
+	char *block_file_path = string_new();
+	string_append(&block_file_path, path_blocks_dir);
+	string_append(&block_file_path, string_itoa(nro_bloque));
+	string_append(&block_file_path, ".bin");
+
+	FILE *pf = fopen(block_file_path, "ab");
+	if(pf == NULL) {
+		log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
+		exit(1);
+	}
+
+	fwrite(datos_a_agregar, strlen(datos_a_agregar), 1, pf);
+
+	fclose(pf);
+	free(block_file_path);
+}
+
+void agregar_bloque_metadata_pokemon(char *path_pokemon_file, int nro_bloque) {
+
+	int size_nro_bloque = strlen(string_itoa(nro_bloque));
+
+	int size_new_string = strlen(path_pokemon_file) + strlen(METADATA_FILE) + 1;
+	char *path_metadata_file = malloc(size_new_string);
+	strcpy(path_metadata_file, path_pokemon_file);
+	string_append(&path_metadata_file, METADATA_FILE);
+
+	t_config *metadata_pokemon = config_create(path_metadata_file);
+
+	char *blocks = config_get_string_value(metadata_pokemon, "BLOCKS");
+	int sizeBlocks = strlen(blocks);
+
+	if(sizeBlocks == 2) {
+		sizeBlocks += size_nro_bloque;
+	} else {
+		sizeBlocks += size_nro_bloque + 1;
+	}
+
+	log_info(logger, "AGREGANDO BLOQUE %d A LA ESTRUCTURA BLOCKS", nro_bloque);
+	char *newBlocks = malloc(sizeBlocks);
+	int posicion = 0;
+
+	if(strlen(blocks) < 3) {
+		strcpy(newBlocks + posicion, "[");
+		posicion ++;
+		strcpy(newBlocks + posicion, string_itoa(nro_bloque));
+		posicion += size_nro_bloque;
+		strcpy(newBlocks + posicion, "]");
+	} else {
+		char *auxiliar = strdup(string_substring(blocks,1, sizeBlocks - 2));
+		strcpy(newBlocks + posicion, "[");
+		posicion ++;
+		strcpy(newBlocks + posicion, auxiliar);
+		posicion += strlen(auxiliar);
+		strcpy(newBlocks + posicion, ",");
+		posicion ++;
+		strcpy(newBlocks + posicion, string_itoa(nro_bloque));
+		posicion += size_nro_bloque;
+		strcpy(newBlocks + posicion, "]");
+		free(auxiliar);
+	}
+
+	config_set_value(metadata_pokemon, "BLOCKS", newBlocks);
+	config_save(metadata_pokemon);
+	config_destroy(metadata_pokemon);
+
+}
+
+void crear_metadata_pokemon(char *path_file) {
 
     //creamos un nuevo string que va a ser el path del metadata.txt
-	int size_new_string = strlen(path_pokefile) + strlen(METADATA_FILE) + 1;
+	int size_new_string = strlen(path_file) + strlen(METADATA_FILE) + 1;
     char *path_metadata_file = malloc(size_new_string);
-    strcpy(path_metadata_file, path_pokefile);
+    strcpy(path_metadata_file, path_file);
     string_append(&path_metadata_file, METADATA_FILE);
 
-    FILE *metadataPointerFile = fopen(path_metadata_file,"w+");
+    log_info(logger, "CREANDO ARCHIVO %s", METADATA_FILE);
+    FILE *metadataPointerFile = fopen(path_metadata_file, "w+");
     if(metadataPointerFile == NULL) {
-    	log_error(logger, "ERROR AL CREAR EL ARCHIVO metadata del Pokemon");
+    	log_error(logger, "ERROR AL CREAR EL ARCHIVO %s", path_metadata_file);
     	exit(1);
     }
 
     char *info_metadataTxt = string_new();
-    string_append(&info_metadataTxt, "DIRECTORY=");
-    string_append(&info_metadataTxt, "N");//es un archivo, no un directorio
+    string_append(&info_metadataTxt, "DIRECTORY=N"); //es un archivo, no un directorio
     string_append(&info_metadataTxt, "\n");
-    string_append(&info_metadataTxt, "SIZE=");
-    string_append(&info_metadataTxt, "cantidad bytes"); //TODO UN FUNC QUE NOS DIGA LA CANT
+    string_append(&info_metadataTxt, "SIZE=0");
     string_append(&info_metadataTxt, "\n");
-    string_append(&info_metadataTxt, "BLOCKS=");
+    string_append(&info_metadataTxt, "BLOCKS=[]");
     string_append(&info_metadataTxt, "\n");
-    string_append(&info_metadataTxt, "[Bloques donde esta]"); //TODO saber en que bloque esta
     string_append(&info_metadataTxt, "OPEN= Y");
     string_append(&info_metadataTxt, "\n");
 
@@ -359,18 +459,10 @@ void crear_metadata_pokemon(char *path_pokefile) {
 
     free(info_metadataTxt);
     fclose(metadataPointerFile);
-
-    int resultado = hay_espacio();
-  	if(resultado == -1) {
-  		log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP"); // agregar algo para que salte la parte de escritura
-  		exit(1); // solo por ahora
-  	}
-  	bitarray_set_bit(bitarray,resultado);
-
-
     free(path_metadata_file);
 
 }
+
 int filesize (FILE* archivo ){
 	fseek(archivo,0,SEEK_END);
 	int ultimo = ftell(archivo);

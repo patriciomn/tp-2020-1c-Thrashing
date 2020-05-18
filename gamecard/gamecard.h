@@ -24,13 +24,14 @@
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
 #define METADATA_DIR "/metadata"
 #define METADATA_FILE "/metadata.txt"
-#define BLOCKS_DIR "/blocks"
+#define BLOCKS_DIR "/Blocks"
 #define FILES_DIR "/files"
+#define POKEMON_DIR "/Pokemon"
 #define METADATA_TXT_PATH "/metadata/metadata.txt"
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
-#define POKEMON_FILE ".txt" //no se bien que extension deberia ser
+#define POKEMON_FILE_EXT ".txt" //no se bien que extension deberia ser
 
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 
@@ -98,11 +99,11 @@ void crear_directorio_blocks(char *path_pto_montaje);
 void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
 int existe_archivo_pokemon(char *path);
-void crear_archivos_pokemon(char *path_pokefile);
-int hay_espacio();
+void crear_archivos_pokemon(char *path_pokefile, int posX, int posY, int cantidad);
 void crear_metadata_pokemon(char *path_pokeflie);
 int filesize (FILE* archivo );
-
+void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
+int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 
