@@ -8,7 +8,7 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000);
+    //crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -517,12 +517,8 @@ void catch_pokemon(char* pokemon,int posx,int posy){}
 void get_pokemon(char*pokemon){}
 
 // Funciones para la conexion ----------------------------------------------------------
-/*
-void reintentar_conexion_broker() {
-}
 
-
-int crear_conexion(char *ip, char* puerto) {
+int crear_conexion() {
 	struct addrinfo hints;
 	struct addrinfo *server_info;
 
@@ -531,11 +527,12 @@ int crear_conexion(char *ip, char* puerto) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	getaddrinfo(ip, puerto, &hints, &server_info);
+	getaddrinfo("127.0.0.1", "4444", &hints, &server_info);
 
 	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
 
 	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1)
+		log_error(logger, "ERROR AL CONECTARSE CON EL BROKER");
 		return -1;
 
 	freeaddrinfo(server_info);
@@ -543,20 +540,39 @@ int crear_conexion(char *ip, char* puerto) {
 	return socket_cliente;
 }
 
+void suscripcion_colas_broker() {
+
+	log_info(logger, "ESTABLECIENDO CONEXION CON EL BROKER");
+	socket_cliente_np = crear_conexion();
+	enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
+
+	//socket_cliente_cp = crear_conexion();
+	//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
+
+	//socket_cliente_gp = crear_conexion();
+	//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
+
+}
+
+
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
+
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
-	paquete->queue_id = SUSCRIPCION;
+	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	//memcpy(paquete->buffer->stream, cola, paquete->buffer->size);
+	memcpy(paquete->buffer->stream, &(cola), paquete->buffer->size);
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
-	void* info_a_enviar = serializar_paquete(paquete, bytes);
+	void* info_a_enviar = serializar_paquete_suscripcion(paquete, bytes);
 
-	send(socket_cliente, info_a_enviar, bytes, 0);
+	log_info(logger, "ENVIANDO MENSAJE DE SUSCRIPCION AL BROKER");
+	if(send(socket_cliente, info_a_enviar, bytes, MSG_WAITALL) == -1) {
+		log_error(logger, "ERROR AL ENVIAR MENSAJE DE SUSCRIPCION AL BROKER");
+	}
 
 	free(info_a_enviar);
 	free(paquete->buffer->stream);
@@ -564,20 +580,21 @@ void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 	free(paquete);
 }
 
-void* serializar_paquete(t_paquete* paquete, int bytes) {
+void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
 	void *magic = malloc(bytes);
 	int desplazamiento = 0;
 
-	memcpy(magic + desplazamiento, &(paquete->queue_id), sizeof(int));
+	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento+= sizeof(int);
+	desplazamiento += sizeof(int);
 	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
 	desplazamiento+= paquete->buffer->size;
 
 	return magic;
 }
 
+/*
 void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
 	int socket_servidor;
 
