@@ -8,6 +8,8 @@ int main () {
 
     verificar_punto_de_montaje();
 
+    suscripcion_colas_broker();
+
     //crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000);
 
     bitarray_destroy(bitarray);
