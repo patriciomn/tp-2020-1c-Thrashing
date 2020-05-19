@@ -18,6 +18,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+
 //#include "utils.h"
 
 #define MAGIC_NUMBER "TALL_GRASS"
@@ -31,8 +32,7 @@
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
-#define POKEMON_FILE_EXT ".txt" //no se bien que extension deberia ser
-
+#define POKEMON_FILE_EXT ".txt"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 
 #define GUION "-"
@@ -61,7 +61,7 @@ struct config_tallGrass {
 struct mensaje {
     int id;
     void* message;
-} ; // Tiene sentido plantear algo asi para despues responder con el id??
+} ;
 
 //cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
 enum TIPO{

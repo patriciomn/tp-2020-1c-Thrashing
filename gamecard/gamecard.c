@@ -8,7 +8,7 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000); // en realidad se pasa el nombre del pokemon
+    crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
