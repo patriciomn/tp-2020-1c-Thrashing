@@ -60,10 +60,16 @@ void serve_client(int* socket)
 {
 	int cod_op;
 
-	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1)
+	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
+		log_error(logger,"ERROR: socket error" );
 		pthread_exit(NULL);	
-	if (cod_op == 0 || cod_op == -1  )
+	}
+		
+	if (cod_op == 0 || cod_op == -1  ){
+		log_error(logger,"ERROR: Bad operation code" );
 		pthread_exit(NULL);
+	}	
+	log_info(logger,"Enter to process request, cod_op: %d", cod_op);
 	process_request(cod_op, *socket);
 }
 
