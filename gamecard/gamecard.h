@@ -25,7 +25,7 @@
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
 #define METADATA_DIR "/metadata"
 #define METADATA_FILE "/metadata.txt"
-#define BLOCKS_DIR "/Blocks"
+#define BLOCKS_DIR "/blocks"
 #define FILES_DIR "/files"
 #define POKEMON_DIR "/Pokemon"
 #define METADATA_TXT_PATH "/metadata/metadata.txt"
@@ -120,11 +120,7 @@ void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_b
 int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
-
-
-
-
-
+void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 
 
 int tipo_mensaje(char* tipo_mensaje);
