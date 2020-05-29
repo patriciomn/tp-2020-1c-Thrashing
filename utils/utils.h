@@ -5,29 +5,34 @@
 
 	FORMA DE ENVIO DE MENSAJES:
 
-	SUSCRIBE: SUSCRITO | QUEUE_ID  Dejar solo 8 bytes para la suscripcion -> respondo ack con uid4 que genero y guardo para identificar al procesp
+	SUSCRIBE: SUSCRITO | QUEUE_ID  Dejar solo 8 bytes para la suscripcion 
+	-> respondo ack con uid4 que genero y guardo para identificar al proceso (ACK | UUID4)
 
 	NEW : NEW_POKEMON  | SIZE | name_size | name | posx | posy | cantidad
 	APPEARED: APPEARED_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy 
 
 	CATCH: CATCH_POKEMON  | SIZE | name_size | name | posx | posy
 	CAUGHT: CAUGHT_POKEMON  | CORRELATIONID | SIZE | caught
-	
+
 	GET: GET_POKEMON  | SIZE | name_size | name
 	LOCALIZED: LOCALIZED_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy | cantidad_posiciones
 
-	ACK: ACK  | ID 
+	ACK: ACK  | ID broker responde
 
 
 
 	FORMA DE RECEPCION DE MENSAJES DE LA COLA:
 
 	NEW : NEW_POKEMON | ID  | SIZE | name_size | name | posx | posy | cantidad
-	APPEARED: APPEARED_POKEMON | ID | CORRELATIONID | SIZE | name_size | name | posx | posy 
-	CATCH: CATCH_POKEMON |ID | CORRELATIONID | SIZE | name_size | name | posx | posy
-	CAUGHT: CAUGHT_POKEMON |ID | CORRELATIONID | SIZE | caught
-	GET: GET_POKEMON |ID | CORRELATIONID | SIZE | name_size | name
-	LOCALIZED: LOCALIZED_POKEMON |ID | CORRELATIONID | SIZE | name_size | name | posx | posy | cantidad_posiciones
+	APPEARED: APPEARED_POKEMON  | CORRELATIONID | ID | SIZE | name_size | name | posx | posy 
+
+	CATCH: CATCH_POKEMON |ID  | SIZE | name_size | name | posx | posy
+	CAUGHT: CAUGHT_POKEMON  | CORRELATIONID | ID | SIZE | caught
+
+	GET: GET_POKEMON |ID  | SIZE | name_size | name
+	LOCALIZED: LOCALIZED_POKEMON | CORRELATIONID | ID | SIZE | name_size | name | posx | posy | cantidad_posiciones
+
+	ACK RECEPCION: ACK | UUID4 | QUEUE_ID | ID  broker recibe
 
 */
 
