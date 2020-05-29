@@ -4,22 +4,25 @@
 /*
 
 	FORMA DE ENVIO DE MENSAJES:
-	SUSCRIBE: SUSCRITO | QUEUE_ID
 
-	NEW : NEW_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy | cantidad
+	SUSCRIBE: SUSCRITO | QUEUE_ID  Dejar solo 8 bytes para la suscripcion -> respondo ack con uid4 que genero y guardo para identificar al procesp
+
+	NEW : NEW_POKEMON  | SIZE | name_size | name | posx | posy | cantidad
 	APPEARED: APPEARED_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy 
-	CATCH: CATCH_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy
-	CAUGHT: CAUGHT_POKEMON | CORRELATIONID | SIZE | caught
-	GET: GET_POKEMON | CORRELATIONID | SIZE | name_size | name
+
+	CATCH: CATCH_POKEMON  | SIZE | name_size | name | posx | posy
+	CAUGHT: CAUGHT_POKEMON  | CORRELATIONID | SIZE | caught
+	
+	GET: GET_POKEMON  | SIZE | name_size | name
 	LOCALIZED: LOCALIZED_POKEMON | CORRELATIONID | SIZE | name_size | name | posx | posy | cantidad_posiciones
 
-	ACK: ACK | QUEUE_ID | ID | 	CORRELATIONID
+	ACK: ACK  | ID 
 
 
 
 	FORMA DE RECEPCION DE MENSAJES DE LA COLA:
 
-	NEW : NEW_POKEMON |ID | CORRELATIONID | SIZE | name_size | name | posx | posy | cantidad
+	NEW : NEW_POKEMON | ID  | SIZE | name_size | name | posx | posy | cantidad
 	APPEARED: APPEARED_POKEMON | ID | CORRELATIONID | SIZE | name_size | name | posx | posy 
 	CATCH: CATCH_POKEMON |ID | CORRELATIONID | SIZE | name_size | name | posx | posy
 	CAUGHT: CAUGHT_POKEMON |ID | CORRELATIONID | SIZE | caught
@@ -93,8 +96,9 @@ typedef struct{
 typedef struct{ //Este no lo entendi
 	int name_size;
 	char* name;
-	position pos;
 	int cantidad_posiciones;
+	position * pos;
+	
 }localized_pokemon;
 
 
