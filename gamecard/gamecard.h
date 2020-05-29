@@ -25,7 +25,7 @@
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
 #define METADATA_DIR "/metadata"
 #define METADATA_FILE "/metadata.txt"
-#define BLOCKS_DIR "/Blocks"
+#define BLOCKS_DIR "/blocks"
 #define FILES_DIR "/files"
 #define POKEMON_DIR "/Pokemon"
 #define METADATA_TXT_PATH "/metadata/metadata.txt"
@@ -65,21 +65,35 @@ struct mensaje {
 
 //cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
 enum TIPO{
+
+	//QUEUE_ID
 	NEW_POKEMON = 1,
+	APPEARED_POKEMON = 2,
 	CATCH_POKEMON = 3,
+	CAUGHT_POKEMON = 4,
 	GET_POKEMON = 5,
-	SUSCRIPCION = 7,
+	LOCALIZED_POKEMON = 6,
+
+	//ACTION
+	SUSCRITO = 7,
+	ACK = 8,
 };
 
 typedef struct{
+	int id;
+	int correlation_id;
 	int size;
 	void* stream;
 } t_buffer;
 
 typedef struct{
-	enum TIPO queue_id;
+	enum TIPO codigo_operacion;
 	t_buffer* buffer;
 } t_paquete;
+
+int socket_cliente_np;
+int socket_cliente_cp;
+int socket_cliente_gp;
 
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
@@ -106,11 +120,7 @@ void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_b
 int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
-
-
-
-
-
+void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 
 
 int tipo_mensaje(char* tipo_mensaje);
@@ -120,8 +130,8 @@ void get_pokemon(char*pokemon);
 
 // Funciones Sockets
 
-int crear_conexion_broker(char *ip, char* puerto);
+int crear_conexion_broker();
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
-void* serializar_paquete(t_paquete* paquete, int bytes);
+void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
 
 #endif /* GAMECARD_H_ */

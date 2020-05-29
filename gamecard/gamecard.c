@@ -8,7 +8,9 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    crear_archivos_pokemon("Pikachu", 1000000, 1000000, 1000000);
+    //suscripcion_colas_broker();
+
+    crear_archivos_pokemon("Pikachu", 100, 100, 100);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -259,7 +261,6 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 
 	char *path_file = string_new();
 	string_append_with_format(&path_file, "%s%s%s", datos_config->pto_de_montaje, FILES_DIR, "/");
-	//string_capitalized(pokemon);
 
 	char *pokemon_file = string_new();
 	string_append_with_format(&pokemon_file, "%s%s", pokemon, POKEMON_FILE_EXT);
@@ -281,12 +282,13 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 	//habria que modificar el metadata para indicar que esta abierto
 	char *coordenadas = string_new();
 	string_append_with_format(&coordenadas, "%s%s%s%s%s", string_itoa(posX), "-", string_itoa(posY), "=", string_itoa(cantidad));
+	string_append(&coordenadas, "\n");
 
 
 	int coordenadas_size = strlen(coordenadas);
 	int cant_blocks = (int) ceil((double)coordenadas_size / datos_config->size_block); // aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
 
-
+	int desplazamiento = 0;
 	for(int i = 0 ; i < cant_blocks ; i++) {
 		int bloque = obtener_bloque_libre();
 		if(bloque == -1) {
@@ -296,15 +298,24 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 		bitarray_set_bit(bitarray, bloque);
 		agregar_bloque_metadata_pokemon(path_file, bloque);
 		// crear el bloque en el directorio BLOCKS, crear el archivo y escribir la info
+		char *auxiliar = strdup(string_substring(coordenadas, desplazamiento, datos_config->size_block));
+
+		char *path_block_dir = string_new();
+		string_append_with_format(&path_block_dir, "%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/");
+
+		escribir_datos_bloque(path_block_dir, auxiliar, bloque);
+		desplazamiento += datos_config->size_block;
+
+		free(path_block_dir);
 	}
 
-    //escribimos el bitarray en el archivo
-    //if(fwrite(coordenadas, strlen(coordenadas) + 1, 1, pointerFile) == 0) {
-    	//log_error(logger, "NO SE PUDO ESCRIBIR LAS COORDENADAS EN EL ARCHIVO %s", pokemon_file);
-    	//exit(1);
-    //} else {
-    	//log_info(logger, "SE ESCRIBIO EN EL ARCHIVO %s:%s", pokemon_file, coordenadas);
-    //}
+    //escribimos las coordenadas en el archivo
+    if(fwrite(coordenadas, strlen(coordenadas) + 1, 1, pointerFile) == 0) {
+    	log_error(logger, "NO SE PUDO ESCRIBIR LAS COORDENADAS EN EL ARCHIVO CON RUTA %s", pokemon_file);
+    	exit(1);
+    } else {
+    	log_info(logger, "SE ESCRIBIERON LOS DATOS EN EL ARCHIVO CON RUTA %s", pokemon_file);
+    }
 
 	free(coordenadas);
     fclose(pointerFile);
@@ -358,20 +369,23 @@ void verificar_espacio_bloque_de_datos(char *path_metadata_pokemon, char *datos_
 	}
 }
 */
-void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque) {
+void escribir_datos_bloque(char *path_block_dir, char *datos_a_agregar, int nro_bloque) {
 
 	char *block_file_path = string_new();
-	string_append(&block_file_path, path_blocks_dir);
+	string_append(&block_file_path, path_block_dir);
 	string_append(&block_file_path, string_itoa(nro_bloque));
-	string_append(&block_file_path, ".bin");
+	string_append(&block_file_path, ".txt"); //por ahora txt para ver que los datos se escribieron correctamente, despues se cambia a bin
 
+	log_info(logger, "CREANDO EL ARCHIVO CON RUTA %s", block_file_path);
 	FILE *pf = fopen(block_file_path, "ab");
 	if(pf == NULL) {
 		log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
 		exit(1);
 	}
 
-	fwrite(datos_a_agregar, strlen(datos_a_agregar), 1, pf);
+	log_info(logger, "ESCRIBIENDO DATOS EN EL BLOQUE %d EN EL DIRECTORIO %s", nro_bloque, block_file_path);
+	if(fwrite(datos_a_agregar, strlen(datos_a_agregar), 1, pf) == 0)
+		log_error(logger, "NO SE HA PODIDO ESCRIBIR DATOS EN EL DIRECTORIO %s", block_file_path);
 
 	fclose(pf);
 	free(block_file_path);
@@ -470,46 +484,6 @@ int filesize (FILE* archivo ){
 	return ultimo/8;
 }
 
-/*
-void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
-	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
-
-	switch(variable a definir){
-		case NEW_POKEMON:
-			// se procesa el mensaje new_pokemon
-			// new_pokemon(char* pokemon,int posx,int posy,int cant)
-		break;
-
-		case CATCH_POKEMON:
-			// se procesa el mensaje new_pokemon
-			// catch_pokemon(char* pokemon,int posx,int posy)
-		break;
-
-		case GET_POKEMON:
-			// se procesa el mensaje new_pokemon
-		break;
-
-		default:
-			// en caso de que no sea ninguna (ver que hacer)
-			// get_pokemon(char*pokemon)
-		break;
-	}
-	*/
-	/*
-	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
-		return NEW_POKEMON;
-	}
-	else if(strcmp(tipo_mensaje,"CATCH_POKEMON") == 0){
-		return CATCH_POKEMON;
-	}
-	else if(strcmp(tipo_mensaje,"GET_POKEMON") == 0){
-		return GET_POKEMON;
-	}
-	return -1;
-
-}
-*/
-
 void new_pokemon(char* pokemon,int posx,int posy,int cant){}
 
 void catch_pokemon(char* pokemon,int posx,int posy){}
@@ -517,12 +491,8 @@ void catch_pokemon(char* pokemon,int posx,int posy){}
 void get_pokemon(char*pokemon){}
 
 // Funciones para la conexion ----------------------------------------------------------
-/*
-void reintentar_conexion_broker() {
-}
 
-
-int crear_conexion(char *ip, char* puerto) {
+int crear_conexion() {
 	struct addrinfo hints;
 	struct addrinfo *server_info;
 
@@ -531,11 +501,12 @@ int crear_conexion(char *ip, char* puerto) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	getaddrinfo(ip, puerto, &hints, &server_info);
+	getaddrinfo("127.0.0.1", "4444", &hints, &server_info); // despues en la entrega cambiar los valores de la ip y el puerto
 
 	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
 
 	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1)
+		log_error(logger, "ERROR AL CONECTARSE CON EL BROKER");
 		return -1;
 
 	freeaddrinfo(server_info);
@@ -543,20 +514,39 @@ int crear_conexion(char *ip, char* puerto) {
 	return socket_cliente;
 }
 
+void suscripcion_colas_broker() {
+
+	log_info(logger, "ESTABLECIENDO CONEXION CON EL BROKER");
+	socket_cliente_np = crear_conexion();
+	enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
+
+	//socket_cliente_cp = crear_conexion();
+	//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
+
+	//socket_cliente_gp = crear_conexion();
+	//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
+
+}
+
+
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
+
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
-	paquete->queue_id = SUSCRIPCION;
+	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	//memcpy(paquete->buffer->stream, cola, paquete->buffer->size);
+	memcpy(paquete->buffer->stream, &(cola), paquete->buffer->size);
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
-	void* info_a_enviar = serializar_paquete(paquete, bytes);
+	void* info_a_enviar = serializar_paquete_suscripcion(paquete, bytes);
 
-	send(socket_cliente, info_a_enviar, bytes, 0);
+	log_info(logger, "ENVIANDO MENSAJE DE SUSCRIPCION AL BROKER");
+	if(send(socket_cliente, info_a_enviar, bytes, MSG_WAITALL) == -1) {
+		log_error(logger, "ERROR AL ENVIAR MENSAJE DE SUSCRIPCION AL BROKER");
+	}
 
 	free(info_a_enviar);
 	free(paquete->buffer->stream);
@@ -564,20 +554,21 @@ void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 	free(paquete);
 }
 
-void* serializar_paquete(t_paquete* paquete, int bytes) {
+void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
 	void *magic = malloc(bytes);
 	int desplazamiento = 0;
 
-	memcpy(magic + desplazamiento, &(paquete->queue_id), sizeof(int));
+	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento+= sizeof(int);
+	desplazamiento += sizeof(int);
 	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
 	desplazamiento+= paquete->buffer->size;
 
 	return magic;
 }
 
+/*
 void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
 	int socket_servidor;
 
@@ -628,5 +619,45 @@ void serve_client(int* socket) {
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
 	process_request(cod_op, *socket);
+}
+*/
+
+/*
+void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
+	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
+
+	switch(variable a definir){
+		case NEW_POKEMON:
+			// se procesa el mensaje new_pokemon
+			// new_pokemon(char* pokemon,int posx,int posy,int cant)
+		break;
+
+		case CATCH_POKEMON:
+			// se procesa el mensaje new_pokemon
+			// catch_pokemon(char* pokemon,int posx,int posy)
+		break;
+
+		case GET_POKEMON:
+			// se procesa el mensaje new_pokemon
+		break;
+
+		default:
+			// en caso de que no sea ninguna (ver que hacer)
+			// get_pokemon(char*pokemon)
+		break;
+	}
+	*/
+	/*
+	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
+		return NEW_POKEMON;
+	}
+	else if(strcmp(tipo_mensaje,"CATCH_POKEMON") == 0){
+		return CATCH_POKEMON;
+	}
+	else if(strcmp(tipo_mensaje,"GET_POKEMON") == 0){
+		return GET_POKEMON;
+	}
+	return -1;
+
 }
 */

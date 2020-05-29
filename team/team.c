@@ -1,26 +1,27 @@
 #include "team.h"
 
-conexion* conexion_broker;
-
+team* equipo;
 t_log* logger;
 t_config* config;
-pthread_rwlock_t lockPoksRequeridos =  PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockEntrePoks = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockColaReady = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockEntrenadores = PTHREAD_RWLOCK_INITIALIZER;
-pthread_mutex_t mutexCPU = PTHREAD_MUTEX_INITIALIZER;
+config_team* datos_config;
+conexion* conexion_broker;
 pthread_t servidor_gameboy;
 pthread_t suscripcion_appeared;
 pthread_t suscripcion_localized;
 pthread_t suscripcion_caught;
-team* equipo;
-config_team* datos_config;
 t_list* mensajes;
 sem_t semExecTeam;
 sem_t semPlanificar;
 sem_t semExecEntre[CANT_ENTRE];
 sem_t semPoks;
 sem_t semCaught;
+pthread_rwlock_t lockPoksRequeridos =  PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockEntrePoks = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockColaReady = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockEntrenadores = PTHREAD_RWLOCK_INITIALIZER;
+pthread_mutex_t mutexCPU = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 int main(int argc,char* argv[]){
 	iniciar_team(argv[1]);
@@ -45,7 +46,7 @@ void iniciar_team(char* teamConfig){
 	crear_team();
 	iniciar_semaforos();
 	suscribirse_broker();
-	get_pokemones();
+	enviar_mensajes_get_pokemon();
 	pthread_create(&servidor_gameboy,NULL,(void*)iniciar_servidor,NULL);
 	list_iterate(equipo->entrenadores,(void*)crear_hilo_entrenador);
 }
@@ -64,6 +65,7 @@ void iniciar_config(char* teamConfig){
 	datos_config->objetivos = config_get_string_value(config,"OBJETIVOS_ENTRENADORES");
 	datos_config->alpha = config_get_double_value(config,"ALPHA");
 	datos_config->estimacion_inicial = config_get_double_value(config,"ESTIMACION_INICIAL");
+	datos_config->quantum = config_get_int_value(config,"QUANTUM");
 }
 
 //CREACION---------------------------------------------------------------------------------------------------------------------
@@ -98,16 +100,6 @@ void crear_team(){
 	free(poks);
 	free(objs);
 	free(pos);
-}
-
-void get_pokemones(){
-	void get(void* element){
-		pokemon* pok = element;
-		get_pokemon(pok->name);
-	}
-	t_list* especies = especies_objetivo_team();
-	list_iterate(especies,(void*)get);
-	list_destroy(especies);
 }
 
 void crear_hilo_entrenador(entrenador* entre){
@@ -154,14 +146,12 @@ void crear_entrenador(int tid,int posx,int posy,char* pokemones,char* objetivos)
 void salir_equipo(){
 	log_info(logger,"Team%d Ha Cumplido Su Objetivo",equipo->pid);
 	log_info(logger,"Cantidad Total De Ciclos De CPU Del TEAM: %d",equipo->cant_ciclo);
-	void cant_ciclos(void* ele){
-		entrenador* aux = ele;
+	void cant_ciclos(entrenador* aux){
 		log_info(logger,"Cantidad De Ciclos De CPU Del Entrenador%d: %d",aux->tid,aux->ciclos_totales);
 	}
 	list_iterate(equipo->entrenadores,(void*)cant_ciclos);
 
-	void free_entrenador(void* ele){
-		entrenador* aux = ele;
+	void free_entrenador(entrenador* aux){
 		free(aux);
 	}
 
@@ -185,8 +175,7 @@ void salir_equipo(){
 pokemon* pokemon_a_atrapar(){
 	pokemon* pok_elegido;
 
-	bool disponible(void* ele){
-		pokemon* aux = ele;
+	bool disponible(pokemon* aux){
 		return aux->espera_caught == 0;
 	}
 	pok_elegido = list_find(equipo->poks_requeridos,(void*)disponible);
@@ -200,7 +189,7 @@ void ejecutar_equipo(){
 		if(!cumplir_objetivo_team()){
 			if(!verificar_deadlock_equipo()){
 				sem_wait(&semPoks);
-				entre = planificar_entrenador();
+				entre = algoritmo_corto_plazo();
 			}
 			else{//USANDO FIFO
 				log_warning(logger,"EN DEADLOCK");
@@ -222,55 +211,57 @@ void ejecutar_equipo(){
 void ejecutar_entrenador(entrenador* entre){
 	inicio:	sem_wait(&semExecEntre[entre->tid]);
 
-	if(!verificar_deadlock_equipo()){
-		pokemon* pok = pokemon_a_atrapar();
-		move_entrenador(entre,pok->posx,pok->posy);
-		int caso_default = catch_pokemon(entre,pok);
-		if(caso_default != 1){
-			log_warning(logger,"Entrenador%d BLOCKED En Espera De Caught!",entre->tid);
-			list_add(entre->espera_caught,pok);
-			pok->espera_caught = 1;
+	while(entre->estado == EXEC){
+		if(!verificar_deadlock_equipo()){
+			pokemon* pok = pokemon_a_atrapar();
+			move_entrenador(entre,pok->posx,pok->posy);
+			int caso_default = catch_pokemon(entre,pok);
+			if(caso_default != 1){
+				log_warning(logger,"Entrenador%d BLOCKED En Espera De Caught!",entre->tid);
+				list_add(entre->espera_caught,pok);
+				pok->espera_caught = 1;
+				bloquear_entrenador(entre);
+				goto inicio;
+			}
+		}
+		else{
+			bool entrenador_espera_deadlock(entrenador* aux){
+				return aux->estado == BLOCKED && verificar_deadlock_entrenador(aux);
+			}
+			t_list* entrenadores = equipo->entrenadores;
+			entrenador* entre2 = list_find(entrenadores,(void*)entrenador_espera_deadlock);
+			move_entrenador(entre,entre2->posx,entre2->posy);
+			intercambiar_pokemon(entre,entre2);
+			if(cumplir_objetivo_entrenador(entre2) && cumplir_objetivo_entrenador(entre)){
+				log_info(logger,"Deadlock Ha Solucionado");
+				salir_entrenador(entre2);
+			}
+			else if(cumplir_objetivo_entrenador(entre2)){
+				log_info(logger,"Deadlock Del Entrenador%d Ha Solucionado",entre2->tid);
+				salir_entrenador(entre2);
+			}
+			else if(cumplir_objetivo_entrenador(entre)){
+				log_info(logger,"Deadlock Del Entrenador%d Ha Solucionado",entre->tid);
+			}
+			else{
+				log_info(logger,"Deadlock No Ha Solucionado");
+			}
+		}
+
+		if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
+			log_warning(logger,"Entrenador%d BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
 			bloquear_entrenador(entre);
 			goto inicio;
 		}
-	}
-	else{
-		bool entrenador_espera_deadlock(void* element){
-			entrenador* aux = element;
-			return aux->estado == BLOCKED && verificar_deadlock_entrenador(aux);
-		}
-		t_list* entrenadores = equipo->entrenadores;
-		entrenador* entre2 = list_find(entrenadores,(void*)entrenador_espera_deadlock);
-		move_entrenador(entre,entre2->posx,entre2->posy);
-		intercambiar_pokemon(entre,entre2);
-		if(cumplir_objetivo_entrenador(entre2) && cumplir_objetivo_entrenador(entre)){
-			log_info(logger,"Deadlock Ha Solucionado");
-			salir_entrenador(entre2);
-		}
-		else if(cumplir_objetivo_entrenador(entre2)){
-			log_info(logger,"Deadlock Del Entrenador%d Ha Solucionado",entre2->tid);
-			salir_entrenador(entre2);
-		}
-		else if(cumplir_objetivo_entrenador(entre)){
-			log_info(logger,"Deadlock Del Entrenador%d Ha Solucionado",entre->tid);
+		else if(!cumplir_objetivo_entrenador(entre)){
+			log_warning(logger,"Entrenador%d BLOCKED Finaliza Su Recorrido!",entre->tid);
+			bloquear_entrenador(entre);
+			goto inicio;
 		}
 		else{
-			log_info(logger,"Deadlock No Ha Solucionado");
+			salir_entrenador(entre);
+			sem_post(&semExecTeam);
 		}
-	}
-	if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
-		log_warning(logger,"Entrenador%d BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
-		bloquear_entrenador(entre);
-		goto inicio;
-	}
-	else if(!cumplir_objetivo_entrenador(entre)){
-		log_warning(logger,"Entrenador%d BLOCKED Finaliza Su Recorrido!",entre->tid);
-		bloquear_entrenador(entre);
-		goto inicio;
-	}
-	else{
-		salir_entrenador(entre);
-		sem_post(&semExecTeam);
 	}
 }
 
@@ -278,19 +269,13 @@ void despertar_entrenador(entrenador* entre){
 	if(entre->estado == NEW || entre->estado == BLOCKED || entre->estado == EXEC){
 		log_info(logger,"Entrenador%d READY",entre->tid);
 		entre->estado = READY;
-	}
-	else if(entre->estado == EXIT){
-		perror("OPERACION NO PERMITIDA!");
-	}
-	else{
-		perror("%s ALREADY READY");
+		list_add(equipo->cola_ready,entre);
 	}
 }
 
 void activar_entrenador(entrenador* entre){
 	if(entre->estado == READY){
-		bool by_tid(void* ele){
-			entrenador* aux = ele;
+		bool by_tid(entrenador* aux){
 			return aux->tid == entre->tid;
 		}
 		pthread_rwlock_wrlock(&lockColaReady);
@@ -302,26 +287,13 @@ void activar_entrenador(entrenador* entre){
 		entre->start_time = time(NULL);
 		sem_post(&semExecEntre[entre->tid]);
 	}
-	else if(entre->estado == NEW || entre->estado == BLOCKED || entre->estado == EXIT){
-		perror("OPERACION NO PERMITIDA!");
-	}
-	else{
-		perror("%s ALREADY RUN");
-	}
 }
 
 void bloquear_entrenador(entrenador* entre){
 	if(entre->estado == EXEC){
 		printf("Entrenador%d BLOCKED\n",entre->tid);
 		entre->estado = BLOCKED;
-		entre->service_time = time(NULL) - entre->start_time;
 		sem_post(&semExecTeam);
-	}
-	else if(entre->estado == NEW || entre->estado == READY || entre->estado == EXIT){
-		perror("OPERACION NO PERMITIDA!");
-	}
-	else{
-		perror("ALREADY BLOCKED");
 	}
 }
 
@@ -333,12 +305,6 @@ void salir_entrenador(entrenador* entre){
 		entre->finish_time = time(NULL);
 		entre->turnaround_time = entre->finish_time - entre->arrival_time;
 	}
-	else if(entre->estado == NEW || entre->estado == READY){
-		perror("OPERACION NO PERMITIDA!");
-	}
-	else{
-		perror("%s ALREADY EXIT");
-	}
 }
 
 void move_entrenador(entrenador* entre,int posx,int posy){
@@ -346,6 +312,7 @@ void move_entrenador(entrenador* entre,int posx,int posy){
 	int ciclos = abs(entre->posx-posx)+abs(entre->posy-posy) * CICLOS_MOVER;
 	for(int i=0;i<ciclos;i++){
 		printf("Entrenador%d moviendose ...\n",entre->tid);
+		entre->service_time++;
 		sumar_ciclos(entre,1);
 		sleep(datos_config->retardo_cpu);
 	}
@@ -353,8 +320,8 @@ void move_entrenador(entrenador* entre,int posx,int posy){
 	entre->posy = posy;
 }
 
-int catch_pokemon(entrenador* entre,pokemon* pok){
-	int caso_default = -1;
+bool catch_pokemon(entrenador* entre,pokemon* pok){
+	bool caso_default = -1;
 	log_info(logger,"Entrenador%d Atrapando %s",entre->tid,pok->name);
 	sleep(datos_config->retardo_cpu);
 
@@ -363,6 +330,7 @@ int catch_pokemon(entrenador* entre,pokemon* pok){
 		for(int i=0;i<CICLOS_ENVIAR;i++){
 			printf("TEAM %d enviando mensaje a BROKER ...\n",equipo->pid);
 			sleep(datos_config->retardo_cpu);
+			entre->service_time++;
 			sumar_ciclos(entre,1);
 		}
 		enviar_mensaje_catch_pokemon(pok->name,pok->posx,pok->posy,conexion_broker->catch);
@@ -384,8 +352,7 @@ int catch_pokemon(entrenador* entre,pokemon* pok){
 
 pokemon* pokemon_a_intercambiar(entrenador* entre){
 	t_list* no_necesarios;
-	bool no_necesitar(void* ele){
-		pokemon* aux = ele;
+	bool no_necesitar(pokemon* aux){
 		return !necesitar_pokemon(entre,aux->name);
 	}
 	no_necesarios = list_filter(entre->pokemones,(void*)no_necesitar);
@@ -399,16 +366,15 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 	for(int i=0;i<CICLOS_INTERCAMBIAR;i++){
 		printf("Entrenador%d y Entrenador%d intercambiando pokemones ...\n",entre1->tid,entre2->tid);
 		sleep(datos_config->retardo_cpu);
+		entre1->service_time++;
 		sumar_ciclos(entre1,1);
 	}
 	pokemon* pok1 = pokemon_a_intercambiar(entre1);
 	pokemon* pok2 = pokemon_a_intercambiar(entre2);
-	bool by_name1(void* ele){
-		pokemon* aux = ele;
+	bool by_name1(pokemon* aux){
 		return aux->name = pok1->name;
 	}
-	bool by_name2(void* ele){
-		pokemon* aux = ele;
+	bool by_name2(pokemon* aux){
 		return aux->name = pok2->name;
 	}
 	list_add(entre1->pokemones,pok2);
@@ -418,81 +384,12 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 }
 
 //PLANIFICACION----------------------------------------------------------------------------------------------------------------------
-
-entrenador* planificar_entrenador(){
-	entrenador* entre;
-	if(string_equals_ignore_case(datos_config->algoritmo,"FIFO")){
-		entre = algoritmo_fifo(equipo->cola_ready);
-	}
-	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-SD")){
-		entre = algoritmo_sjf_sin_desalojo(equipo->cola_ready);
-	}
-	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD")){
-		entre = algoritmo_sjf_sin_desalojo(equipo->cola_ready);
-	}
-	return entre;
-}
-
-entrenador* algoritmo_fifo(t_list* cola_ready){
-	printf("==========FIFO==========\n");
-	entrenador* entre;
-	bool fifo(void* ele1,void* ele2){
-		entrenador* aux1 = ele1;
-		entrenador* aux2 = ele2;
-		return aux1->arrival_time < aux2->arrival_time;
-	}
-	t_list* cola_fifo = list_sorted(cola_ready,(void*)fifo);
-	entre = list_get(cola_fifo,0);
-	list_destroy(cola_fifo);
-	return entre;
-}
-
-entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready){
-	printf("==========SJF SIN DESALOJO==========\n");
-	entrenador* entre;
-	bool sjf_sin_desalojo(void* ele1,void* ele2){
-		entrenador* aux1 = ele1;
-		entrenador* aux2 = ele2;
-		if(estimacion(aux1) == estimacion(aux2)){
-			return aux1->arrival_time < aux2->arrival_time;
-		}
-		return estimacion(aux1) < estimacion(aux2);
-	}
-	t_list* cola_sjf = list_sorted(cola_ready,(void*)sjf_sin_desalojo);
-	entre = list_get(cola_sjf,0);
-	entre->estimacion_anterior = estimacion(entre);
-	printf("======Estimacion %lf========\n",estimacion(entre));
-
-	list_destroy(cola_sjf);
-	return entre;
-}
-
-entrenador* algoritmo_round_robin(t_list* cola_ready){
-	printf("==========ROUND ROBIN==========\n");
-	entrenador* entre;
-	bool sjf_sin_desalojo(void* ele1,void* ele2){
-		entrenador* aux1 = ele1;
-		entrenador* aux2 = ele2;
-		if(estimacion(aux1) == estimacion(aux2)){
-			return aux1->arrival_time < aux2->arrival_time;
-		}
-		return estimacion(aux1) < estimacion(aux2);
-	}
-	list_sort(cola_ready,(void*)sjf_sin_desalojo);
-	entre = list_get(cola_ready,0);
-	entre->estimacion_anterior = estimacion(entre);
-	return entre;
-}
-
-void find_entrenador_cerca(pokemon* pok){
-	bool by_estado(void* element1){
-		entrenador* aux = element1;
+void algoritmo_largo_plazo(pokemon* pok){
+	bool by_estado(entrenador* aux){
 		return (aux->estado == NEW || aux->estado == BLOCKED) && (!verificar_deadlock_entrenador(aux)
 				&& list_is_empty(aux->espera_caught));
 	}
-	bool by_distancia(void* element1, void* element2){
-		entrenador* aux = element1;
-		entrenador* next = element2;
+	bool by_distancia(entrenador* aux,entrenador* next){
 		return (distancia_pokemon(aux,pok)) < (distancia_pokemon(next,pok));
 	}
 	pthread_rwlock_wrlock(&lockEntrenadores);
@@ -502,16 +399,43 @@ void find_entrenador_cerca(pokemon* pok){
 		list_sort(entrenadores,(void*)by_distancia);
 		entrenador* elegido = list_find(entrenadores,(void*)by_estado);
 		float distancia = distancia_pokemon(elegido,pok);
-		void equidistancia(void* ele){
-			entrenador* aux = ele;
+		void pasar_ready(entrenador* aux){
 			if(distancia_pokemon(aux,pok) == distancia){
-				list_add(equipo->cola_ready,aux);
 				despertar_entrenador(aux);
 			}
 		}
-		list_iterate(entrenadores,(void*)equidistancia);
+		list_iterate(entrenadores,(void*)pasar_ready);
 		list_destroy(entrenadores);
 	}
+}
+
+entrenador* algoritmo_corto_plazo(){
+	entrenador* entre;
+	if(string_equals_ignore_case(datos_config->algoritmo,"FIFO")){
+		entre = algoritmo_fifo(equipo->cola_ready);
+	}
+	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-SD")){
+		entre = algoritmo_sjf_sin_desalojo(equipo->cola_ready);
+	}
+	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD")){
+		entre = algoritmo_sjf_con_desalojo(equipo->cola_ready);
+	}
+	else{
+		entre = algoritmo_round_robin(equipo->cola_ready);
+	}
+	return entre;
+}
+
+entrenador* algoritmo_fifo(t_list* cola_ready){
+	printf("==========FIFO==========\n");
+	entrenador* entre;
+	bool fifo(entrenador* aux1,entrenador* aux2){
+		return aux1->arrival_time < aux2->arrival_time;
+	}
+	t_list* cola_fifo = list_sorted(cola_ready,(void*)fifo);
+	entre = list_get(cola_fifo,0);
+	list_destroy(cola_fifo);
+	return entre;
 }
 
 double estimacion(entrenador* entre){
@@ -523,6 +447,47 @@ double estimacion(entrenador* entre){
 	return res;
 }
 
+entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready){
+	printf("==========SJF SIN DESALOJO==========\n");
+	entrenador* entre;
+	bool sjf_sin_desalojo(entrenador* aux1,entrenador* aux2){
+		if(estimacion(aux1) == estimacion(aux2)){
+			return aux1->arrival_time < aux2->arrival_time;
+		}
+		return estimacion(aux1) < estimacion(aux2);
+	}
+	t_list* cola_sjf = list_sorted(cola_ready,(void*)sjf_sin_desalojo);
+	entre = list_get(cola_sjf,0);
+	entre->estimacion_anterior = estimacion(entre);
+	list_destroy(cola_sjf);
+	return entre;
+}
+
+entrenador* algoritmo_sjf_con_desalojo(t_list* cola_ready){//implementar
+	printf("==========SJF CON DESALOJO==========\n");
+	entrenador* entre;
+
+	return entre;
+}
+
+entrenador* algoritmo_round_robin(t_list* cola_ready){//IMPLEMENTAR
+	printf("==========ROUND ROBIN==========\n");
+	entrenador* entre = list_get(equipo->cola_ready,0);
+
+	struct sigaction action;
+	action.sa_handler = (void*)fin_de_quantum;
+	action.sa_flags = 0;
+	sigemptyset(&action.sa_mask);
+	sigaction(SIGALRM, &action,NULL);
+	alarm(datos_config->quantum);
+	return entre;
+}
+
+void fin_de_quantum(){
+	printf("Fin De Quantum\n");
+	alarm(datos_config->quantum);
+}
+
 //DEADLOCK------------------------------------------------------------------------------------------------------------
 bool verificar_deadlock_entrenador(entrenador* entre){
 	return (verificar_cantidad_pokemones(entre) != 1) && (!cumplir_objetivo_entrenador(entre));
@@ -530,33 +495,29 @@ bool verificar_deadlock_entrenador(entrenador* entre){
 
 bool verificar_deadlock_equipo(){
 	return list_all_satisfy(equipo->entrenadores,(void*)verificar_deadlock_entrenador)
-			&& list_all_satisfy(equipo->entrenadores,(void*)verificar_pokemon_exceso_noNecesario)
+			&& list_all_satisfy(equipo->entrenadores,(void*)verificar_pokemon_exceso_no_necesario)
 			&& list_all_satisfy(equipo->entrenadores,(void*)verificar_espera_circular);
 }
 
-bool verificar_pokemon_exceso_noNecesario(entrenador* entre){
-	bool exceso(void* element){
-		pokemon* aux = element;
+bool verificar_pokemon_exceso_no_necesario(entrenador* entre){
+	bool exceso(pokemon* aux){
 		return cant_especie_pokemon(entre,aux->name) > cant_especie_objetivo(entre,aux->name);
 	}
-	bool noNecesario(void* element){
-		pokemon* aux = element;
+	bool noNecesario(pokemon* aux){
 		return !necesitar_pokemon(entre,aux->name);
 	}
-	return list_any_satisfy(entre->pokemones,exceso) || list_any_satisfy(entre->pokemones,noNecesario);
+	return list_any_satisfy(entre->pokemones,(void*)exceso) || list_any_satisfy(entre->pokemones,(void*)noNecesario);
 }
 
 pokemon* pokemon_no_necesario(entrenador* entre){
-	bool no_necesario(void* ele){
-		pokemon* aux = ele;
+	bool no_necesario(pokemon* aux){
 		return !necesitar_pokemon(entre,aux->name) || pokemon_exceso(entre,aux->name);
 	}
 	return list_find(entre->pokemones,(void*)no_necesario);
 }
 
 bool verificar_espera_circular(entrenador* entre1){
-	bool en_espera(void* ele2){
-		entrenador* aux2 = ele2;
+	bool en_espera(entrenador* aux2){
 		pokemon* no1 = pokemon_no_necesario(entre1);
 		pokemon* no2 = pokemon_no_necesario(aux2);
 		return necesitar_pokemon(entre1,no2->name) && necesitar_pokemon(aux2,no1->name);
@@ -582,12 +543,10 @@ bool cumplir_objetivo_team(){
 }
 
 bool cumplir_objetivo_entrenador(entrenador* entre){
-	bool by_especie(void* element){
-		pokemon* aux = element;
+	bool by_especie(pokemon* aux){
 		return contener_pokemon(entre,aux->name);
 	}
-	bool by_cantidad(void* element){
-			pokemon* aux = element;
+	bool by_cantidad(pokemon* aux){
 			return cant_especie_objetivo(entre,aux->name) == cant_especie_pokemon(entre,aux->name);
 	}
 	return list_all_satisfy(entre->objetivos,(void*)by_especie) && list_all_satisfy(entre->objetivos,(void*)by_cantidad) ;
@@ -595,8 +554,7 @@ bool cumplir_objetivo_entrenador(entrenador* entre){
 
 bool contener_pokemon(entrenador* entre,char* name){
 	bool res = 0;
-	bool by_name(void* element){
-		pokemon* aux = element;
+	bool by_name(pokemon* aux){
 		return (strcmp(aux->name,name) == 0);
 	}
 	pthread_rwlock_rdlock(&lockEntrePoks);
@@ -616,8 +574,7 @@ bool necesitar_pokemon(entrenador* entre,char* name){
 
 int cant_especie_objetivo_team(char* name){
 	int res = 0;
-	bool by_name(void* element){
-		pokemon* aux = element;
+	bool by_name(pokemon* aux){
 		return (strcmp(aux->name,name) == 0);
 	}
 	res = list_count_satisfying(equipo->objetivos,(void*)by_name);
@@ -626,8 +583,7 @@ int cant_especie_objetivo_team(char* name){
 
 int cant_especie_objetivo(entrenador* entre,char* name){
 	int res = 0;
-	bool by_name(void* element){
-		pokemon* aux = element;
+	bool by_name(pokemon* aux){
 		return (strcmp(aux->name,name) == 0);
 	}
 	res = list_count_satisfying(entre->objetivos,(void*)by_name);
@@ -636,8 +592,7 @@ int cant_especie_objetivo(entrenador* entre,char* name){
 
 int cant_especie_pokemon(entrenador* entre,char* name){
 	int res = 0;
-	bool by_name(void* element){
-		pokemon* aux = element;
+	bool by_name(pokemon* aux){
 		return (strcmp(aux->name,name) == 0);
 	}
 	pthread_rwlock_rdlock(&lockEntrePoks);
@@ -655,19 +610,17 @@ bool verificar_cantidad_pokemones(entrenador* entre){
 }
 
 t_list* especies_objetivo_team(){
-	bool repetido(void* element){
-		pokemon* aux = element;
+	bool repetido(pokemon* aux){
 		return cant_especie_objetivo_team(aux->name) > 1;
 	}
 	t_list* objetivos = list_duplicate(equipo->objetivos);
 	t_list* especies = list_create();
 	for(int i=0;i<list_size(objetivos);i++){
 		pokemon* obj = list_get(objetivos,i);
-		bool by_name(void* ele){
-			pokemon* aux = ele;
+		bool by_name(pokemon* aux){
 			return strcmp(aux->name,obj->name) == 0;
 		}
-		if(!list_any_satisfy(especies,by_name)){
+		if(!list_any_satisfy(especies,(void*)by_name)){
 			list_add(especies,obj);
 		}
 	}
@@ -704,8 +657,7 @@ int cant_pokemones(char** poks){
 }
 
 void remove_pokemon_requeridos(pokemon* pok){
-	bool by_name_pos(void* element){
-		pokemon* aux = element;
+	bool by_name_pos(pokemon* aux){
 		return ((strcmp(aux->name,pok->name)==0) && (aux->posx==pok->posx) && (aux->posy==pok->posy));
 	}
 	pthread_rwlock_wrlock(&lockPoksRequeridos);
@@ -727,14 +679,23 @@ void set_pokemon(pokemon* pok,int posx,int posy){
 }
 
 pokemon* find_pokemon(char* name){
-	bool by_name(void* element){
-		pokemon* aux = element;
+	bool by_name(pokemon* aux){
 		return (strcmp(aux->name,name)==0);
 	}
 		return list_find(equipo->poks_requeridos,(void*)by_name);
 }
 
 //MENSAJES------------------------------------------------------------------------------------------------------------------------
+void enviar_mensajes_get_pokemon(){
+	void get(void* element){
+		pokemon* pok = element;
+		get_pokemon(pok->name);
+	}
+	t_list* especies = especies_objetivo_team();
+	list_iterate(especies,(void*)get);
+	list_destroy(especies);
+}
+
 void get_pokemon(char* pokemon){
 	conexion_broker->get = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
 	if(conexion_broker->get == -1){
@@ -750,7 +711,7 @@ void get_pokemon(char* pokemon){
 	}
 }
 
-void appeared_pokemon(int cliente_fd){
+void appeared_pokemon(int cliente_fd){//gameboy
 	int size;
 	int desplazamiento = 0;
 	int posx,posy,cant;
@@ -768,7 +729,7 @@ void appeared_pokemon(int cliente_fd){
 		list_add(equipo->poks_requeridos,pok);
 		pthread_rwlock_unlock(&lockPoksRequeridos);
 		printf("%s Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name);
-		find_entrenador_cerca(pok);
+		algoritmo_largo_plazo(pok);
 		sem_post(&semPoks);
 	}
 	else{
@@ -776,7 +737,7 @@ void appeared_pokemon(int cliente_fd){
 	}
 }
 
-void localized_pokemon(int cliente_fd){
+void recibir_localized_pokemon(int cliente_fd){//IMPLEMENTAR
 	int cod_op;
 	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
@@ -803,22 +764,20 @@ void recibir_caught_pokemon(){
 		if(cod_op != -1){
 			t_list* paquete = recibir_paquete(conexion_broker->caught);
 			void display(void* ele){
-				enviar_confirmacion(conexion_broker->caught);
+				//enviar_confirmacion(CAUGHT_POKEMON,conexion_broker->caught);
 				void* valor = ele;
 				int id,resultado;
 				memcpy(&id,valor,sizeof(int));
 				memcpy(&resultado,valor+sizeof(int),sizeof(int));
 				log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID:%d Resultado:%d \n",id,resultado);
-				bool by_tipo_id(void* ele){
-					msg* aux = ele;
+
+				bool by_tipo_id(msg* aux){
 					return aux->tipo_msg==CATCH_POKEMON && aux->id_recibido==id;
 				}
 				msg* mensaje = list_find(mensajes,(void*)by_tipo_id);
 				if(mensaje != NULL && resultado==1){
-					bool espera_caught(void* ele){
-						entrenador* aux = ele;
-						bool by_pokemon(void* ele){
-							pokemon* pok = ele;
+					bool espera_caught(entrenador* aux){
+						bool by_pokemon(pokemon* pok){
 							return pok->espera_caught == 1 && pok->name == mensaje->pok->name;
 						}
 						return list_any_satisfy(aux->espera_caught,(void*)by_pokemon);
@@ -826,8 +785,7 @@ void recibir_caught_pokemon(){
 					entrenador* entre = list_find(equipo->entrenadores,(void*)espera_caught);
 					list_add(entre->pokemones,mensaje->pok);
 					printf("Entrenador%d Ha Atrapado Pokemon %s\n",entre->tid,mensaje->pok->name);
-					bool es_caught(void* ele){
-						pokemon* aux = ele;
+					bool es_caught(pokemon* aux){
 						return aux->name == mensaje->pok->name;
 					}
 					list_remove_by_condition(entre->espera_caught,(void*)es_caught);
@@ -851,7 +809,7 @@ void recibir_appeared_pokemon(){
 		if(cod_op != -1){
 			t_list* paquete = recibir_paquete(conexion_broker->appeared);
 			void display(void* ele){
-				enviar_confirmacion(conexion_broker->appeared);
+				//enviar_ack(APPEARED_POKEMON,conexion_broker->appeared);
 				void* valor = ele;
 				int id,tam,posx,posy;
 				memcpy(&id,valor,sizeof(int));
@@ -862,6 +820,7 @@ void recibir_appeared_pokemon(){
 				strcpy(name,n);
 				memcpy(&posx,valor+sizeof(int)*2+len,sizeof(int));
 				memcpy(&posy,valor+sizeof(int)*3+len,sizeof(int));
+
 				log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,name,posx,posy);
 				if(requerir_atrapar(name)){
 					pokemon* pok = crear_pokemon(name);
@@ -884,6 +843,112 @@ void recibir_appeared_pokemon(){
 	}
 }
 
+void enviar_ack(int tipo,int id,int id_correlativo,int socket_cliente){
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = ACK;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)*4;
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int), &tipo, sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int)*2, &id, sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int)*3, &id_correlativo, sizeof(int));
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+
+void enviar_info_suscripcion(int tipo,int socket_cliente){
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = SUSCRITO;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)*2;
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int), &tipo, sizeof(int));
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente){
+	equipo->cant_ciclo += 1;
+	int tam = strlen(pokemon) + 1;
+	int name_size = strlen(pokemon);
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = GET_POKEMON;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)*2 + tam ;
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),pokemon,tam);
+	memcpy(paquete->buffer->stream+sizeof(int)+tam,&name_size,sizeof(int));
+	int bytes = paquete->buffer->size + sizeof(int)*2;
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	printf("GET_POKEMON: %s\n",pokemon);
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cliente){
+	equipo->cant_ciclo += 1;
+	int tam = strlen(pokemon) + 1;
+	int name_size = strlen(pokemon);
+
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = CATCH_POKEMON;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)*4 + tam ;
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int), pokemon, tam);
+	memcpy(paquete->buffer->stream+sizeof(int)+tam,&name_size,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int)*2+tam, &posx,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int)*3+tam, &posy,sizeof(int));
+
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	log_info(logger,"CATCH_POKEMON: %s",pokemon);
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void recibir_confirmacion_suscripcion(int cliente_fd){
+	int cod_op;
+	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
+		cod_op = -1;
+
+	printf("Se Ha Suscripto A La Cola\n");
+}
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
 	suscribirse_appeared();
@@ -896,6 +961,7 @@ void suscribirse_broker(){
 	else{
 		pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
 		pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
+		//pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
 	}
 }
 
@@ -1037,94 +1103,6 @@ void* serializar_paquete(t_paquete* paquete, int bytes){
 	return magic;
 }
 
-t_config* leer_config(char* config){
-	return config_create(config);
-}
-
-void enviar_info_suscripcion(int tipo,int socket_cliente){
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = SUSCRIPCION;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2;
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int), &tipo, sizeof(int));
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
-void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente){
-	equipo->cant_ciclo += 1;
-	int tam = strlen(pokemon) + 1;
-	int tipo = GET_POKEMON;
-
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = MENSAJE;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2 + tam ;
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&tipo,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*2,pokemon,tam);
-	int bytes = paquete->buffer->size + sizeof(int)*2;
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	printf("GET_POKEMON: %s\n",pokemon);
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
-void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cliente){
-	equipo->cant_ciclo += 1;
-	int tam_pokemon = strlen(pokemon) + 1;
-	int tipo = CATCH_POKEMON;
-
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = MENSAJE;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*4 + tam_pokemon ;
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&tipo,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*2, pokemon, tam_pokemon);
-	memcpy(paquete->buffer->stream+sizeof(int)*2+tam_pokemon, &posx,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*3+tam_pokemon, &posy,sizeof(int));
-
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	log_info(logger,"CATCH_POKEMON: %s",pokemon);
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
-void recibir_confirmacion_suscripcion(int cliente_fd){
-	int cod_op;
-	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
-		cod_op = -1;
-
-	printf("Se Ha Suscripto A La Cola\n");
-}
 
 int recibir_id_mensaje(int cliente_fd){
 	int id;
@@ -1165,8 +1143,6 @@ t_list* recibir_paquete(int socket_cliente){
 	return valores;
 }
 
-void enviar_confirmacion(int socket_cliente){
-	int conf = 1;
-	send(socket_cliente,&conf, sizeof(int), 0);
-	printf("Confirmacion Enviada\n");
+t_config* leer_config(char* config){
+	return config_create(config);
 }
