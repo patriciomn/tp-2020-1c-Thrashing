@@ -74,7 +74,7 @@ void serve_client(int* socket)
 }
 
 
-//ESTO HAY QUE CODEARLO
+
 void process_request(int cod_op, int cliente_fd) {
 	int size;
 	void* msg;		
