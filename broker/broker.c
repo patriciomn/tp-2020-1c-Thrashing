@@ -82,11 +82,13 @@ void process_request(int cod_op, int cliente_fd) {
 	void * correlation_id_str = malloc(sizeof(int));;
 	
 	log_info(logger,"Processing request, cod_op: %d", cod_op);
-	msg = recibir_mensaje(cliente_fd, &size);	
+	
 
 	if (cod_op == SUSCRITO) atender_suscripcion(msg, cliente_fd );
 	
 	else if (cod_op == ACK) atender_ack(msg);
+
+	msg = recibir_mensaje(cliente_fd, &size);	
 
 	item->id = get_id();
 
@@ -128,29 +130,37 @@ void process_request(int cod_op, int cliente_fd) {
 	free(msg);
 	pthread_exit(NULL);
 }
+
+
 void atender_suscripcion(void * msg, int cliente_fd ){
-	int tipo;
+	int queue_id;
+	int pid;
 	suscriber * sus = malloc(sizeof(suscriber));
-	void * confirmation = malloc(sizeof(int));
-	memcpy(&(tipo), msg, sizeof(int));
+	void * confirmation = malloc(sizeof(int)*2);
+
+	memcpy(&(queue_id), msg, sizeof(int));
 
 
 	sus->cliente_fd = cliente_fd;
 	sus->sended = list_create();
 
+	pid = generate_pid();
+
 	//Agregar cliente_fd a una lista de suscribers
-	list_add(suscribers[tipo -1], sus);
+	list_add(suscribers[queue_id -1], sus);
 
 	//Enviar confirmacion
-	sprintf(confirmation, "%d", 1);
-	send(cliente_fd, confirmation, sizeof(int), 0);
+	sprintf(confirmation, "%d", ACK);
+	memcpy(confirmation + sizeof(int) , &pid, sizeof(int));
 
-	//Enviar todos los mensajes anteriores de la cola $TIPO
-	enviar_cacheados( cliente_fd,  tipo);
+	send(cliente_fd, confirmation, sizeof(int)*2, 0);
+
+	//Enviar todos los mensajes anteriores de la cola $queue_id
+	enviar_cacheados( cliente_fd,  queue_id);
 		
 	while(1){
-		//Dejo abierto este hilo a la espera de que haya un nuevo mensaje en la cola $TIPO
-		//Entro en while 1 y recorro constantemente la cola $TIPO hasta que haya un mensaje que tenga en cliente_fd un ack false.
+		//Dejo abierto este hilo a la espera de que haya un nuevo mensaje en la cola $queue_id
+		//Entro en while 1 y recorro constantemente la cola $queue_id hasta que haya un mensaje que tenga en cliente_fd un ack false.
 		//En caso de existir mensaje, hago send y vuelvo al while 1
 	}
 		
@@ -174,12 +184,12 @@ void enviar_cacheados(int cliente_fd, int tipo){
 		int size;
 		void * a_enviar = serializar_paquete(paquete,  &size);
 		
-
 		send(cliente_fd, a_enviar, sizeof(size), 0);
 	}
 	list_iterate(queue,(void*)enviar);
 	
 }
+
 t_paquete* crear_paquete(int op){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->buffer = malloc(sizeof(t_buffer));
@@ -187,23 +197,24 @@ t_paquete* crear_paquete(int op){
 	return paquete;
 }
 
-
 void atender_ack(void *msg){
+	int pid;
 	int id;
-	int correlation_id;
 	int queue_id;
+	memcpy(&(pid), msg, sizeof(int));
+	msg+=sizeof(int);
 	memcpy(&(queue_id), msg, sizeof(int));
 	msg+=sizeof(int);
 	memcpy(&(id), msg, sizeof(int));
-	msg+=sizeof(int);
-	memcpy(&(correlation_id), msg, sizeof(int));
+	
+	
 	//en msg viene id, correlation_id y queue_id
 	//cambiar estado de ack a true del mensaje en suscribers[queue_id][cliente_fd].sendes.ack
 	//En caso de que esten todos los mensajes enviados
 	pthread_exit(NULL);
 }
-void* recibir_mensaje(int socket_cliente, int* size)
-{
+
+void* recibir_mensaje(int socket_cliente, int* size){
 	void * buffer;
 
 	recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
@@ -216,6 +227,10 @@ void* recibir_mensaje(int socket_cliente, int* size)
 int get_id(){
 	//PROGRAMAME
 	return 10;
+}
+int generate_pid(){
+	//PROGRAMAME
+	return 1
 }
 
 
