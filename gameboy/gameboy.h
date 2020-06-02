@@ -16,18 +16,18 @@
 #include<sys/time.h>
 
 enum TIPO{
+
+	//QUEUE_ID
 	NEW_POKEMON = 1,
 	APPEARED_POKEMON = 2,
 	CATCH_POKEMON = 3,
 	CAUGHT_POKEMON = 4,
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
-	SUSCRIPTOR = 7,
-};
 
-enum OPERACION{
-	SUSCRIPCION = 8,
-	MENSAJE = 9,
+	//ACTION
+	SUSCRITO = 7,
+	ACK = 8,
 };
 
 enum TIPO_PROCESO{
@@ -54,6 +54,11 @@ struct option{
 	int val;
 };
 
+typedef struct{
+	int posx;
+	int posy;
+}position;
+
 t_log* logger;
 t_config* config;
 int conexion;
@@ -61,7 +66,6 @@ int conexion;
 t_log* iniciar_logger(void);
 t_config* leer_config(void);
 void iniciar_gameboy(int argc,char* argv[]);
-int getopt_long_only (int argc, char *const *argv, const char *shortopts, const struct option *longopts, int *indexptr);
 void conectar_proceso(int proceso);
 int proceso(char* proceso);
 int tipo_mensaje(char* tipo_mensaje);
@@ -83,7 +87,7 @@ void liberar_conexion(int socket_cliente);
 void* serializar_paquete(t_paquete* paquete, int bytes);
 void recibir_confirmacion_suscripcion(int cliente_fd);
 void* recibir_buffer(int socket_cliente, uint32_t* size);
-void enviar_confirmacion(int socket_cliente);
+void enviar_ack(int id,int socket_cliente);
 t_paquete* crear_paquete(int accion);
 t_list* recibir_paquete(int socket_cliente);
 void recibir_get_pokemon();
