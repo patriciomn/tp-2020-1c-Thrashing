@@ -47,6 +47,7 @@ void iniciar_logger_config() {
 void obtener_datos_archivo_config() {
 	datos_config->tiempo_reintento_conexion = config_get_int_value(config_tall_grass, "TIEMPO_DE_REINTENTO_CONEXION");
 	datos_config->tiempo_reintento_operacion = config_get_int_value(config_tall_grass,"TIEMPO_DE_REINTENTO_OPERACION");
+	datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
 
 	int size_ip = strlen(config_get_string_value(config_tall_grass, "IP_BROKER")) + 1;
 	datos_config->ip_broker = malloc(size_ip);
@@ -286,7 +287,7 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 
 
 	int coordenadas_size = strlen(coordenadas);
-	int cant_blocks = (int) ceil((double)coordenadas_size / datos_config->size_block); // aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
+	int cant_blocks = (int) ceilT((double)coordenadas_size / datos_config->size_block); // aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
 
 	int desplazamiento = 0;
 	for(int i = 0 ; i < cant_blocks ; i++) {
@@ -478,17 +479,13 @@ void crear_metadata_pokemon(char *path_file) {
 
 }
 
-int filesize (FILE* archivo ){
-	fseek(archivo,0,SEEK_END);
-	int ultimo = ftell(archivo);
-	return ultimo/8;
-}
 
-void new_pokemon(char* pokemon,int posx,int posy,int cant){}
+//CAMBIE  NOMBRE PORQUE ROMPE AHORA QUE ESTAN LOS UTILS :)
+void newPokemon(char* pokemon,int posx,int posy,int cant){}
 
-void catch_pokemon(char* pokemon,int posx,int posy){}
+void catchPokemon(char* pokemon,int posx,int posy){}
 
-void get_pokemon(char*pokemon){}
+void getPokemon(char*pokemon){}
 
 // Funciones para la conexion ----------------------------------------------------------
 
@@ -661,3 +658,12 @@ void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 
 }
 */
+int ceilT(double numero){
+	int numAux = numero;
+	if(numero > numAux){
+		return numAux+1;
+	}else{
+		return numAux;
+	}
+}
+

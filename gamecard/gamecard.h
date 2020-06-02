@@ -19,7 +19,7 @@
 #include <sys/socket.h>
 #include <pthread.h>
 
-//#include "utils.h"
+#include "../utils/utils.h"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -51,6 +51,7 @@ struct metadata_info {
 struct config_tallGrass {
     int tiempo_reintento_conexion;
     int tiempo_reintento_operacion;
+	int tiempo_retardo_operacion;
     char *ip_broker;
     char *pto_de_montaje;
     int puerto_broker;
@@ -64,7 +65,7 @@ struct mensaje {
 } ;
 
 //cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
-enum TIPO{
+/*enum TIPO{
 
 	//QUEUE_ID
 	NEW_POKEMON = 1,
@@ -90,7 +91,7 @@ typedef struct{
 	enum TIPO codigo_operacion;
 	t_buffer* buffer;
 } t_paquete;
-
+*/
 int socket_cliente_np;
 int socket_cliente_cp;
 int socket_cliente_gp;
@@ -115,7 +116,7 @@ void crear_archivos_metadata(char *path_metadata);
 int existe_archivo_pokemon(char *path);
 void crear_archivos_pokemon(char *path_pokefile, int posX, int posY, int cantidad);
 void crear_metadata_pokemon(char *path_pokeflie);
-int filesize (FILE* archivo );
+
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
@@ -124,14 +125,14 @@ void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro
 
 
 int tipo_mensaje(char* tipo_mensaje);
-void new_pokemon(char* pokemon,int posx,int posy,int cant);
-void catch_pokemon(char* pokemon,int posx,int posy);
-void get_pokemon(char*pokemon);
+void newPokemon(char* pokemon,int posx,int posy,int cant);
+void catchPokemon(char* pokemon,int posx,int posy);
+void getPokemon(char*pokemon);
 
 // Funciones Sockets
 
 int crear_conexion_broker();
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
 void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
-
+int ceilT(double numero);
 #endif /* GAMECARD_H_ */
