@@ -46,7 +46,6 @@ enum TIPO{
 	ACK = 8,
 };
 
-
 typedef struct{
 	int size;
 	void* stream;
@@ -56,6 +55,11 @@ typedef struct{
 	enum TIPO codigo_operacion;
 	t_buffer* buffer;
 } t_paquete;
+
+typedef struct{
+	int posx;
+	int posy;
+}position;
 
 typedef struct{
 	int tid;
@@ -77,6 +81,7 @@ typedef struct{
 
 typedef struct{
 	int pid;
+	entrenador* exec;
 	t_list* entrenadores;
 	t_list* objetivos;
 	int cant_ciclo;
@@ -198,9 +203,10 @@ void recibir_appeared_pokemon();
 void enviar_confirmacion(int socket_cliente);
 t_list* recibir_paquete(int socket_cliente);
 double estimacion(entrenador* entre);
-entrenador* algoritmo_fifo(t_list* cola_ready);
+void algoritmo_fifo(t_list* cola_ready);
 void fin_de_quantum();
-entrenador* algoritmo_round_robin(t_list* cola_ready);
-entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready);
-entrenador* algoritmo_sjf_con_desalojo(t_list* cola_ready);
+void algoritmo_round_robin(t_list* cola_ready);
+void algoritmo_sjf_sin_desalojo(t_list* cola_ready);
+void algoritmo_sjf_con_desalojo(t_list* cola_ready);
+bool verificar_espera_caught(entrenador* entre);
 #endif /* TEAM_H_ */

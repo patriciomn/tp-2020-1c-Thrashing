@@ -189,18 +189,24 @@ void ejecutar_equipo(){
 		if(!cumplir_objetivo_team()){
 			if(!verificar_deadlock_equipo()){
 				sem_wait(&semPoks);
+				pokemon* pok = pokemon_a_atrapar();
+				algoritmo_largo_plazo(pok);
 				entre = algoritmo_corto_plazo();
 			}
 			else{//USANDO FIFO
 				log_warning(logger,"EN DEADLOCK");
 				t_list* deadlocks = list_filter(equipo->entrenadores,(void*)verificar_deadlock_entrenador);
-				entre = algoritmo_fifo(deadlocks);
+				algoritmo_fifo(deadlocks);
+				entre = list_get(deadlocks,0);
 				despertar_entrenador(entre);
 				list_destroy(deadlocks);
 			}
-			pthread_mutex_lock(&mutexCPU);
-			activar_entrenador(entre);
-			pthread_mutex_unlock(&mutexCPU);
+
+			if(entre != NULL){
+				pthread_mutex_lock(&mutexCPU);
+				activar_entrenador(entre);
+				pthread_mutex_unlock(&mutexCPU);
+			}
 		}
 		else{
 			salir_equipo();
@@ -209,9 +215,9 @@ void ejecutar_equipo(){
 }
 
 void ejecutar_entrenador(entrenador* entre){
-	inicio:	sem_wait(&semExecEntre[entre->tid]);
+	while(1){
+		sem_wait(&semExecEntre[entre->tid]);
 
-	while(entre->estado == EXEC){
 		if(!verificar_deadlock_equipo()){
 			pokemon* pok = pokemon_a_atrapar();
 			move_entrenador(entre,pok->posx,pok->posy);
@@ -221,10 +227,9 @@ void ejecutar_entrenador(entrenador* entre){
 				list_add(entre->espera_caught,pok);
 				pok->espera_caught = 1;
 				bloquear_entrenador(entre);
-				goto inicio;
 			}
 		}
-		else{
+		else{//DEADLOCK
 			bool entrenador_espera_deadlock(entrenador* aux){
 				return aux->estado == BLOCKED && verificar_deadlock_entrenador(aux);
 			}
@@ -251,12 +256,10 @@ void ejecutar_entrenador(entrenador* entre){
 		if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
 			log_warning(logger,"Entrenador%d BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
 			bloquear_entrenador(entre);
-			goto inicio;
 		}
 		else if(!cumplir_objetivo_entrenador(entre)){
 			log_warning(logger,"Entrenador%d BLOCKED Finaliza Su Recorrido!",entre->tid);
 			bloquear_entrenador(entre);
-			goto inicio;
 		}
 		else{
 			salir_entrenador(entre);
@@ -284,6 +287,7 @@ void activar_entrenador(entrenador* entre){
 		printf("Entrenador%d Sale De Cola Ready\n",entre->tid);
 		printf("Entrenador%d EXEC\n",entre->tid);
 		entre->estado = EXEC;
+		equipo->exec = entre;
 		entre->start_time = time(NULL);
 		sem_post(&semExecEntre[entre->tid]);
 	}
@@ -386,8 +390,9 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 //PLANIFICACION----------------------------------------------------------------------------------------------------------------------
 void algoritmo_largo_plazo(pokemon* pok){
 	bool by_estado(entrenador* aux){
-		return (aux->estado == NEW || aux->estado == BLOCKED) && (!verificar_deadlock_entrenador(aux)
-				&& list_is_empty(aux->espera_caught));
+		return (aux->estado == NEW || aux->estado == BLOCKED)
+				&& !verificar_deadlock_entrenador(aux)
+				&& !verificar_espera_caught(aux);
 	}
 	bool by_distancia(entrenador* aux,entrenador* next){
 		return (distancia_pokemon(aux,pok)) < (distancia_pokemon(next,pok));
@@ -409,33 +414,35 @@ void algoritmo_largo_plazo(pokemon* pok){
 	}
 }
 
+bool verificar_espera_caught(entrenador* entre){
+	return !list_is_empty(entre->espera_caught);
+}
+
 entrenador* algoritmo_corto_plazo(){
 	entrenador* entre;
 	if(string_equals_ignore_case(datos_config->algoritmo,"FIFO")){
-		entre = algoritmo_fifo(equipo->cola_ready);
+		algoritmo_fifo(equipo->cola_ready);
 	}
 	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-SD")){
-		entre = algoritmo_sjf_sin_desalojo(equipo->cola_ready);
+		algoritmo_sjf_sin_desalojo(equipo->cola_ready);
 	}
 	else if(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD")){
-		entre = algoritmo_sjf_con_desalojo(equipo->cola_ready);
+		algoritmo_sjf_con_desalojo(equipo->cola_ready);
 	}
 	else{
-		entre = algoritmo_round_robin(equipo->cola_ready);
+		algoritmo_round_robin(equipo->cola_ready);
 	}
+
+	entre = list_get(equipo->cola_ready,0);
 	return entre;
 }
 
-entrenador* algoritmo_fifo(t_list* cola_ready){
+void algoritmo_fifo(t_list* cola_ready){
 	printf("==========FIFO==========\n");
-	entrenador* entre;
 	bool fifo(entrenador* aux1,entrenador* aux2){
 		return aux1->arrival_time < aux2->arrival_time;
 	}
-	t_list* cola_fifo = list_sorted(cola_ready,(void*)fifo);
-	entre = list_get(cola_fifo,0);
-	list_destroy(cola_fifo);
-	return entre;
+	list_sort(cola_ready,(void*)fifo);
 }
 
 double estimacion(entrenador* entre){
@@ -447,45 +454,49 @@ double estimacion(entrenador* entre){
 	return res;
 }
 
-entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready){
+void algoritmo_sjf_sin_desalojo(t_list* cola_ready){
 	printf("==========SJF SIN DESALOJO==========\n");
-	entrenador* entre;
 	bool sjf_sin_desalojo(entrenador* aux1,entrenador* aux2){
 		if(estimacion(aux1) == estimacion(aux2)){
 			return aux1->arrival_time < aux2->arrival_time;
 		}
 		return estimacion(aux1) < estimacion(aux2);
 	}
-	t_list* cola_sjf = list_sorted(cola_ready,(void*)sjf_sin_desalojo);
-	entre = list_get(cola_sjf,0);
-	entre->estimacion_anterior = estimacion(entre);
-	list_destroy(cola_sjf);
-	return entre;
+	list_sort(cola_ready,(void*)sjf_sin_desalojo);
 }
 
-entrenador* algoritmo_sjf_con_desalojo(t_list* cola_ready){//implementar
+void algoritmo_sjf_con_desalojo(t_list* cola_ready){//implementar
 	printf("==========SJF CON DESALOJO==========\n");
-	entrenador* entre;
-
-	return entre;
+	entrenador* exec = equipo->exec;
+	entrenador* ready = list_get(cola_ready,0);
+	bool sjf_sin_desalojo(entrenador* aux1,entrenador* aux2){
+		if(estimacion(aux1) == estimacion(aux2)){
+			return aux1->arrival_time < aux2->arrival_time;
+		}
+		return estimacion(aux1) < estimacion(aux2);
+	}
+	if(exec->estimacion_anterior > ready->estimacion_anterior){
+		list_add(cola_ready,exec);
+		list_sort(cola_ready,(void*)sjf_sin_desalojo);
+	}
 }
 
-entrenador* algoritmo_round_robin(t_list* cola_ready){//IMPLEMENTAR
-	printf("==========ROUND ROBIN==========\n");
-	entrenador* entre = list_get(equipo->cola_ready,0);
+void desalojar_entrenador(entrenador* entre){
 
+}
+
+void algoritmo_round_robin(t_list* cola_ready){//IMPLEMENTAR
+	printf("==========ROUND ROBIN==========\n");
 	struct sigaction action;
 	action.sa_handler = (void*)fin_de_quantum;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);
 	sigaction(SIGALRM, &action,NULL);
 	alarm(datos_config->quantum);
-	return entre;
 }
 
 void fin_de_quantum(){
 	printf("Fin De Quantum\n");
-	alarm(datos_config->quantum);
 }
 
 //DEADLOCK------------------------------------------------------------------------------------------------------------
@@ -729,7 +740,6 @@ void appeared_pokemon(int cliente_fd){//gameboy
 		list_add(equipo->poks_requeridos,pok);
 		pthread_rwlock_unlock(&lockPoksRequeridos);
 		printf("%s Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name);
-		algoritmo_largo_plazo(pok);
 		sem_post(&semPoks);
 	}
 	else{
@@ -893,11 +903,12 @@ void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = GET_POKEMON;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2 + tam ;
+	paquete->buffer->size = sizeof(int) + tam ;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	//memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream,&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),pokemon,tam);
-	memcpy(paquete->buffer->stream+sizeof(int)+tam,&name_size,sizeof(int));
+
 	int bytes = paquete->buffer->size + sizeof(int)*2;
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
@@ -916,17 +927,20 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cli
 	equipo->cant_ciclo += 1;
 	int tam = strlen(pokemon) + 1;
 	int name_size = strlen(pokemon);
+	position* pos = malloc(sizeof(position));
+	pos->posx = posx;
+	pos->posy = posy;
 
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = CATCH_POKEMON;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*4 + tam ;
+	paquete->buffer->size = sizeof(int)*2 + tam +sizeof(position);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	//memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream,&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int), pokemon, tam);
 	memcpy(paquete->buffer->stream+sizeof(int)+tam,&name_size,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*2+tam, &posx,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*3+tam, &posy,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int)*2+tam, &pos,sizeof(position));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
