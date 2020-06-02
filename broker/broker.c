@@ -46,7 +46,7 @@ void esperar_cliente(int socket_servidor)
 {
 	struct sockaddr_in dir_cliente;
 
-	unsigned int tam_direccion = sizeof(struct sockaddr_in);
+	int tam_direccion = sizeof(struct sockaddr_in);
 	log_info(logger,"Waiting Client");
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
 	log_info(logger,"Client received");
@@ -65,8 +65,8 @@ void serve_client(int* socket)
 		pthread_exit(NULL);	
 	}
 		
-	if (cod_op == 0 || cod_op == -1  ){
-		log_error(logger,"ERROR: Bad operation code" );
+	if (cod_op <= 0 ){
+		log_error(logger,"ERROR: Bad operation code: %d", cod_op);
 		pthread_exit(NULL);
 	}	
 	log_info(logger,"Enter to process request, cod_op: %d", cod_op);
