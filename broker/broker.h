@@ -18,23 +18,21 @@
 #include<pthread.h>
 #include<assert.h>
 #include<signal.h>
+#include<semaphore.h>
 
 
-
-typedef struct{
-	bool ack;
-	int id;
-}sent;
 
 typedef struct{
 	int cliente_fd;
-	t_list* sended;
+	int pid;
 }suscriber;
 
 typedef struct{
     int id;
     int correlation_id;
-    void* message;	
+    void* message;
+	t_list* enviados; //ACA SOLO METO PIDS
+	t_list* recibidos; //IDEM ENVIADOS
 }queue_item;
 
 t_list* queues[6];
@@ -44,12 +42,15 @@ t_log* logger;
 t_config* config;
 pthread_t thread;
 
+sem_t semSend;
+
 
 
 
 void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
 int get_id(void);
+int generate_pid(void);
 void build_queues(void);
 void build_suscribers(void);
 void start_sender_thread(void);
@@ -59,9 +60,8 @@ void esperar_cliente(int socket_servidor);
 void serve_client(int* socket);
 void process_request(int cod_op, int cliente_fd);
 void * recibir_mensaje(int socket_cliente, int* size);
-void atender_suscripcion(void * msg, int cliente_fd );
-void atender_ack(void *msg);
-void enviar_cacheados(int cliente_fd, int tipo);
-t_paquete* crear_paquete(int op);
-void atender_ack(void *msg);
+void atender_suscripcion(int cliente_fd );
+void atender_ack(int cliente_fd);
+void enviar_cacheados(suscriber* sus, int queue_id);
+void* crear_paquete(int op, queue_item* queue_item, int* size);
 #endif /* CONEXIONES_H_ */

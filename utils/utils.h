@@ -5,8 +5,8 @@
 
 	FORMA DE ENVIO DE MENSAJES:
 
-	SUSCRIBE: SUSCRITO | QUEUE_ID  Dejar solo 8 bytes para la suscripcion 
-	-> respondo ack con pid que genero y guardo para identificar al proceso (ACK | PID)
+	SUSCRIBE: SUSCRITO | QUEUE_ID | PID  Dejar solo 12 bytes para la suscripcion. En caso de ser la primera suscripcion mandar un -1 en PID
+	-> respondo ack con pid que genero y guardo para identificar al proceso (ACK | PID) 
 
 	NEW : NEW_POKEMON  | SIZE | name_size | name | posx | posy | cantidad
 	APPEARED: APPEARED_POKEMON | SIZE | CORRELATIONID | name_size | name | posx | posy 
@@ -24,13 +24,13 @@
 	FORMA DE RECEPCION DE MENSAJES DE LA COLA:
 
 	NEW : NEW_POKEMON | ID   | name_size | name | posx | posy | cantidad
-	APPEARED: APPEARED_POKEMON  | CORRELATIONID | ID | SIZE | name_size | name | posx | posy 
+	APPEARED: APPEARED_POKEMON  | ID | CORRELATIONID  | name_size | name | posx | posy 
 
 	CATCH: CATCH_POKEMON | ID   | name_size | name | posx | posy
-	CAUGHT: CAUGHT_POKEMON  | CORRELATIONID | ID | SIZE | caught
+	CAUGHT: CAUGHT_POKEMON  | ID | CORRELATIONID |  caught
 
 	GET: GET_POKEMON |ID   | name_size | name
-	LOCALIZED: LOCALIZED_POKEMON | CORRELATIONID | ID  | name_size | name | posx | posy | cantidad_posiciones
+	LOCALIZED: LOCALIZED_POKEMON | ID | CORRELATIONID  | name_size | name | posx | posy | cantidad_posiciones
 
 	ACK RECEPCION: ACK | PID | QUEUE_ID | ID  broker recibe
 

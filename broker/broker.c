@@ -79,27 +79,28 @@ void process_request(int cod_op, int cliente_fd) {
 	int size;
 	void* msg;		
 	queue_item *item = malloc(sizeof(queue_item));
-	void * correlation_id_str = malloc(sizeof(int));;
+	void * confirmation = malloc(sizeof(int)*2);;
 	
 	log_info(logger,"Processing request, cod_op: %d", cod_op);
 	
 
-	if (cod_op == SUSCRITO) atender_suscripcion(msg, cliente_fd );
+	if (cod_op == SUSCRITO) atender_suscripcion(cliente_fd );
 	
-	else if (cod_op == ACK) atender_ack(msg);
+	else if (cod_op == ACK) atender_ack(  cliente_fd);
 
 	msg = recibir_mensaje(cliente_fd, &size);	
 
 	item->id = get_id();
 
-	memcpy(&(item->correlation_id), msg, sizeof(int));
-	msg += sizeof(int);
+	
 
 	if (cod_op == NEW_POKEMON){
 		new_pokemon* new = deserializar_new(msg);
 		item->message = new;
 	}
 	else if (cod_op == APPEARED_POKEMON){
+		memcpy(&(item->correlation_id), msg, sizeof(int));
+		msg += sizeof(int);
 		appeared_pokemon* appeared = deserializar_appeared(msg);
 		item->message = appeared;
 	}
@@ -108,6 +109,8 @@ void process_request(int cod_op, int cliente_fd) {
 		item->message = catch;
 	}
 	else if (cod_op == CAUGHT_POKEMON){
+		memcpy(&(item->correlation_id), msg, sizeof(int));
+		msg += sizeof(int);
 		caught_pokemon* caught = deserializar_caught(msg);
 		item->message = caught;
 	}
@@ -116,6 +119,8 @@ void process_request(int cod_op, int cliente_fd) {
 		item->message = get;
 	}
 	else if (cod_op == LOCALIZED_POKEMON){
+		memcpy(&(item->correlation_id), msg, sizeof(int));
+		msg += sizeof(int);
 		localized_pokemon* localized = deserializar_localized(msg);
 		item->message = localized;
 	}
@@ -123,31 +128,53 @@ void process_request(int cod_op, int cliente_fd) {
 	//Pushear en la cola correspondiente con id, correlationId 
 	list_add(queues[cod_op -1], item);
 	
-	//Responder correlation_id al que me envio el req (cliente_fd)
-	sprintf(correlation_id_str, "%d", item->correlation_id);
-	send(cliente_fd, correlation_id_str, sizeof(item->correlation_id), 0);
+	//Responder id al que me envio el req (cliente_fd)
+	sprintf(confirmation, "%d", ACK);
+	memcpy(confirmation + sizeof(int) , &item->id, sizeof(int));
+	send(cliente_fd, confirmation, sizeof(item->id), 0);
+
+
+	//Aca deberia levantar algun semaforo que habilite un proceso que me mande el mensaje que se agrego a la cola a los demas
+	sem_post(&semSend);
 
 	free(msg);
+	free(confirmation);
 	pthread_exit(NULL);
 }
 
 
-void atender_suscripcion(void * msg, int cliente_fd ){
+void atender_suscripcion( int cliente_fd ){
+	void * msg=malloc(sizeof(int)*2);
 	int queue_id;
 	int pid;
+	
 	suscriber * sus = malloc(sizeof(suscriber));
 	void * confirmation = malloc(sizeof(int)*2);
 
-	memcpy(&(queue_id), msg, sizeof(int));
 
+	//recibo 8 bytes restantes
+	recv(cliente_fd, msg, sizeof(int) * 2, MSG_WAITALL);
+
+
+	memcpy(&(queue_id), msg, sizeof(int));
+	msg+=sizeof(int);
+	memcpy(&(pid), msg, sizeof(int));
+
+	if (pid == -1){
+		//Esto pasa cuando entra por primera vez
+		pid = generate_pid();
+	}
 
 	sus->cliente_fd = cliente_fd;
-	sus->sended = list_create();
-
-	pid = generate_pid();
-
-	//Agregar cliente_fd a una lista de suscribers
-	list_add(suscribers[queue_id -1], sus);
+	sus->pid = pid;
+	
+	bool existe(suscriber* aux){
+		return aux->pid == pid;
+	}
+	if (!list_find(suscribers[queue_id -1],(void*)existe) ){
+		//Agregar cliente_fd a una lista de suscribers
+		list_add(suscribers[queue_id -1], sus);
+	}	
 
 	//Enviar confirmacion
 	sprintf(confirmation, "%d", ACK);
@@ -156,61 +183,85 @@ void atender_suscripcion(void * msg, int cliente_fd ){
 	send(cliente_fd, confirmation, sizeof(int)*2, 0);
 
 	//Enviar todos los mensajes anteriores de la cola $queue_id
-	enviar_cacheados( cliente_fd,  queue_id);
+	enviar_cacheados( sus,  queue_id);
 		
 	while(1){
 		//Dejo abierto este hilo a la espera de que haya un nuevo mensaje en la cola $queue_id
-		//Entro en while 1 y recorro constantemente la cola $queue_id hasta que haya un mensaje que tenga en cliente_fd un ack false.
-		//En caso de existir mensaje, hago send y vuelvo al while 1
+		sem_wait(&semSend);
+		enviar_cacheados( sus,  queue_id);
 	}
 		
 }
 
-void enviar_cacheados(int cliente_fd, int tipo){
-	t_list* queue = list_filter(queues[tipo -1],(void*)true);
 
-	if(list_is_empty(queue)) return;
-
-	
-
-	void enviar(void* ele){
-		queue_item * item = ele;
-		t_paquete * paquete = crear_paquete(NEW_POKEMON);
-		paquete->codigo_operacion = tipo;
-		paquete->buffer->id =item->id;
-		paquete->buffer->correlation_id =item->correlation_id;
-		paquete->buffer->stream = item->message;
-
-		int size;
-		void * a_enviar = serializar_paquete(paquete,  &size);
-		
-		send(cliente_fd, a_enviar, sizeof(size), 0);
+void enviar_cacheados(suscriber * sus, int queue_id){
+	void enviar(queue_item* queue_item){
+		bool existe(suscriber * sus_aux){
+			return sus_aux->pid == sus->pid;
+		}
+		if (!list_any_satisfy(queue_item->recibidos,(void*)existe) ){
+			int size;
+			size =0;
+			void * paquete = crear_paquete(queue_id, queue_item, &size);
+			send(sus->cliente_fd, paquete, size, 0);
+			if(!list_any_satisfy(queue_item->enviados, (void*)existe)){
+				list_add(queue_item->enviados, sus);
+			}
+		}
 	}
-	list_iterate(queue,(void*)enviar);
+	list_iterate(queues[queue_id -1],(void*)enviar);
 	
 }
 
-t_paquete* crear_paquete(int op){
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->codigo_operacion = op;
+void* crear_paquete(int op, queue_item * queue_item, int *size) {
+	int desplazamiento = 0;
+	void* stream = serializar_any(queue_item ->message ,size,  op);
+
+	void* paquete = malloc(*size + sizeof(int) * 3);
+
+	memcpy(paquete, &(op), sizeof(int) );
+	desplazamiento +=sizeof(int);
+	memcpy(paquete + desplazamiento, &(queue_item->id), sizeof(int) );
+	desplazamiento +=sizeof(int);
+	if (op == APPEARED_POKEMON || op == CAUGHT_POKEMON || op == LOCALIZED_POKEMON ){
+		memcpy(paquete + desplazamiento, &(queue_item->correlation_id), sizeof(int) );
+		desplazamiento +=sizeof(int);
+	}
+	memcpy(paquete + desplazamiento, stream, *size);
+
+	*size += desplazamiento;
+	
 	return paquete;
 }
 
-void atender_ack(void *msg){
-	int pid;
-	int id;
-	int queue_id;
+void atender_ack( int cliente_fd){
+	int pid, queue_id, id;
+	void *msg=malloc(sizeof(int) * 3);
+	suscriber * sus = malloc(sizeof(suscriber));
+	queue_item * new;
+	//en msg viene id, correlation_id y queue_id
+
+
+	//recibo 12 bytes restantes
+	recv(cliente_fd, msg, sizeof(int) * 3, MSG_WAITALL);
+
 	memcpy(&(pid), msg, sizeof(int));
 	msg+=sizeof(int);
 	memcpy(&(queue_id), msg, sizeof(int));
 	msg+=sizeof(int);
 	memcpy(&(id), msg, sizeof(int));
+
+	sus->pid = pid;
+	sus->cliente_fd = cliente_fd;
+
+	bool existe(queue_item* aux){
+		return aux->id == id;
+	}
+	new = list_find(queues[queue_id -1],(void*)existe);
+	list_remove_by_condition(queues[queue_id -1], (void*)existe);
+	list_add(new->recibidos, sus);
+	list_add(queues[queue_id -1], new);
 	
-	
-	//en msg viene id, correlation_id y queue_id
-	//cambiar estado de ack a true del mensaje en suscribers[queue_id][cliente_fd].sendes.ack
-	//En caso de que esten todos los mensajes enviados
 	pthread_exit(NULL);
 }
 
@@ -230,7 +281,7 @@ int get_id(){
 }
 int generate_pid(){
 	//PROGRAMAME
-	return 1
+	return 1;
 }
 
 
@@ -240,6 +291,7 @@ void iniciar_broker(void){
 	config = config_create("broker.config");
 	build_queues();
 	build_suscribers();
+	sem_init(&semSend,0,1);
 	start_sender_thread();
 	log_info(logger,"BROKER START!");
 	
@@ -251,6 +303,8 @@ void build_queues(void){
 		queues[i] =	list_create();
 }
 void build_suscribers(void){
+	for (int i = 0; i < 6; i++)
+		suscribers[i] =	list_create();
 	//Aca hay que levantar de la memoria todos los suscribers y generar suscribers 
 }
 
