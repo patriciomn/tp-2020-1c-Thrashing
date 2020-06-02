@@ -853,26 +853,15 @@ void recibir_appeared_pokemon(){
 	}
 }
 
-void enviar_ack(int tipo,int id,int id_correlativo,int socket_cliente){
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = ACK;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*4;
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int), &tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*2, &id, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*3, &id_correlativo, sizeof(int));
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
+void enviar_ack(int id,int socket_cliente){
+	int operacion = ACK;
+	int bytes = 2 * sizeof(int);
+	void* buf = malloc(bytes);
+	memcpy(buf,&operacion,sizeof(int));
+	memcpy(buf+sizeof(int),&id,sizeof(int));
+	send(socket_cliente,&buf, bytes, 0);
+	printf("CONFIRMACION ENVIADA\n");
+	free(buf);
 }
 
 
@@ -882,8 +871,8 @@ void enviar_info_suscripcion(int tipo,int socket_cliente){
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int)*2;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&equipo->pid,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int), &tipo, sizeof(int));
+	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&equipo->pid,sizeof(int));
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
@@ -921,6 +910,7 @@ void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente){
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
 	free(paquete);
+
 }
 
 void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cliente){
@@ -950,6 +940,7 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cli
 
 	log_info(logger,"CATCH_POKEMON: %s",pokemon);
 
+	free(pos);
 	free(a_enviar);
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
