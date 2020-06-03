@@ -17,7 +17,6 @@ void iniciar_gameboy(int argc,char* argv[]){
 	int process,tipo_msg;
 	if(argv[1]!=NULL &&argv[2]!=NULL){
 		process = proceso(argv[1]);//identificar BROKER/GAMECARD/TEAM/SUSCRIPTOR
-		conectar_proceso(process);
 		tipo_msg = tipo_mensaje(argv[2]);
 		if(process == SUSCRITO){
 			suscriptor(tipo_msg);
@@ -30,12 +29,20 @@ void iniciar_gameboy(int argc,char* argv[]){
 			//argv[3]:nombre_pokemon,argv[4]:posx,argv[5]:posy,argv[6]:cantidad,argv[7]:id_correlacional
 			if(process == BROKER){
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL&&argv[6]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_new_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			else{
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL&&argv[6]!=NULL&&argv[7]){
+					conectar_proceso(process);
 					enviar_mensaje_new_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),atoi(argv[7]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 
@@ -44,12 +51,20 @@ void iniciar_gameboy(int argc,char* argv[]){
 			//argv[3]:nombre_pokemon,argv[4]:posx,argv[5]:posy
 			if(process == BROKER){
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_catch_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			else{
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL &&argv[6]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_catch_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			break;
@@ -57,30 +72,50 @@ void iniciar_gameboy(int argc,char* argv[]){
 			//argv[3]:nombre_pokemon,argv[4]:posx,argv[5]:posy,argv[6]:id_mensaje
 			if(process == BROKER){
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL&&argv[6]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_appeared_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}else{
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_appeared_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			break;
 		case CAUGHT_POKEMON:
 			//argv[3]:id_mensaje,argv[4]:ok/fail
 			if(argv[3]!=NULL &&argv[4]!=NULL){
+				conectar_proceso(process);
 				enviar_mensaje_caught_pokemon(atoi(argv[3]),atoi(argv[4]),conexion);
+			}
+			else{
+				log_error(logger,"Parametros Incompletos");
 			}
 			break;
 		case GET_POKEMON:
 			//argv[3]:nombre_pokemon
 			if(process == BROKER){
 				if(argv[3]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_get_pokemon_broker(argv[3],conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			else{
 				if(argv[3]!=NULL&&argv[4]!=NULL){
+					conectar_proceso(process);
 					enviar_mensaje_get_pokemon(argv[3],atoi(argv[4]),conexion);
+				}
+				else{
+					log_error(logger,"Parametros Incompletos");
 				}
 			}
 			break;
