@@ -6,11 +6,11 @@ int main () {
 
     obtener_datos_archivo_config();
 
-    verificar_punto_de_montaje();
+    //verificar_punto_de_montaje();
 
-    //suscripcion_colas_broker();
+    suscripcion_colas_broker();
 
-    crear_archivos_pokemon("Pikachu", 100, 100, 100);
+    //crear_archivos_pokemon("Pikachu", 100, 100, 100);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -47,7 +47,7 @@ void iniciar_logger_config() {
 void obtener_datos_archivo_config() {
 	datos_config->tiempo_reintento_conexion = config_get_int_value(config_tall_grass, "TIEMPO_DE_REINTENTO_CONEXION");
 	datos_config->tiempo_reintento_operacion = config_get_int_value(config_tall_grass,"TIEMPO_DE_REINTENTO_OPERACION");
-	datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
+	//datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
 
 	int size_ip = strlen(config_get_string_value(config_tall_grass, "IP_BROKER")) + 1;
 	datos_config->ip_broker = malloc(size_ip);
@@ -489,6 +489,24 @@ void getPokemon(char*pokemon){}
 
 // Funciones para la conexion ----------------------------------------------------------
 
+void suscripcion_colas_broker() {
+
+	log_info(logger, "ESTABLECIENDO CONEXION CON EL BROKER");
+	socket_cliente_np = crear_conexion();
+	socket_cliente_cp = crear_conexion();
+	socket_cliente_gp = crear_conexion();
+
+	if(socket_cliente_np == -1) { // puede ser cualquier socket_cliente, si uno no conecto el resto tampoco
+			log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
+			pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
+			pthread_join(servidor_gamecard, NULL);
+	}
+	//enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
+	//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
+	//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
+
+}
+
 int crear_conexion() {
 	struct addrinfo hints;
 	struct addrinfo *server_info;
@@ -502,27 +520,13 @@ int crear_conexion() {
 
 	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
 
-	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1)
-		log_error(logger, "ERROR AL CONECTARSE CON EL BROKER");
+	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1) {
 		return -1;
+	}
 
 	freeaddrinfo(server_info);
 
 	return socket_cliente;
-}
-
-void suscripcion_colas_broker() {
-
-	log_info(logger, "ESTABLECIENDO CONEXION CON EL BROKER");
-	socket_cliente_np = crear_conexion();
-	enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
-
-	//socket_cliente_cp = crear_conexion();
-	//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
-
-	//socket_cliente_gp = crear_conexion();
-	//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
-
 }
 
 
@@ -530,7 +534,7 @@ void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
-	paquete->codigo_operacion = SUSCRITO;
+	//paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
@@ -565,8 +569,9 @@ void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
 	return magic;
 }
 
-/*
-void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
+
+void iniciar_servidor(void) {
+
 	int socket_servidor;
 
     struct addrinfo hints, *servinfo, *p;
@@ -576,7 +581,7 @@ void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    getaddrinfo(ip_gamecard, puerto_gamecard, &hints, &servinfo);
+    getaddrinfo(IP_SERVIDOR, PUERTO_SERVIDOR, &hints, &servinfo);
 
     for (p=servinfo; p != NULL; p = p->ai_next)
     {
@@ -591,33 +596,111 @@ void iniciar_servidor(char *ip_gamecard, char *puerto_gamecard) {
     }
 
 	listen(socket_servidor, SOMAXCONN);
-
+	log_info(logger, "GAMECARD INICIADO COMO SERVIDOR PARA GAMEBOY, ESPERANDO MENSAJES...");
     freeaddrinfo(servinfo);
 
     while(1)
     	esperar_cliente(socket_servidor);
 }
 
+// revisar los fuckings recvs
 void esperar_cliente(int socket_servidor) {
 	struct sockaddr_in dir_cliente;
-	pthread_t thread; //ver si es global o local (teniendo en cuenta que nos van a llover 10000 peticiones por segundo)
-
 	int tam_direccion = sizeof(struct sockaddr_in);
 
-	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
+	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, (socklen_t *)&tam_direccion);
+	log_info(logger, "GAMEBOY CONECTADO!",socket_cliente);
 
-	//pthread_create(&thread,NULL,(void*)serve_client,&socket_cliente);
-	pthread_detach(thread);
-
-}
-
-void serve_client(int* socket) {
 	int cod_op;
-	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1)
+	if(recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL) == -1) {
 		cod_op = -1;
-	process_request(cod_op, *socket);
+	}
+	printf("Codigo operacion: %d\n", cod_op);
+
+	int sizeStream;
+	if(recv(socket_cliente, &sizeStream, sizeof(int), MSG_WAITALL) == -1) {
+		sizeStream = -1;
+	}
+	printf("size_stream: %d\n", sizeStream);
+
+	void *stream = malloc(sizeStream);
+	if(recv(socket_cliente, stream, sizeStream, MSG_WAITALL) == -1) {
+
+	}
+
+	//printf("Codigo operacion: %d\n", codigoOperacion);
+	//atender_peticion(socket_cliente);
 }
-*/
+
+
+void atender_peticion(int socket_cliente) {
+	log_info(logger, "ATENDER PETICION");
+
+	int codigoDeOperacion;
+	if(recv(socket_cliente, &codigoDeOperacion, sizeof(int), MSG_WAITALL) == -1) {
+		log_error(logger, "ERROR AL RECIBIR EL CODIGO DE OPERACION");
+		codigoDeOperacion = -1;
+	}
+	log_info(logger, "codigo de operacion: %d", codigoDeOperacion);
+
+	int size_buffer;
+
+	switch(codigoDeOperacion) {
+		case NEW_POKEMON:
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON");
+			recv(socket_cliente, &size_buffer, sizeof(int), MSG_WAITALL);
+			void *stream = malloc(size_buffer);
+			recv(socket_cliente, stream, size_buffer, MSG_WAITALL);
+			NPokemon *newPokemon = malloc(sizeof(NPokemon));
+
+			deserealizar_new_pokemon(stream, newPokemon);
+
+			printf("%d\n",newPokemon->correlational_id);
+			printf("%s\n", newPokemon->name);
+			printf("%d\n", newPokemon->posicion.posX);
+			printf("%d\n", newPokemon->posicion.posY);
+			printf("%d\n", newPokemon->cantidad);
+
+			free(stream);
+			exit(0);
+		break;
+
+		case 3:
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON");
+		break;
+
+		case 5:
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON");
+		break;
+
+		default:
+			log_warning(logger, "NO SE RECIBIO NINGUNA DE LAS ANTERIORES");
+		break;
+	}
+}
+
+void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon) {
+	int desplazamiento = 0;
+
+	memcpy(&(newPokemon->correlational_id), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(&(newPokemon->size_name), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+
+	newPokemon->name = malloc(newPokemon->size_name);
+	memcpy(newPokemon->name, stream + desplazamiento, newPokemon->size_name);
+	desplazamiento += newPokemon->size_name;
+
+	memcpy(&(newPokemon->posicion), stream + desplazamiento, sizeof(Position));
+	desplazamiento += sizeof(Position);
+
+	memcpy(&(newPokemon->cantidad), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+}
+
+
+
 
 /*
 void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
@@ -643,20 +726,6 @@ void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
 			// get_pokemon(char*pokemon)
 		break;
 	}
-	*/
-	/*
-	if(strcmp(tipo_mensaje,"NEW_POKEMON") == 0){
-		return NEW_POKEMON;
-	}
-	else if(strcmp(tipo_mensaje,"CATCH_POKEMON") == 0){
-		return CATCH_POKEMON;
-	}
-	else if(strcmp(tipo_mensaje,"GET_POKEMON") == 0){
-		return GET_POKEMON;
-	}
-	return -1;
-
-}
 */
 int ceilT(double numero){
 	int numAux = numero;

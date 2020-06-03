@@ -38,6 +38,9 @@
 #define GUION "-"
 #define IGUAL "="
 
+#define IP_SERVIDOR		 "127.0.0.3"
+#define PUERTO_SERVIDOR  "4446"
+
 
 t_log *logger;
 t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
@@ -59,14 +62,17 @@ struct config_tallGrass {
     int blocks;
 };
 
+struct dataServer{
+	char *ipGamecard;
+	int puertoGamecard;
+};
+
 struct mensaje {
     int id;
     void* message;
 } ;
-
-//cambio los valores de pokemon segun la carpeta utils que va a utilizar(supongo) el broker
-/*enum TIPO{
-
+/*
+enum TIPO {
 	//QUEUE_ID
 	NEW_POKEMON = 1,
 	APPEARED_POKEMON = 2,
@@ -74,12 +80,8 @@ struct mensaje {
 	CAUGHT_POKEMON = 4,
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
-
-	//ACTION
-	SUSCRITO = 7,
-	ACK = 8,
 };
-
+ /*
 typedef struct{
 	int id;
 	int correlation_id;
@@ -87,11 +89,31 @@ typedef struct{
 	void* stream;
 } t_buffer;
 
-typedef struct{
+
+typedef struct {
+	int size;
+	void* stream;
+} t_buffer;
+
+typedef struct {
 	enum TIPO codigo_operacion;
 	t_buffer* buffer;
 } t_paquete;
 */
+typedef struct {
+	int posX;
+	int posY;
+}Position;
+
+typedef struct {
+	int correlational_id;
+	int size_name;
+	char *name;
+	Position posicion;
+	int cantidad;
+}NPokemon;
+
+
 int socket_cliente_np;
 int socket_cliente_cp;
 int socket_cliente_gp;
@@ -99,6 +121,8 @@ int socket_cliente_gp;
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
 
+// Hilos para gamecard
+pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servidor e interacturar con gameboy si el broker cae
 
 //FUNCIONES
 
@@ -132,7 +156,19 @@ void getPokemon(char*pokemon);
 // Funciones Sockets
 
 int crear_conexion_broker();
+int crear_conexion();
+void esperar_cliente(int socket_servidor);
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
 void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
+void atender_peticion(int socket);
+void iniciar_servidor();
+void suscripcion_colas_broker();
 int ceilT(double numero);
+
+// serializaciones y deserealizaciones
+
+void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon);
+
+
+
 #endif /* GAMECARD_H_ */
