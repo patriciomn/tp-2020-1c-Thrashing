@@ -2,6 +2,8 @@
 
 int main () {
 
+	//printf("Positions size: %d", sizeof(Position));
+
     iniciar_logger_config();
 
     obtener_datos_archivo_config();
@@ -529,7 +531,7 @@ int crear_conexion() {
 	return socket_cliente;
 }
 
-
+/*
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 
 	t_paquete* paquete = malloc(sizeof(t_paquete));
@@ -568,7 +570,7 @@ void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
 
 	return magic;
 }
-
+*/
 
 void iniciar_servidor(void) {
 
@@ -603,7 +605,7 @@ void iniciar_servidor(void) {
     	esperar_cliente(socket_servidor);
 }
 
-// revisar los fuckings recvs
+
 void esperar_cliente(int socket_servidor) {
 	struct sockaddr_in dir_cliente;
 	int tam_direccion = sizeof(struct sockaddr_in);
@@ -615,7 +617,13 @@ void esperar_cliente(int socket_servidor) {
 	if(recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL) == -1) {
 		cod_op = -1;
 	}
-	printf("Codigo operacion: %d\n", cod_op);
+	log_info(logger, "codigo de operacion: %d", cod_op);
+
+	atender_peticion(socket_cliente, cod_op);
+}
+
+
+void atender_peticion(int socket_cliente, int cod_op) {
 
 	int sizeStream;
 	if(recv(socket_cliente, &sizeStream, sizeof(int), MSG_WAITALL) == -1) {
@@ -625,52 +633,51 @@ void esperar_cliente(int socket_servidor) {
 
 	void *stream = malloc(sizeStream);
 	if(recv(socket_cliente, stream, sizeStream, MSG_WAITALL) == -1) {
-
 	}
 
-	//printf("Codigo operacion: %d\n", codigoOperacion);
-	//atender_peticion(socket_cliente);
-}
-
-
-void atender_peticion(int socket_cliente) {
-	log_info(logger, "ATENDER PETICION");
-
-	int codigoDeOperacion;
-	if(recv(socket_cliente, &codigoDeOperacion, sizeof(int), MSG_WAITALL) == -1) {
-		log_error(logger, "ERROR AL RECIBIR EL CODIGO DE OPERACION");
-		codigoDeOperacion = -1;
-	}
-	log_info(logger, "codigo de operacion: %d", codigoDeOperacion);
-
-	int size_buffer;
-
-	switch(codigoDeOperacion) {
+	switch(cod_op) {
 		case NEW_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON");
-			recv(socket_cliente, &size_buffer, sizeof(int), MSG_WAITALL);
-			void *stream = malloc(size_buffer);
-			recv(socket_cliente, stream, size_buffer, MSG_WAITALL);
 			NPokemon *newPokemon = malloc(sizeof(NPokemon));
+			deserealizar_new_pokemon_gameboy(stream, newPokemon);
 
-			deserealizar_new_pokemon(stream, newPokemon);
+			printf("ID MENSAJE: %d\n", newPokemon->id_mensaje);
+			printf("POKEMON: %s\n", newPokemon->nombre);
+			printf("PosX: %d\n", newPokemon->posicion.posX);
+			printf("PosY: %d\n", newPokemon->posicion.posY);
+			printf("Cantidad: %d\n", newPokemon->cantidad);
 
-			printf("%d\n",newPokemon->correlational_id);
-			printf("%s\n", newPokemon->name);
-			printf("%d\n", newPokemon->posicion.posX);
-			printf("%d\n", newPokemon->posicion.posY);
-			printf("%d\n", newPokemon->cantidad);
-
+			free(newPokemon);
 			free(stream);
 			exit(0);
 		break;
 
-		case 3:
+		case CATCH_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON");
+			CPokemon *catchPokemon = malloc(sizeof(CPokemon));
+			deserealizar_catch_pokemon_gameboy(stream, catchPokemon);
+
+			printf("ID MENSAJE: %d\n", catchPokemon->id_mensaje);
+			printf("POKEMON: %s\n", catchPokemon->nombre);
+			printf("PosX: %d\n", catchPokemon->posicion.posX);
+			printf("PosY: %d\n", catchPokemon->posicion.posY);
+
+			free(catchPokemon);
+			free(stream);
+			exit(0);
 		break;
 
-		case 5:
+		case GET_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON");
+			GPokemon *getPokemon = malloc(sizeof(GPokemon));
+			deserealizar_get_pokemon_gameboy(stream, getPokemon);
+
+			printf("ID MENSAJE: %d\n", getPokemon->id_mensaje);
+			printf("POKEMON: %s\n", getPokemon->nombre);
+
+			free(getPokemon);
+			free(stream);
+			exit(0);
 		break;
 
 		default:
@@ -679,18 +686,20 @@ void atender_peticion(int socket_cliente) {
 	}
 }
 
-void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon) {
+void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon) {
 	int desplazamiento = 0;
 
-	memcpy(&(newPokemon->correlational_id), stream + desplazamiento, sizeof(int));
+	memcpy(&(newPokemon->id_mensaje), stream + desplazamiento, sizeof(int));
 	desplazamiento += sizeof(int);
 
-	memcpy(&(newPokemon->size_name), stream + desplazamiento, sizeof(int));
+	int size_name;
+	memcpy(&size_name, stream + desplazamiento, sizeof(int));
 	desplazamiento += sizeof(int);
+	size_name ++;
 
-	newPokemon->name = malloc(newPokemon->size_name);
-	memcpy(newPokemon->name, stream + desplazamiento, newPokemon->size_name);
-	desplazamiento += newPokemon->size_name;
+	newPokemon->nombre = malloc(size_name);
+	memcpy(newPokemon->nombre, stream + desplazamiento, size_name);
+	desplazamiento += size_name;
 
 	memcpy(&(newPokemon->posicion), stream + desplazamiento, sizeof(Position));
 	desplazamiento += sizeof(Position);
@@ -699,34 +708,41 @@ void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon) {
 	desplazamiento += sizeof(int);
 }
 
+void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon) {
+	int desplazamiento = 0;
 
+	memcpy(&(catchPokemon->id_mensaje), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
 
+	int size_name;
+	memcpy(&size_name, stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+	size_name ++;
 
-/*
-void tipo_mensaje(char* tipo_mensaje){ //robado de Gameboy, robar es malo
-	log_info(logger,"TIPO_MENSAJE: %s",tipo_mensaje);
+	catchPokemon->nombre = malloc(size_name);
+	memcpy(catchPokemon->nombre, stream + desplazamiento, size_name);
+	desplazamiento += size_name;
 
-	switch(variable a definir){
-		case NEW_POKEMON:
-			// se procesa el mensaje new_pokemon
-			// new_pokemon(char* pokemon,int posx,int posy,int cant)
-		break;
+	memcpy(&(catchPokemon->posicion), stream + desplazamiento, sizeof(Position));
+	desplazamiento += sizeof(Position);
+}
 
-		case CATCH_POKEMON:
-			// se procesa el mensaje new_pokemon
-			// catch_pokemon(char* pokemon,int posx,int posy)
-		break;
+void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon) {
+	int desplazamiento = 0;
 
-		case GET_POKEMON:
-			// se procesa el mensaje new_pokemon
-		break;
+	memcpy(&(getPokemon->id_mensaje), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
 
-		default:
-			// en caso de que no sea ninguna (ver que hacer)
-			// get_pokemon(char*pokemon)
-		break;
-	}
-*/
+	int size_name;
+	memcpy(&size_name, stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+	size_name ++;
+
+	getPokemon->nombre = malloc(size_name);
+	memcpy(getPokemon->nombre, stream + desplazamiento, size_name);
+	desplazamiento += size_name;
+}
+
 int ceilT(double numero){
 	int numAux = numero;
 	if(numero > numAux){

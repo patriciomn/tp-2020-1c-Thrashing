@@ -81,7 +81,7 @@ enum TIPO {
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
 };
- /*
+
 typedef struct{
 	int id;
 	int correlation_id;
@@ -105,13 +105,25 @@ typedef struct {
 	int posY;
 }Position;
 
+// Los siguientes structs son para recibir mensajes del gameboy
+
 typedef struct {
-	int correlational_id;
-	int size_name;
-	char *name;
+	int id_mensaje;
+	char *nombre;
 	Position posicion;
 	int cantidad;
 }NPokemon;
+
+typedef struct {
+	int id_mensaje;
+	char *nombre;
+	Position posicion;
+}CPokemon;
+
+typedef struct {
+	int id_mensaje;
+	char *nombre;
+}GPokemon;
 
 
 int socket_cliente_np;
@@ -160,15 +172,15 @@ int crear_conexion();
 void esperar_cliente(int socket_servidor);
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
 void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
-void atender_peticion(int socket);
+void atender_peticion(int socket, int cod_op);
 void iniciar_servidor();
 void suscripcion_colas_broker();
 int ceilT(double numero);
 
 // serializaciones y deserealizaciones
 
-void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon);
-
-
+void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon);
+void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon);
+void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon);
 
 #endif /* GAMECARD_H_ */
