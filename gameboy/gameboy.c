@@ -254,7 +254,7 @@ void enviar_mensaje_new_pokemon_broker(char* pokemon,int posx,int posy,int cant,
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream,&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),pokemon,tam);
-	memcpy(paquete->buffer->stream+sizeof(int)+tam, &pos,sizeof(position));
+	memcpy(paquete->buffer->stream+sizeof(int)+tam,pos,sizeof(position));
 	memcpy(paquete->buffer->stream+sizeof(int)+tam+sizeof(position), &cant,sizeof(int));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
@@ -284,7 +284,7 @@ void enviar_mensaje_new_pokemon(char* pokemon,int posx,int posy,int cant, int id
 	memcpy(paquete->buffer->stream,&id_correlacional,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int)*2,pokemon,tam);
-	memcpy(paquete->buffer->stream+sizeof(int)*2+tam, &pos,sizeof(position));
+	memcpy(paquete->buffer->stream+sizeof(int)*2+tam,pos,sizeof(position));
 	memcpy(paquete->buffer->stream+sizeof(int)*2+tam+sizeof(position), &cant,sizeof(int));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
@@ -314,13 +314,14 @@ void enviar_mensaje_appeared_pokemon_broker(char* pokemon,int posx,int posy,int 
 	memcpy(paquete->buffer->stream, &id_correlacional, sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int)*2, pokemon,tam);
-	memcpy(paquete->buffer->stream+tam+sizeof(int)*2,&pos, sizeof(position));
+	memcpy(paquete->buffer->stream+tam+sizeof(int)*2,pos, sizeof(position));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
 	send(socket_cliente, a_enviar, bytes, 0);
 
+	free(pos);
 	free(a_enviar);
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
@@ -329,21 +330,24 @@ void enviar_mensaje_appeared_pokemon_broker(char* pokemon,int posx,int posy,int 
 
 void enviar_mensaje_appeared_pokemon(char* pokemon,int posx,int posy,int socket_cliente){
 	int tam = strlen(pokemon) + 1;
+	position* pos = malloc(sizeof(position));
+	pos->posx = posx;
+	pos->posy = posy;
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
 	paquete->codigo_operacion = APPEARED_POKEMON;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = tam + sizeof(int)*2;
+	paquete->buffer->size = tam + sizeof(position);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream,pokemon,tam);
-	memcpy(paquete->buffer->stream+tam,&posx, sizeof(int));
-	memcpy(paquete->buffer->stream+tam+sizeof(int),&posy,sizeof(int));
+	memcpy(paquete->buffer->stream+tam,pos,sizeof(position));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
 	send(socket_cliente, a_enviar, bytes, 0);
 
+	free(pos);
 	free(a_enviar);
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
@@ -388,7 +392,7 @@ void enviar_mensaje_catch_pokemon_broker(char* pokemon,int posx,int posy,int soc
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream,&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),pokemon,tam);
-	memcpy(paquete->buffer->stream+sizeof(int)+tam, &pos,sizeof(position));
+	memcpy(paquete->buffer->stream+sizeof(int)+tam,pos,sizeof(position));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
@@ -419,7 +423,7 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int id_correla
 	memcpy(paquete->buffer->stream,&id_correlacional,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int)*2,pokemon,tam);
-	memcpy(paquete->buffer->stream+sizeof(int)*2+tam, &pos,sizeof(position));
+	memcpy(paquete->buffer->stream+sizeof(int)*2+tam,pos,sizeof(position));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
