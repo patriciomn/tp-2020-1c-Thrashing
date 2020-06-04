@@ -18,7 +18,8 @@ void iniciar_gameboy(int argc,char* argv[]){
 	if(argv[1]!=NULL &&argv[2]!=NULL){
 		process = proceso(argv[1]);//identificar BROKER/GAMECARD/TEAM/SUSCRIPTOR
 		tipo_msg = tipo_mensaje(argv[2]);
-		if(process == SUSCRITO){
+		if(process == SUSCRIPTOR){
+			conectar_proceso(process);
 			suscriptor(tipo_msg);
 			//argv[3] tiempoLimitado
 			recibir_mensajes(atoi(argv[3]));
@@ -136,7 +137,7 @@ int proceso(char* proceso){
 		return GAMECARD;
 	}
 	else{
-		return SUSCRITO;
+		return SUSCRIPTOR;
 	}
 	return -1;
 }
@@ -169,7 +170,7 @@ void conectar_proceso(int proceso){
 			puerto = config_get_string_value(config,"BROKER_PUERTO");
 			log_info(logger,"Conectado A BROKER");
 			break;
-		case SUSCRITO:
+		case SUSCRIPTOR:
 			ip = config_get_string_value(config,"BROKER_IP");
 			puerto = config_get_string_value(config,"BROKER_PUERTO");
 			log_info(logger,"Conectado A BROKER");

@@ -31,10 +31,11 @@ enum TIPO{
 };
 
 enum TIPO_PROCESO{
+	SUSCRIPTOR = 9,
 	TEAM = 10,
 	GAMECARD = 11,
 	GAMEBOY = 12,
-	BROKER,
+	BROKER = 13,
 };
 
 typedef struct{
