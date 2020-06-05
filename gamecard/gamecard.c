@@ -10,9 +10,9 @@ int main () {
 
     //verificar_punto_de_montaje();
 
-    suscripcion_colas_broker();
+    //suscripcion_colas_broker();
 
-    //crear_archivos_pokemon("Pikachu", 100, 100, 100);
+    crear_archivos_pokemon("Pepito", 100, 100, 100);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -259,18 +259,37 @@ void crear_archivos_metadata(char *path_metadata) {
     free(path_metadata_file);
     free(path_bitmap_file);
 }
+//CREO QUE ESTO ES NECESARIO, SI VES EN LA PAG 18 EL SEGUNDO EJEMPLO DE PATH
+char* crear_directorio_pokemon(char *path_pto_montaje, char* pokemon) {
+		
+    int size_new_string = strlen(path_pto_montaje) + strlen(POKEMON_DIR)+strlen(pokemon) + 1;
+    char *path_files = malloc(size_new_string);
+    strcpy(path_files, path_pto_montaje);
+    string_append(&path_files, POKEMON_DIR);
+	string_append(&path_files, pokemon);
+
+
+    int rta_mkdir = mkdir(path_files, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if(rta_mkdir == 0) {
+        log_info(logger,"DIRECTORIO %s CREADO", path_files);
+    } else {
+        log_error(logger,"ERROR AL CREAR EL DIRECTORIO %s",path_files);
+    }
+	return path_files;
+    free(path_files);
+}
 
 void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
-
 	char *path_file = string_new();
-	string_append_with_format(&path_file, "%s%s%s", datos_config->pto_de_montaje, FILES_DIR, "/");
-
+	string_append(&path_file, (crear_directorio_pokemon(datos_config->pto_de_montaje, pokemon))); 
+	
 	char *pokemon_file = string_new();
-	string_append_with_format(&pokemon_file, "%s%s", pokemon, POKEMON_FILE_EXT);
+	string_append_with_format(&pokemon_file, "/%s%s", pokemon, POKEMON_FILE_EXT);
 
 	char *path_pokemon_file = string_new();
 	string_append(&path_pokemon_file, path_file);
 	string_append(&path_pokemon_file, pokemon_file);
+	
 
 	log_info(logger, "CREANDO ARCHIVO %s", pokemon_file);
     FILE *pointerFile = fopen(path_pokemon_file,"w");
@@ -280,7 +299,8 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
     }
 
     crear_metadata_pokemon(path_file); // creamos la metadata del archivo pokemon y solo rellenamos el campo DIRECTORY y OPEN
-
+		//ME ROMPE ACA, CUANDO SALE DE LA FUNCION DE ARRIBA
+	log_info(logger, "holis");
 	//ECRIBIR EL ARCHIVO POKEMON. Al menos es para probar
 	//habria que modificar el metadata para indicar que esta abierto
 	char *coordenadas = string_new();
@@ -289,7 +309,8 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
 
 
 	int coordenadas_size = strlen(coordenadas);
-	int cant_blocks = (int) ceilT((double)coordenadas_size / datos_config->size_block); // aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
+	int cant_blocks = (int) ceilT((double)coordenadas_size / datos_config->size_block); 
+	// aca determino la cantidad de bloques en base a lo que vaya a escribir en el archivo
 
 	int desplazamiento = 0;
 	for(int i = 0 ; i < cant_blocks ; i++) {
@@ -461,20 +482,20 @@ void crear_metadata_pokemon(char *path_file) {
     }
 
     char *info_metadataTxt = string_new();
-    string_append(&info_metadataTxt, "DIRECTORY=N"); //es un archivo, no un directorio
+    string_append(&info_metadataTxt, "DIRECTORY=N");
     string_append(&info_metadataTxt, "\n");
     string_append(&info_metadataTxt, "SIZE=0");
     string_append(&info_metadataTxt, "\n");
     string_append(&info_metadataTxt, "BLOCKS=[]");
     string_append(&info_metadataTxt, "\n");
-    string_append(&info_metadataTxt, "OPEN= Y");
+    string_append(&info_metadataTxt, "OPEN= N");
     string_append(&info_metadataTxt, "\n");
-
+	
     if(fwrite(info_metadataTxt, string_length(info_metadataTxt), 1, metadataPointerFile) == 0) {
     	log_error(logger, "ERROR AL ESCRIBIR EL ARCHIVO metadata.txt");
     	exit(1);	// despues ver de implementar un goto en vez de exit()
     }
-
+	
     free(info_metadataTxt);
     fclose(metadataPointerFile);
     free(path_metadata_file);
