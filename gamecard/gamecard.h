@@ -18,8 +18,12 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include "sockets.h"
 
 #include "../utils/utils.h"
+
+#define IP_SERVIDOR		 "127.0.0.3"
+#define PUERTO_SERVIDOR  "4446"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -37,10 +41,6 @@
 
 #define GUION "-"
 #define IGUAL "="
-
-#define IP_SERVIDOR		 "127.0.0.3"
-#define PUERTO_SERVIDOR  "4446"
-
 
 t_log *logger;
 t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
@@ -72,35 +72,7 @@ struct mensaje {
     void* message;
 } ;
 
-typedef struct {
-	int posX;
-	int posY;
-}Position;
-
 // Los siguientes structs son para recibir mensajes del gameboy
-
-typedef struct {
-	int id_mensaje;
-	char *nombre;
-	Position posicion;
-	int cantidad;
-}NPokemon;
-
-typedef struct {
-	int id_mensaje;
-	char *nombre;
-	Position posicion;
-}CPokemon;
-
-typedef struct {
-	int id_mensaje;
-	char *nombre;
-}GPokemon;
-
-
-int socket_cliente_np;
-int socket_cliente_cp;
-int socket_cliente_gp;
 
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
@@ -141,19 +113,7 @@ void getPokemon(char*pokemon);
 // Funciones Sockets
 
 int crear_conexion_broker();
-int crear_conexion();
-void esperar_cliente(int socket_servidor);
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
 void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
-void atender_peticion(int socket, int cod_op);
-void iniciar_servidor();
-void suscripcion_colas_broker();
-int ceilT(double numero);
-
-// serializaciones y deserealizaciones
-
-void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon);
-void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon);
-void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon);
 
 #endif /* GAMECARD_H_ */
