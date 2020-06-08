@@ -13,7 +13,8 @@ int main () {
 
     //suscripcion_colas_broker();
 
-    crear_archivos_pokemon("Pepito", 100, 100, 100);
+    crear_archivos_pokemon("pepa", 200, 100, 100);
+    crear_archivos_pokemon("chancha",50,10,2);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
@@ -301,10 +302,6 @@ void crear_archivos_pokemon(char *pokemon, int posX, int posY, int cantidad) {
     }
 
     crear_metadata_pokemon(path_file); // creamos la metadata del archivo pokemon y solo rellenamos el campo DIRECTORY y OPEN
-		//ME ROMPE ACA, CUANDO SALE DE LA FUNCION DE ARRIBA
-	log_info(logger, "holis");
-	//ECRIBIR EL ARCHIVO POKEMON. Al menos es para probar
-	//habria que modificar el metadata para indicar que esta abierto
 	char *coordenadas = string_new();
 	string_append_with_format(&coordenadas, "%s%s%s%s%s", string_itoa(posX), "-", string_itoa(posY), "=", string_itoa(cantidad));
 	string_append(&coordenadas, "\n");
@@ -482,11 +479,13 @@ void crear_metadata_pokemon(char *path_file) {
     	log_error(logger, "ERROR AL CREAR EL ARCHIVO %s", path_metadata_file);
     	exit(1);
     }
+    int tamanio = fileSize(path_file);
 
     char *info_metadataTxt = string_new();
     string_append(&info_metadataTxt, "DIRECTORY=N");
     string_append(&info_metadataTxt, "\n");
-    string_append(&info_metadataTxt, "SIZE=0");
+    string_append(&info_metadataTxt, "SIZE=");
+    string_append(&info_metadataTxt, string_itoa(tamanio));
     string_append(&info_metadataTxt, "\n");
     string_append(&info_metadataTxt, "BLOCKS=[]");
     string_append(&info_metadataTxt, "\n");
@@ -504,6 +503,17 @@ void crear_metadata_pokemon(char *path_file) {
 
 }
 
+int fileSize(char* file) { 
+        FILE* fp = fopen(file, "r"); 
+        if (fp == NULL) { 
+       log_error(logger, "No existe el archivo.");
+        return -1; 
+    } 
+      fseek(fp, 0L, SEEK_END);  
+    int res = (int) ftell(fp); 
+    fclose(fp); 
+    return (res/BITS); 
+} 
 
 //CAMBIE  NOMBRE PORQUE ROMPE AHORA QUE ESTAN LOS UTILS :)
 void newPokemon(char* pokemon,int posx,int posy,int cant){}

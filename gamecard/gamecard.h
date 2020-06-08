@@ -38,6 +38,7 @@
 #define BITS 8
 #define POKEMON_FILE_EXT ".txt"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
+#define PATH_POKECARPETA "/home/utnso/desktop/tall-grass/files/"
 
 #define GUION "-"
 #define IGUAL "="
@@ -103,17 +104,13 @@ int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
-
+int fileSize(char* file);
 
 int tipo_mensaje(char* tipo_mensaje);
 void newPokemon(char* pokemon,int posx,int posy,int cant);
 void catchPokemon(char* pokemon,int posx,int posy);
 void getPokemon(char*pokemon);
 
-// Funciones Sockets
 
-int crear_conexion_broker();
-void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
-void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
 
 #endif /* GAMECARD_H_ */
