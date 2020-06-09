@@ -71,7 +71,10 @@ void iniciar_config(char* teamConfig){
 //CREACION---------------------------------------------------------------------------------------------------------------------
 void crear_team(){
 	equipo = malloc(sizeof(team));
-	equipo->pid = getpid();
+	uuid_generate(equipo->pid);
+	char buf[1024];
+	uuid_unparse(equipo->pid,buf);
+	printf("Pid:%s\n",buf);
 	equipo->entrenadores = list_create();
 	equipo->objetivos = list_create();
 	equipo->poks_requeridos = list_create();
@@ -856,10 +859,10 @@ void enviar_info_suscripcion(int tipo,int socket_cliente){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2;
+	paquete->buffer->size = sizeof(int) + sizeof(uuid_t);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&equipo->pid,sizeof(uuid_t));
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
 	void* a_enviar = serializar_paquete(paquete, bytes);

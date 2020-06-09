@@ -18,6 +18,7 @@
 #include<signal.h>
 #include<semaphore.h>
 #include<sys/time.h>
+#include <uuid/uuid.h>
 
 #define IP "127.0.0.2"
 #define PUERTO "4445"
@@ -80,7 +81,7 @@ typedef struct{
 }entrenador;
 
 typedef struct{
-	int pid;
+	uuid_t pid;
 	entrenador* exec;
 	t_list* entrenadores;
 	t_list* objetivos;

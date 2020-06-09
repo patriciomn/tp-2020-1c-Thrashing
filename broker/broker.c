@@ -3,11 +3,15 @@
 t_log* logger;
 t_config* config;
 config_broker* datos_config;
-
-t_list* queues[6];
-t_list* suscribers[6];
+mq* cola_get;
+mq* cola_localized;
+mq* cola_catch;
+mq* cola_caught;
+mq* cola_new;
+mq* cola_appeared;
 pthread_t thread_servidor;
-sem_t semSend;
+pthread_t thread_suscripcion;
+pthread_t thread_ack;
 
 int cant_busqueda;
 uint32_t cache_size;
@@ -17,10 +21,11 @@ uint32_t mem_total;
 uint32_t id_particion;
 t_list* cache;//una lista de particiones
 void* memoria;
-
-sem_t semHayEspacio;
-sem_t semNoVacio;
 pthread_rwlock_t lockSus = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockCache = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockCola = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockMemAsignada = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockParticion = PTHREAD_RWLOCK_INITIALIZER;
 
 
 int main(){	
@@ -28,17 +33,52 @@ int main(){
 	terminar_broker( logger, config);
 }
 
+void sig_handler(int signo){
+	handler_dump(SIGUSR1);
+}
+
 void iniciar_broker(void){
 	logger = log_create("broker.log","broker",1,LOG_LEVEL_INFO);
 	iniciar_config("broker.config");
-	build_queues();
-	build_suscribers();
-	sem_init(&semSend,0,1);
-	start_sender_thread();
+	iniciar_colas_mensaje();
 	log_info(logger,"BROKER START!");
 	iniciar_memoria();
 	iniciar_servidor();
+	signal(SIGINT,sig_handler);
 	log_info(logger,"creating server");
+}
+
+void iniciar_semaforos(){
+
+}
+
+mq* crear_cola_mensaje(int tipo){
+	mq* message_queue = malloc(sizeof(mq));
+	message_queue->tipo_queue = tipo;
+	message_queue->mensajes = list_create();
+	message_queue->suscriptors = list_create();
+	message_queue->id = 0;
+	return message_queue;
+}
+
+void iniciar_colas_mensaje(){
+	cola_new = crear_cola_mensaje(NEW_POKEMON);
+	cola_appeared = crear_cola_mensaje(APPEARED_POKEMON);
+	cola_catch = crear_cola_mensaje(CATCH_POKEMON);
+	cola_caught = crear_cola_mensaje(CAUGHT_POKEMON);
+	cola_get = crear_cola_mensaje(GET_POKEMON);
+	cola_localized = crear_cola_mensaje(LOCALIZED_POKEMON);
+}
+
+mensaje* crear_mensaje(int tipo_msg,int socket,int nro_id,void* msg){
+	mensaje* m = malloc(sizeof(mensaje));
+	m->tipo_msg = tipo_msg;
+	m->id = nro_id;
+	m->suscriptors_enviados = list_create();
+	m->suscriptors_ack = list_create();
+	m->msj = msg;
+	log_info(logger,"Nuevo Mensaje Tipo_Mensaje:%d ID_Mensaje:%d",m->tipo_msg,m->id);
+	return m;
 }
 
 void iniciar_config(char* memoria_config){
@@ -56,7 +96,6 @@ void iniciar_config(char* memoria_config){
 
 void iniciar_servidor(void){
 	int socket_servidor;
-
     struct addrinfo hints, *servinfo, *p;
 
     memset(&hints, 0, sizeof(hints));
@@ -66,8 +105,7 @@ void iniciar_servidor(void){
 
     getaddrinfo(datos_config->ip_broker, datos_config->puerto_broker, &hints, &servinfo);
 
-    for (p=servinfo; p != NULL; p = p->ai_next)
-    {
+    for (p=servinfo; p != NULL; p = p->ai_next){
         if ((socket_servidor = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
             continue;
 
@@ -89,12 +127,11 @@ void iniciar_servidor(void){
 void esperar_cliente(int socket_servidor){
 	struct sockaddr_in dir_cliente;
 
-	int tam_direccion = sizeof(struct sockaddr_in);
-	log_info(logger,"Waiting Client");
+	socklen_t tam_direccion = sizeof(struct sockaddr_in);
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
 	int* cliente_fd = malloc(sizeof(int));
 	*cliente_fd = socket_cliente;
-	log_info(logger,"Client received");
+	log_info(logger,"Proceso Conectado Con Socket %d",*cliente_fd);
 	pthread_create(&thread_servidor,NULL,(void*)serve_client,cliente_fd);
 	pthread_detach(thread_servidor);
 }
@@ -113,141 +150,287 @@ void serve_client(int* socket){
 	}	
 	int cliente_fd = *socket;
 	free(socket);
-	log_info(logger,"Enter to process request, cod_op: %d", cod_op);
+	printf("Enter to process request, cod_op: %d\n", cod_op);
 	process_request(cod_op, cliente_fd);
 }
 
 void process_request(int cod_op, int cliente_fd) {
-	queue_item *item = malloc(sizeof(queue_item));
-	void * confirmation = malloc(sizeof(int)*2);;
-	
-	log_info(logger,"Processing request, cod_op: %d", cod_op);
+	if (cod_op == SUSCRITO){
+		atender_suscripcion(cliente_fd);
+	}
+	else if (cod_op == ACK){
+		atender_ack(cliente_fd);
+	}
+	else{
+		void* msg = recibir_mensaje(cliente_fd);
 
-	if (cod_op == SUSCRITO) atender_suscripcion(cliente_fd);
-	
-	else if (cod_op == ACK) atender_ack( cliente_fd);
-
-	void* msg = recibir_mensaje(cliente_fd);
-	item->id = get_id();
-
-	if (cod_op == NEW_POKEMON){
-		printf("NEW_POKEMON\n");
-		new_pokemon* new = deserializar_new(msg);
-		printf("Pokemon:%s\n",new->name);
-		printf("Size:%d\n",new->name_size);
-		printf("Pos:[%d,%d]\n",new->pos.posx,new->pos.posy);
-		printf("Cantidad:%d\n",new->cantidad);
-		//almacena
-		particion* part_aux = malloc_cache(new->name_size+sizeof(uint32_t)*4);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&new->name_size,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t),new->name,new->name_size);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)+new->name_size,&new->pos.posx,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)*2+new->name_size,&new->pos.posy,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)*3+new->name_size,&new->cantidad,sizeof(uint32_t));
-		log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
-		item->message = new;
-	}
-	else if (cod_op == APPEARED_POKEMON){
-		printf("APPEARED_POKEMON\n");
-		memcpy(&(item->correlation_id), msg, sizeof(int));
-		printf("Correlation id:%d\n",item->correlation_id);
-		appeared_pokemon* appeared = deserializar_appeared(msg);
-		printf("Pokemon:%s\n",appeared->name);
-		printf("Size:%d\n",appeared->name_size);
-		printf("Pos:[%d,%d]\n",appeared->pos.posx,appeared->pos.posy);
-		//almacena
-		particion* part_aux = malloc_cache(appeared->name_size+sizeof(uint32_t)*3);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&appeared->name_size,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t),appeared->name,appeared->name_size);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)+appeared->name_size,&appeared->pos.posx,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)*2+appeared->name_size,&appeared->pos.posy,sizeof(uint32_t));
-		log_warning(logger,"MENSAJE_ID:%d APPEARED_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
-		item->message = appeared;
-	}
-	else if (cod_op == CATCH_POKEMON){
-		printf("CATCH_POKEMON\n");
-		catch_pokemon* catch = deserializar_catch(msg);
-		printf("Pokemon:%s\n",catch->name);
-		printf("Size:%d\n",catch->name_size);
-		printf("Pos:[%d,%d]\n",catch->pos.posx,catch->pos.posy);
-		//almacena
-		particion* part_aux = malloc_cache(catch->name_size+sizeof(uint32_t)*3);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&catch->name_size,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t),catch->name,catch->name_size);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)+catch->name_size,&catch->pos.posx,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)*2+catch->name_size,&catch->pos.posx,sizeof(uint32_t));
-		log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
-		item->message = catch;
-	}
-	else if (cod_op == CAUGHT_POKEMON){
-		printf("CAUGHT_POKEMON\n");
-		memcpy(&(item->correlation_id), msg, sizeof(int));
-		printf("Correlation id:%d\n",item->correlation_id);
-		caught_pokemon* caught = deserializar_caught(msg);
-		printf("Resultado:%d\n",caught->caught);
-		particion* part_aux = malloc_cache(sizeof(uint32_t));
-		//almacena
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&caught->caught,sizeof(uint32_t));
-		log_warning(logger,"MENSAJE_ID:%d CAUGHT_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
-		item->message = caught;
-	}
-	else if (cod_op == GET_POKEMON){
-		printf("GET_POKEMON\n");
-		get_pokemon* get = deserializar_get(msg);
-		printf("Pokemon:%s\n",get->name);
-		printf("Size:%d\n",get->name_size);
-		//almacena
-		particion* part_aux = malloc_cache(get->name_size+sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&get->name_size,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t),get->name,get->name_size);
-		log_warning(logger,"MENSAJE_ID:%d GET_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
-		item->message = get;
-	}
-	else if (cod_op == LOCALIZED_POKEMON){
-		printf("LOCALIZED_POKEMON\n");
-		memcpy(&(item->correlation_id), msg, sizeof(int));
-		printf("Correlation id:%d\n",item->correlation_id);
-		localized_pokemon* localized = deserializar_localized(msg);
-		printf("Pokemon:%s\n",localized->name);
-		printf("Size:%d\n",localized->name_size);
-		printf("Cant_posiciones:%d\n",localized->cantidad_posiciones);
-		for(int i=0;i<localized->cantidad_posiciones;i++){
-			printf("Pos[%d]:[%d,%d]\n",i,localized->pos[i].posx,localized->pos[i].posy);
+		if (cod_op == NEW_POKEMON){
+			mensaje_new_pokemon(msg,cliente_fd);
 		}
-		//almacena
-		particion* part_aux = malloc_cache(localized->name_size+sizeof(uint32_t)*2+sizeof(position)*localized->cantidad_posiciones);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio,&localized->name_size,sizeof(uint32_t));
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t),localized->name,localized->name_size);
-		memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+sizeof(uint32_t)+localized->name_size,&localized->cantidad_posiciones,sizeof(uint32_t));
-		int desplazamineto = sizeof(uint32_t)*2+localized->name_size;
-		for(int i=0;i<localized->cantidad_posiciones;i++){
-			memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+desplazamineto,&localized->pos[i].posx,sizeof(uint32_t));
-			desplazamineto+=sizeof(uint32_t);
-			memcpy_cache(part_aux,item->id,cod_op,part_aux->inicio+desplazamineto,&localized->pos[i].posy,sizeof(uint32_t));
-			desplazamineto+=sizeof(uint32_t);
+		else if (cod_op == APPEARED_POKEMON){
+			mensaje_appeared_pokemon(msg,cliente_fd);
 		}
-		log_warning(logger,"MENSAJE_ID:%d LOCALIZED_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
-		item->message = localized;
+		else if (cod_op == CATCH_POKEMON){
+			mensaje_catch_pokemon(msg,cliente_fd);
+		}
+		else if (cod_op == CAUGHT_POKEMON){
+			mensaje_caught_pokemon(msg,cliente_fd);
+		}
+		else if (cod_op == GET_POKEMON){
+			mensaje_get_pokemon(msg,cliente_fd);
+		}
+		else if (cod_op == LOCALIZED_POKEMON){
+			mensaje_localized_pokemon(msg,cod_op);
+		}
+		display_cache();
+		free(msg);
+
+		mq* cola = cola_mensaje(cod_op);
+		if(!list_is_empty(cola->suscriptors)){
+			void enviar(suscriber* sus){
+				enviar_mensajes(sus,cod_op);
+			}
+			list_iterate(cola->suscriptors,(void*)enviar);
+		}
 	}
-	display_cache();
-	
-	//Pushear en la cola correspondiente con id, correlationId 
-	list_add(queues[cod_op -1], item);
-	
-	//Responder id al que me envio el req (cliente_fd)
-	enviar_id(item,cliente_fd);
-
-	//Aca deberia levantar algun semaforo que habilite un proceso que me mande el mensaje que se agrego a la cola a los demas
-	sem_post(&semSend);
-
-	free(msg);
-	free(confirmation);
-	pthread_exit(NULL);
 }
 
-void enviar_id(queue_item *item,int socket_cliente){
+mq* cola_mensaje(uint32_t tipo){
+	switch(tipo){
+		case NEW_POKEMON:
+			return cola_new;
+			break;
+		case GET_POKEMON:
+			return cola_get;
+			break;
+		case CAUGHT_POKEMON:
+			return cola_caught;
+			break;
+		case CATCH_POKEMON:
+			return cola_catch;
+			break;
+		case APPEARED_POKEMON:
+			return cola_appeared;
+			break;
+		case LOCALIZED_POKEMON:
+			return cola_localized;
+			break;
+	}
+	return 0;
+}
+
+void atender_suscripcion(int cliente_fd){
+	void * msg = recibir_mensaje(cliente_fd);
+	int queue_id;
+	uuid_t pid;
+	memcpy(&queue_id,msg,sizeof(uint32_t));
+	memcpy(&pid,msg+sizeof(uint32_t),sizeof(uuid_t));
+	char buf[1024];
+	uuid_unparse(pid,buf);
+	printf("Suscripcion:Pid:%s|Queue_id:%d\n",buf,queue_id);
+
+	suscriber * sus = malloc(sizeof(suscriber));
+	sus->cliente_fd = cliente_fd;
+	uuid_copy(sus->pid,pid);
+
+	mq* cola = cola_mensaje(queue_id);
+	bool existe(suscriber* aux){
+		return uuid_compare(aux->pid,pid) == 0;
+	}
+	if (!list_any_satisfy(cola->suscriptors,(void*)existe) ){
+		list_add(cola->suscriptors, sus);
+		log_info(logger,"Proceso %s Suscripto A La Cola %d SUSCRIPCION",buf,queue_id);
+	}
+	enviar_confirmacion_suscripcion(sus);
+
+	if(!list_is_empty(cola->mensajes)){
+		enviar_mensajes(sus,queue_id);
+	}
+}
+
+void atender_ack(int cliente_fd){
+	uuid_t pid;
+	int queue_id, id;
+	void* msg = recibir_mensaje(cliente_fd);
+
+	memcpy(&(pid), msg, sizeof(uuid_t));
+	memcpy(&(queue_id), msg+sizeof(uuid_t), sizeof(int));
+	memcpy(&(id), msg+sizeof(uuid_t)+sizeof(int), sizeof(int));
+	char buf[1024];
+	uuid_unparse(pid,buf);
+	printf("ACK Recibido:Pid:%s,Tipo:%d,ID:%d\n",buf,queue_id,id);
+
+	bool existe(mensaje* aux){
+		return aux->id == id;
+	}
+
+	bool by_pid(suscriber* aux){
+		return uuid_compare(aux->pid,pid) == 0;
+	}
+
+	mq* cola = cola_mensaje(queue_id);
+
+	pthread_rwlock_rdlock(&lockCola);
+	suscriber* sus = list_find(cola->suscriptors,(void*)by_pid);
+
+	mensaje* item = list_find(cola->mensajes,(void*)existe);
+	pthread_rwlock_unlock(&lockCola);
+	list_add(item->suscriptors_ack,sus);
+	borrar_mensaje(item);
+}
+
+void borrar_mensaje(mensaje* m){
+	bool by_id_tipo(particion* aux){
+		return aux->id_buffer == m->id && aux->tipo_cola == m->tipo_msg;
+	}
+	pthread_rwlock_rdlock(&lockCache);
+	particion* borrar = list_find(cache,(void*)by_id_tipo);
+	pthread_rwlock_unlock(&lockCache);
+	delete_particion(borrar);
+}
+
+void mensaje_new_pokemon(void* msg,int cliente_fd){
+	new_pokemon* new = deserializar_new(msg);
+	printf("Mensaje NEW_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]|Cantidad:%d\n",new->name,new->name_size,new->pos.posx,new->pos.posy,new->cantidad);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(NEW_POKEMON,cliente_fd,cola_new->id,new);
+	cola_new->id++;
+	pthread_rwlock_unlock(&lockCola);
+
+	//almacena
+	particion* part_aux = malloc_cache(new->name_size+sizeof(uint32_t)*4);
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,&new->name_size,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t),new->name,new->name_size);
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t)+new->name_size,&new->pos.posx,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t)*2+new->name_size,&new->pos.posy,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t)*3+new->name_size,&new->cantidad,sizeof(uint32_t));
+	log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_new->mensajes,item);
+	pthread_rwlock_unlock(&lockCola);
+	enviar_id(item,cliente_fd);
+}
+
+void mensaje_appeared_pokemon(void* msg,int cliente_fd){
+	int correlation_id;
+	memcpy(&correlation_id, msg, sizeof(int));
+	appeared_pokemon* appeared = deserializar_appeared(msg);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(APPEARED_POKEMON,cliente_fd,cola_appeared->id,appeared);
+	cola_appeared->id++;
+	pthread_rwlock_unlock(&lockCola);
+	item->id_correlacional = correlation_id;
+	printf("Mensaje APPEARED_POKEMON:Correlation_id:%d|Pokemon:%s|Size:%d|Pos:[%d,%d]\n",item->id_correlacional,appeared->name,appeared->name_size,appeared->pos.posx,appeared->pos.posy);
+
+	//almacena
+	particion* part_aux = malloc_cache(appeared->name_size+sizeof(uint32_t)*4);
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,&appeared->name_size,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t),appeared->name,appeared->name_size);
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t)+appeared->name_size,&appeared->pos.posx,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio+sizeof(uint32_t)*2+appeared->name_size,&appeared->pos.posy,sizeof(uint32_t));
+	log_warning(logger,"MENSAJE_ID:%d APPEARED_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_appeared->mensajes,item);
+	pthread_rwlock_unlock(&lockCola);
+	enviar_id(item,cliente_fd);
+}
+
+void mensaje_catch_pokemon(void* msg,int cliente_fd){
+	catch_pokemon* catch = deserializar_catch(msg);
+	printf("Mensaje CATCH_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]\n",catch->name,catch->name_size,catch->pos.posx,catch->pos.posy);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(CATCH_POKEMON,cliente_fd,cola_catch->id,catch);
+	cola_catch->id++;
+	pthread_rwlock_unlock(&lockCola);
+
+	//almacena
+	particion* part_aux = malloc_cache(catch->name_size+sizeof(uint32_t)*3);
+	memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,&catch->name_size,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio+sizeof(uint32_t),catch->name,catch->name_size);
+	memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio+sizeof(uint32_t)+catch->name_size,&catch->pos.posx,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio+sizeof(uint32_t)*2+catch->name_size,&catch->pos.posx,sizeof(uint32_t));
+	log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_catch->mensajes,item);
+	pthread_rwlock_unlock(&lockCola);
+	enviar_id(item,cliente_fd);
+}
+
+void mensaje_caught_pokemon(void* msg,int cliente_fd){
+	int correlation_id;
+	memcpy(&correlation_id, msg, sizeof(int));
+	caught_pokemon* caught = deserializar_caught(msg);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(CAUGHT_POKEMON,cliente_fd,cola_caught->id,caught);
+	cola_caught->id++;
+	pthread_rwlock_unlock(&lockCola);
+	item->id_correlacional = correlation_id;
+	printf("Mensaje CAUGHT_POKEMON:Correlation_id:%d|Resultado:%d\n",item->id_correlacional,caught->caught);
+	particion* part_aux = malloc_cache(sizeof(uint32_t));
+
+	//almacena
+	memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,&caught->caught,sizeof(uint32_t));
+	log_warning(logger,"MENSAJE_ID:%d CAUGHT_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_caught->mensajes,item);
+	enviar_id(item,cliente_fd);
+}
+
+void mensaje_get_pokemon(void* msg,int cliente_fd){
+	get_pokemon* get = deserializar_get(msg);
+	printf("Mensaje GET_POKEMON:Pokemon:%s|Size:%d\n",get->name,get->name_size);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(GET_POKEMON,cliente_fd,cola_get->id,get);
+	cola_get->id++;
+	pthread_rwlock_unlock(&lockCola);
+
+	//almacena
+	particion* part_aux = malloc_cache(get->name_size+sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio,&get->name_size,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio+sizeof(uint32_t),get->name,get->name_size);
+	log_warning(logger,"MENSAJE_ID:%d GET_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_get->mensajes,item);
+	pthread_rwlock_unlock(&lockCola);
+	enviar_id(item,cliente_fd);
+}
+
+void mensaje_localized_pokemon(void* msg,int cliente_fd){
+	int correlation_id;
+	memcpy(&correlation_id, msg, sizeof(int));
+	localized_pokemon* localized = deserializar_localized(msg);
+	pthread_rwlock_wrlock(&lockCola);
+	mensaje* item = crear_mensaje(LOCALIZED_POKEMON,cliente_fd,cola_localized->id,localized);
+	cola_localized->id++;
+	pthread_rwlock_unlock(&lockCola);
+	item->id_correlacional = correlation_id;
+	printf("Mensaje LOCALIZED_POKEMON:Correlation_id:%d|Pokemon:%s|Size:%d|Cant_posiciones:%d\n",item->id_correlacional,localized->name,localized->name_size,localized->cantidad_posiciones);
+	for(int i=0;i<localized->cantidad_posiciones;i++){
+		printf("Pos[%d]:[%d,%d]\n",i,localized->pos[i].posx,localized->pos[i].posy);
+	}
+
+	//almacena
+	particion* part_aux = malloc_cache(localized->name_size+sizeof(uint32_t)*2+sizeof(position)*localized->cantidad_posiciones);
+	memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,&localized->name_size,sizeof(uint32_t));
+	memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio+sizeof(uint32_t),localized->name,localized->name_size);
+	memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio+sizeof(uint32_t)+localized->name_size,&localized->cantidad_posiciones,sizeof(uint32_t));
+	int desplazamineto = sizeof(uint32_t)*2+localized->name_size;
+	for(int i=0;i<localized->cantidad_posiciones;i++){
+		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio+desplazamineto,&localized->pos[i].posx,sizeof(uint32_t));
+		desplazamineto+=sizeof(uint32_t);
+		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio+desplazamineto,&localized->pos[i].posy,sizeof(uint32_t));
+		desplazamineto+=sizeof(uint32_t);
+	}
+	log_warning(logger,"MENSAJE_ID:%d LOCALIZED_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+	pthread_rwlock_wrlock(&lockCola);
+	list_add(cola_get->mensajes,item);
+	pthread_rwlock_unlock(&lockCola);
+	enviar_id(item,cliente_fd);
+}
+
+void enviar_id(mensaje *item,int socket_cliente){
 	send(socket_cliente,&item->id, sizeof(int), 0);
-	printf("ID_Mensaje Enviado\n");
+	printf("ID_Mensaje:%d De Cola:%d Enviado\n",item->id,item->tipo_msg);
 }
 
 void enviar_confirmacion_suscripcion(suscriber* sus){
@@ -256,200 +439,99 @@ void enviar_confirmacion_suscripcion(suscriber* sus){
 	printf("Confirmacion De Suscripcion Enviada\n");
 }
 
-void atender_suscripcion(int cliente_fd){
-	printf("SUSCRIPCION\n");
-	void * msg = recibir_mensaje(cliente_fd);
-	int queue_id,pid;
-	memcpy(&queue_id,msg,sizeof(uint32_t));
-	memcpy(&pid,msg+sizeof(uint32_t),sizeof(uint32_t));
-	printf("Pid:%d\n",pid);
-	printf("Queue_id:%d\n",queue_id);
-
-	memcpy(&(queue_id), msg, sizeof(int));
-	msg+=sizeof(int);
-	memcpy(&(pid), msg, sizeof(int));
-
-	if (pid == -1){
-		//Esto pasa cuando entra por primera vez
-		pid = generate_pid();
-	}
-
-	suscriber * sus = malloc(sizeof(suscriber));
-	sus->cliente_fd = cliente_fd;
-	sus->pid = pid;
-	
-	bool existe(suscriber* aux){
-		return aux->pid == pid;
-	}
-	if (!list_any_satisfy(suscribers[queue_id -1],(void*)existe) ){
-		//Agregar cliente_fd a una lista de suscribers
-		list_add(suscribers[queue_id -1], sus);
-		log_info(logger,"Proceso %d Suscripto A La Cola %d SUSCRIPCION",sus->pid,queue_id);
-	}	
-
-	//Enviar confirmacion
-	enviar_confirmacion_suscripcion(sus);
-
-	//Enviar todos los mensajes anteriores de la cola $queue_id
-	enviar_cacheados( sus,  queue_id);
-		
-	while(1){
-		//Dejo abierto este hilo a la espera de que haya un nuevo mensaje en la cola $queue_id
-		sem_wait(&semSend);
-		enviar_cacheados( sus,  queue_id);
-	}
-		
-}
-
 //enviar mensajes
-void enviar_cacheados(suscriber * sus, int queue_id){//modificar
-	void enviar(queue_item* queue_item){
-		bool existe(suscriber * sus_aux){
-			return sus_aux->pid == sus->pid;
+void enviar_mensajes(suscriber* sus,int tipo_cola){
+	bool es_tipo(particion* aux){
+		return aux->tipo_cola == tipo_cola;
+	}
+	pthread_rwlock_rdlock(&lockCache);
+	t_list* tipo  = list_filter(cache,(void*)es_tipo);
+	pthread_rwlock_unlock(&lockCache);
+
+	t_paquete* enviar = crear_paquete(tipo_cola);
+	void agregar(particion* aux){
+		agregar_paquete(enviar,aux,sus,tipo_cola);
+	}
+	list_iterate(tipo,(void*)agregar);
+	enviar_paquete(enviar,sus->cliente_fd);
+	char buf[1024];
+	uuid_unparse(sus->pid,buf);
+	log_info(logger,"Mensaje Enviado A Proceso %s",buf);
+	list_destroy(tipo);
+	eliminar_paquete(enviar);
+}
+
+void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t tipo){
+	uint32_t id,size;
+	void* buffer;
+	switch(tipo){
+		case NEW_POKEMON:{
+			id = aux->id_buffer;
+			size = sizeof(uint32_t)+aux->size+1;
+			buffer = malloc(size);
+			memset(buffer,0,size);
+			memcpy(buffer,&id,sizeof(uint32_t));
+			memcpy(buffer+sizeof(uint32_t),aux->inicio,aux->size+1);
+			break;
 		}
-		if (!list_any_satisfy(queue_item->recibidos,(void*)existe) ){
-			int size;
-			size =0;
-			//void * paquete = crear_paquete(queue_id, queue_item, &size);
-			//send(sus->cliente_fd, paquete, size, 0);
-			if(!list_any_satisfy(queue_item->enviados, (void*)existe)){
-				list_add(queue_item->enviados, sus);
+		case GET_POKEMON:{
+			id = aux->id_buffer;
+			size = sizeof(uint32_t)+aux->size+1;
+			buffer = malloc(size);
+			memset(buffer,0,size);
+			memcpy(buffer,&id,sizeof(uint32_t));
+			memcpy(buffer+sizeof(uint32_t),aux->inicio,aux->size);
+			break;
+		}
+		case CATCH_POKEMON:{
+			id = aux->id_buffer;
+			size = sizeof(uint32_t)+aux->size+1;
+			buffer = malloc(size);
+			memset(buffer,0,size);
+			memcpy(buffer,&id,sizeof(uint32_t));
+			memcpy(buffer+sizeof(uint32_t),aux->inicio,aux->size);
+			break;
+		}
+		case CAUGHT_POKEMON:{
+			bool catch_correlacional(mensaje* msj){
+				return msj->id == aux->id_buffer;
 			}
+			mensaje* catch = list_find(cola_catch->mensajes,(void*)catch_correlacional);
+			id = catch->id_correlacional;
+			size = sizeof(uint32_t)*2;
+			buffer = malloc(size);
+			memset(buffer,0,size);
+			memcpy(buffer,&id,sizeof(uint32_t));
+			memcpy(buffer+sizeof(uint32_t),aux->inicio,sizeof(uint32_t));
+			break;
+		}
+		case APPEARED_POKEMON:{
+			bool new_correlacional(mensaje* msj){
+				return msj->id == aux->id_buffer;
+			}
+			mensaje* new = list_find(cola_new->mensajes,(void*)new_correlacional);
+			id = new->id_correlacional;
+			size = sizeof(uint32_t)+aux->size+1;
+			buffer = malloc(size);
+			memset(buffer,0,size);
+			memcpy(buffer,&id,sizeof(uint32_t));
+			memcpy(buffer+sizeof(uint32_t),aux->inicio,aux->size);
+			break;
 		}
 	}
-	list_iterate(queues[queue_id -1],(void*)enviar);
-}
+	agregar_a_paquete(enviar,buffer,size);
 
-//pueden estar en utils
-void* serializar_paq(t_paquete* paquete, int bytes){
-	void * magic = malloc(bytes);
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-	desplazamiento+= paquete->buffer->size;
-
-	return magic;
-}
-
-void crear_buffer(t_paquete* paquete){
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = 0;
-	paquete->buffer->stream = NULL;
-}
-
-t_paquete* crear_paquete(int op){
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	crear_buffer(paquete);
-	paquete->codigo_operacion = op;
-	return paquete;
-}
-
-void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio){
-	paquete->buffer->stream = realloc(paquete->buffer->stream, paquete->buffer->size + tamanio + sizeof(int));
-
-	memcpy(paquete->buffer->stream + paquete->buffer->size, &tamanio, sizeof(int));
-	memcpy(paquete->buffer->stream + paquete->buffer->size + sizeof(int), valor, tamanio);
-
-	paquete->buffer->size += tamanio + sizeof(int);
-}
-
-void enviar_paquete(t_paquete* paquete, int socket_cliente){
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-	void* a_enviar = serializar_paq(paquete, bytes);
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	free(a_enviar);
-}
-
-void eliminar_paquete(t_paquete* paquete){
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
-//------------------------------------------------------------------------------------------------------------------------------
-void atender_ack( int cliente_fd){
-	int pid, queue_id, id;
-	void *msg=malloc(sizeof(int) * 3);
-	suscriber * sus = malloc(sizeof(suscriber));
-	queue_item * new;
-	//en msg viene id, correlation_id y queue_id
-
-
-	//recibo 12 bytes restantes
-	recv(cliente_fd, msg, sizeof(int) * 3, MSG_WAITALL);
-
-	memcpy(&(pid), msg, sizeof(int));
-	msg+=sizeof(int);
-	memcpy(&(queue_id), msg, sizeof(int));
-	msg+=sizeof(int);
-	memcpy(&(id), msg, sizeof(int));
-
-	sus->pid = pid;
-	sus->cliente_fd = cliente_fd;
-
-	bool existe(queue_item* aux){
+	bool by_id(mensaje* aux){
 		return aux->id == id;
 	}
-	new = list_find(queues[queue_id -1],(void*)existe);
-	list_remove_by_condition(queues[queue_id -1], (void*)existe);
-	list_add(new->recibidos, sus);
-	list_add(queues[queue_id -1], new);
-	
-	pthread_exit(NULL);
+	mq* cola = cola_mensaje(tipo);
+	mensaje* m = list_find(cola->mensajes,(void*)by_id);
+	list_add(m->suscriptors_enviados,sus);
+	free(buffer);
 }
-
-int get_id(){
-	//PROGRAMAME
-	return 10;
-}
-int generate_pid(){
-	//PROGRAMAME
-	return 1;
-}
-
-
-void build_queues(void){
-	for (int i = 0; i < 6; i++)
-		queues[i] =	list_create();
-}
-void build_suscribers(void){
-	for (int i = 0; i < 6; i++)
-		suscribers[i] =	list_create();
-	//Aca hay que levantar de la memoria todos los suscribers y generar suscribers 
-}
-
-void start_sender_thread(void){
-	//Aca hay que hacer pthread create de sender thread
-}
-// void sender_thread(void){
-// 	while (1){
-// 		for (int i = 0; i < 6; i++){
-// 			for (int j = 0; j < sizeof(suscribers)/sizeof(suscriber); j++){
-// 				for (int k = 0; k < sizeof(suscribers[i][j].sended)/sizeof(sent); k++){
-// 					if (!suscribers[i][j].sended[k].ack){
-// 						//Send a suscribers[i][j].cliente_fd el mensaje con id suscribers[i][j].sended[k].id ;
-// 					}
-					
-// 				}
-				
-				
-// 			}
-			
-			
-// 		}
-		
-// 	}
-	
-// }
 
 void terminar_broker( t_log* logger, t_config* config){
-	for (int i = 0; i < 6; i++)
-		list_destroy(queues[i]);
+
 	log_destroy(logger);
 	config_destroy(config);
 }
@@ -460,11 +542,6 @@ void iniciar_memoria(){
 	iniciar_cache();
 	//signal(SIGINT,sig_handler);
 
-}
-
-void iniciar_semaforos(){
-	sem_init(&semHayEspacio,0,1);
-	sem_init(&semNoVacio,0,0);
 }
 
 //CACHE-------------------------------------------------------------------------------------------------------------------
@@ -525,7 +602,9 @@ void delete_particion(particion* borrar){
 	borrar->libre = 1;
 	borrar->tipo_cola = -1;
 	borrar->id_buffer = -1;
+	pthread_rwlock_wrlock(&lockMemAsignada);
 	mem_asignada -= borrar->size;
+	pthread_rwlock_unlock(&lockMemAsignada);
 	display_cache();
 }
 
@@ -576,18 +655,28 @@ particion* particiones_dinamicas(uint32_t size){
 		elegida->fin = elegida->inicio+part_size;
 		elegida->libre = 0;
 		elegida->tiempo = time(NULL);
+		pthread_rwlock_wrlock(&lockParticion);
 		id_particion++;
+		pthread_rwlock_unlock(&lockParticion);
+		pthread_rwlock_wrlock(&lockMemAsignada);
 		mem_asignada += part_size;
+		pthread_rwlock_unlock(&lockMemAsignada);
 		particion* next = malloc(sizeof(particion));
+		pthread_rwlock_rdlock(&lockParticion);
 		next->id_particion = id_particion;
+		pthread_rwlock_unlock(&lockParticion);
 		next->libre = 1;
+		pthread_rwlock_rdlock(&lockMemAsignada);
 		next->size = mem_total-mem_asignada;
+		pthread_rwlock_unlock(&lockMemAsignada);
 		next->inicio = elegida->fin;
 		next->fin = next->inicio+next->size;
 		next->tiempo = time(NULL);
 		next->id_buffer = -1;
 		next->tipo_cola = -1;
+		pthread_rwlock_wrlock(&lockCache);
 		list_add(cache,next);
+		pthread_rwlock_unlock(&lockCache);
 	}
 	else if(elegida != NULL && elegida->id_particion != ultima->id_particion){
 		uint32_t size_original = elegida->size;
@@ -595,8 +684,12 @@ particion* particiones_dinamicas(uint32_t size){
 		elegida->fin = elegida->inicio+elegida->size;
 		elegida->libre = 0;
 		elegida->tiempo = time(NULL);
+		pthread_rwlock_wrlock(&lockParticion);
 		id_particion++;
+		pthread_rwlock_unlock(&lockParticion);
+		pthread_rwlock_wrlock(&lockMemAsignada);
 		mem_asignada += part_size;
+		pthread_rwlock_unlock(&lockMemAsignada);
 		if(size_original - size > 0){
 			particion* next = malloc(sizeof(particion));
 			next->libre = 1;
@@ -609,8 +702,13 @@ particion* particiones_dinamicas(uint32_t size){
 			bool posicion(particion* aux){
 				return aux->inicio <= elegida->fin;
 			}
+			pthread_rwlock_rdlock(&lockCache);
 			int pos = list_count_satisfying(cache,(void*)posicion);
+			pthread_rwlock_unlock(&lockCache);
+
+			pthread_rwlock_wrlock(&lockCache);
 			list_add_in_index(cache,pos,next);
+			pthread_rwlock_unlock(&lockCache);
 		}
 	}
 	else{
@@ -636,23 +734,31 @@ particion* buddy_system(uint32_t size){
 	}
 	if(size_particion < mem_total){
 		if(size_particion > (mem_total/2)){
+			pthread_rwlock_rdlock(&lockCache);
 			elegida = list_find(cache,(void*)libre_suficiente);
+			pthread_rwlock_unlock(&lockCache);
 			if(elegida!=NULL){
 				elegida->libre = 0;
 				elegida->size = size_particion;
+				pthread_rwlock_wrlock(&lockMemAsignada);
 				mem_asignada += elegida->size;
+				pthread_rwlock_unlock(&lockMemAsignada);
 			}
 		}
 		else{
 			uint32_t pow_size = log_dos(size_particion);
+			pthread_rwlock_rdlock(&lockCache);
 			particion* primera = list_find(cache,(void*)libre_suficiente);
+			pthread_rwlock_unlock(&lockCache);
 			uint32_t pow_pri = log_dos(primera->size);
 			void aplicar(particion* aux){
 				bool libre_suficiente(particion* p){
 					return p->libre == 1 && p->size >= size_particion && p->size >= datos_config->tamanio_min_compactacion;
 				}
+				pthread_rwlock_rdlock(&lockCache);
 				particion* vic = list_find(cache,(void*)libre_suficiente);
 				particion* ultima = list_get(cache,list_size(cache)-1);
+				pthread_rwlock_unlock(&lockCache);
 				if(aux->inicio==vic->inicio && aux->fin==ultima->fin){
 					uint32_t s = aux->size/2;
 					vic->size = s ;
@@ -664,12 +770,16 @@ particion* buddy_system(uint32_t size){
 					next->libre = 1;
 					next->id_buffer = -1;
 					next->tipo_cola = -1;
+					pthread_rwlock_wrlock(&lockCache);
 					list_add(cache,next);
+					pthread_rwlock_unlock(&lockCache);
 				}
 				else if(aux->inicio==vic->inicio && aux->size==size_particion){
 					vic->size = size_particion;
 					vic->libre = 0;
+					pthread_rwlock_wrlock(&lockMemAsignada);
 					mem_asignada += elegida->size;
+					pthread_rwlock_unlock(&lockMemAsignada);
 				}
 				else if(aux->inicio==vic->inicio){
 					uint32_t s = aux->size/2;
@@ -690,13 +800,21 @@ particion* buddy_system(uint32_t size){
 				}
 			}
 			for(int i=pow_size;i < pow_pri ;i++){
+				pthread_rwlock_wrlock(&lockCache);
 				list_map(cache,(void*)aplicar);
+				pthread_rwlock_unlock(&lockCache);
 			}
+			pthread_rwlock_rdlock(&lockCache);
 			elegida = list_find(cache,(void*)libre_suficiente);
+			pthread_rwlock_unlock(&lockCache);
 		}
+		pthread_rwlock_rdlock(&lockParticion);
 		elegida->id_particion = id_particion;
+		pthread_rwlock_unlock(&lockParticion);
 		elegida->size = size;
+		pthread_rwlock_wrlock(&lockParticion);
 		id_particion++;
+		pthread_rwlock_unlock(&lockParticion);
 	}
 	return elegida;
 }
@@ -708,14 +826,18 @@ particion* algoritmo_particion_libre(uint32_t size){
 	}
 	if(string_equals_ignore_case(datos_config->algoritmo_particion_libre,"FF")){
 		printf("==========FIRST FIT==========\n");
+		pthread_rwlock_rdlock(&lockCache);
 		elegida = list_find(cache,(void*)libre_suficiente);
+		pthread_rwlock_unlock(&lockCache);
 	}
 	else{
 		printf("==========BEST FIT==========\n");
 		bool espacio_min(particion* aux1,particion* aux2){
 			return aux1->size < aux2->size;
 		}
+		pthread_rwlock_wrlock(&lockCache);
 		t_list* aux = list_filter(cache,(void*)libre_suficiente);
+		pthread_rwlock_unlock(&lockCache);
 		list_sort(aux,(void*)espacio_min);
 		elegida = list_get(aux,0);
 		list_destroy(aux);
@@ -734,7 +856,9 @@ particion* algoritmo_reemplazo(){
 		bool ocupada(particion* aux){
 			return aux->libre == 0;
 		}
+		pthread_rwlock_rdlock(&lockCache);
 		aux = list_sorted(cache,(void*)by_id);
+		pthread_rwlock_unlock(&lockCache);
 		victima = list_find(aux,(void*)ocupada);
 		delete_particion(victima);
 		//victima->libre = 1;
@@ -745,9 +869,11 @@ particion* algoritmo_reemplazo(){
 	}
 	else{
 		printf("==========LRU==========\n");
+		pthread_rwlock_rdlock(&lockCache);
 		t_list* sorted = list_duplicate(cache);
 		time_t actual;
 		particion* ultima = list_get(cache,list_size(cache)-1);
+		pthread_rwlock_unlock(&lockCache);
 		actual = time(NULL);
 
 		bool by_time(particion* aux1,particion* aux2){
@@ -828,7 +954,9 @@ void handler_dump(int signo){
 				fprintf(dump,"Espacio    :%p-%p   [%c]   Size:%db\n",aux->inicio,aux->fin,caracter(aux->libre),aux->size);
 			}
 		}
+		pthread_rwlock_rdlock(&lockCache);
 		list_iterate(cache,(void*)imprimir);
+		pthread_rwlock_unlock(&lockCache);
 		fprintf(dump,"---------------------------------------------------------------------------------------------------------------------------------\n");
 
 		fclose(dump);
@@ -865,7 +993,9 @@ void display_cache(){
 		}
 
 	}
+	pthread_rwlock_rdlock(&lockCache);
 	list_iterate(cache,(void*)imprimir);
+	pthread_rwlock_unlock(&lockCache);
 	printf("------------------------------------------------------------------------------\n");
 }
 

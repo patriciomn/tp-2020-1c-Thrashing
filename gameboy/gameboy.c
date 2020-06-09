@@ -1,18 +1,16 @@
 #include "gameboy.h"
 
-int pid;
+uuid_t pid;
 
 int main(int argc,char* argv[]){
 	iniciar_gameboy(argc,argv);
 	terminar_gameboy(conexion, logger, config);
 }
 
-
 void iniciar_gameboy(int argc,char* argv[]){
 	logger = iniciar_logger();
-	config = leer_config();
-	pid = getpid();
-
+	config = leer_config("gameboy.config");
+	uuid_generate(pid);
 	//argv[1]:proceso argv[2]:tipo_mensaje
 	int process,tipo_msg;
 	if(argv[1]!=NULL &&argv[2]!=NULL){
@@ -228,10 +226,6 @@ t_log* iniciar_logger(void){
 	return log_create("gameboy.log","gameboy",1,LOG_LEVEL_INFO);
 }
 
-t_config* leer_config(void){
-	return config_create("gameboy.config");
-}
-
 void terminar_gameboy(int conexion, t_log* logger, t_config* config){
 	log_destroy(logger);
 	config_destroy(config);
@@ -361,8 +355,8 @@ void enviar_mensaje_caught_pokemon(int id_mensaje,int ok_fail,int socket_cliente
 	paquete->buffer = malloc(sizeof(t_buffer));
 	paquete->buffer->size = sizeof(int)*2 ;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream+sizeof(int),&id_mensaje,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int)*2,&ok_fail,sizeof(int));
+	memcpy(paquete->buffer->stream,&id_mensaje,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&ok_fail,sizeof(int));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
@@ -388,7 +382,7 @@ void enviar_mensaje_catch_pokemon_broker(char* pokemon,int posx,int posy,int soc
 
 	paquete->codigo_operacion = CATCH_POKEMON;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int) + tam +sizeof(position) ;
+	paquete->buffer->size = sizeof(int) + tam + sizeof(position) ;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream,&name_size,sizeof(int));
 	memcpy(paquete->buffer->stream+sizeof(int),pokemon,tam);
@@ -492,10 +486,10 @@ void enviar_info_suscripcion(int tipo,int socket_cliente){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2;
+	paquete->buffer->size = sizeof(int) + sizeof(uuid_t);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&pid,sizeof(uuid_t));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
@@ -509,31 +503,48 @@ void enviar_info_suscripcion(int tipo,int socket_cliente){
 	free(paquete);
 }
 
-void enviar_ack(int id,int socket_cliente){
-	int operacion = ACK;
-	int bytes = 2 * sizeof(int);
-	void* buf = malloc(bytes);
-	memcpy(buf,&operacion,sizeof(int));
-	memcpy(buf+sizeof(int),&id,sizeof(int));
-	send(socket_cliente,&buf, bytes, 0);
-	printf("CONFIRMACION ENVIADA\n");
-	free(buf);
+void enviar_ack(int tipo,int id){
+	conectar_proceso(BROKER);
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = ACK;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)*2 + sizeof(uuid_t);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&pid, sizeof(uuid_t));
+	memcpy(paquete->buffer->stream+sizeof(uuid_t),&tipo, sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(uuid_t)+sizeof(int),&id,sizeof(int));
+
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(conexion, a_enviar, bytes, 0);
+	printf("ACK enviado\n");
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
 }
 
 //RECIBIR-----------------------------------------------------------------------------------------------------------------
 void recibir_get_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 	void display(void* valor){
-		int id,tam;
+		int id;
+		memcpy(&id,valor,sizeof(int));
+		get_pokemon* get = deserializar_get(valor+sizeof(int));
+		/*int id,tam;
 		memcpy(&id,valor,sizeof(int));
 		memcpy(&tam,valor+sizeof(int),sizeof(int));
 		char* n = (char*)valor+sizeof(int)*2;
 		char* name = malloc(tam+1);
 		strcpy(name,n);
 		log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n",id,name);
-		free(name);
+		free(name);*/
+		log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n",id,get->name);
 		free(valor);
-		enviar_ack(id,conexion);
+		enviar_ack(GET_POKEMON,id);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -556,7 +567,7 @@ void recibir_new_pokemon(){
 		log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n",id,name,posx,posy,cant);
 		free(name);
 		free(valor);
-		enviar_ack(id,conexion);
+		enviar_ack(NEW_POKEMON,id);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -578,7 +589,7 @@ void recibir_catch_pokemon(){
 		log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n",id,name,posx,posy);
 		free(name);
 		free(valor);
-		enviar_ack(id,conexion);
+		enviar_ack(CATCH_POKEMON,id);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -592,7 +603,7 @@ void recibir_caught_pokemon(){
 		memcpy(&resultado,valor+sizeof(int),sizeof(int));
 		log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID_Correlacional:%d Resultado:%d\n",id,resultado);
 		free(valor);
-		enviar_ack(id,conexion);
+		enviar_ack(CAUGHT_POKEMON,id);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -614,7 +625,7 @@ void recibir_appeared_pokemon(){
 		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,name,posx,posy);
 		free(name);
 		free(valor);
-		enviar_ack(id,conexion);
+		enviar_ack(APPEARED_POKEMON,id);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -657,21 +668,6 @@ t_list* recibir_paquete(int socket_cliente){
 	}
 	free(buffer);
 	return valores;
-}
-
-
-void* serializar_paquete(t_paquete* paquete, int bytes){
-	void * magic = malloc(bytes);
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-	desplazamiento+= paquete->buffer->size;
-
-	return magic;
 }
 
 int crear_conexion(char *ip, char* puerto){

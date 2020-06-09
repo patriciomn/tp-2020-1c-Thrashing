@@ -75,7 +75,6 @@ typedef struct{
 	t_buffer* buffer;
 } t_paquete;
 
-
 typedef struct{
 	int posx;
 	int posy;
@@ -119,8 +118,8 @@ typedef struct{ //Este no lo entendi
 	
 }localized_pokemon;
 
-
-void* serializar_paquete(t_paquete* paquete, int * bytes);
+void* serializar_paquete(t_paquete* paquete, int bytes);
+void* serializar_paq(t_paquete* paquete, int * bytes);
 void* serializar_any(void* paquete, int * bytes, int cod_op);
 void* serializar_new(new_pokemon* paquete, int * bytes);
 void* serializar_appeared(appeared_pokemon* paquete, int * bytes);

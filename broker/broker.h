@@ -19,6 +19,7 @@
 #include<assert.h>
 #include<signal.h>
 #include<semaphore.h>
+#include <uuid/uuid.h>
 
 typedef struct{
 	char* ip_broker;
@@ -34,16 +35,8 @@ typedef struct{
 
 typedef struct{
 	int cliente_fd;
-	int pid;
+	uuid_t pid;
 }suscriber;
-
-typedef struct{
-    int id;
-    int correlation_id;
-    void* message;
-	t_list* enviados; //ACA SOLO METO PIDS
-	t_list* recibidos; //IDEM ENVIADOS
-}queue_item;
 
 typedef struct _cache{
 	bool libre;
@@ -56,13 +49,27 @@ typedef struct _cache{
 	time_t tiempo;
 }particion;
 
+typedef struct{
+	uint32_t id;
+	uint32_t id_correlacional;
+	int tipo_msg;
+	t_list* suscriptors_enviados;
+	t_list* suscriptors_ack;
+	void* msj;
+}mensaje;
+
+typedef struct{
+	uint32_t tipo_queue;
+	t_list* suscriptors;
+	t_list* mensajes;
+	uint32_t id;
+}mq;
+
 void iniciar_config_broker(char* broker_config);
 void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
-int get_id(void);
-int generate_pid(void);
-void build_queues(void);
-void build_suscribers(void);
+void iniciar_colas_mensaje();
+mq* crear_cola_mensaje(int tipo);
 void start_sender_thread(void);
 void sender_thread(void);
 void iniciar_servidor(void);
@@ -74,8 +81,22 @@ void atender_suscripcion(int cliente_fd );
 void atender_ack(int cliente_fd);
 void enviar_cacheados(suscriber* sus, int queue_id);
 t_paquete* crear_paquete(int op);
-void enviar_id(queue_item *item,int socket_cliente);
-
+void enviar_id(mensaje *item,int socket_cliente);
+void mensaje_new_pokemon(void* msg,int cliente_fd);
+void mensaje_appeared_pokemon(void* msg,int cliente_fd);
+void mensaje_catch_pokemon(void* msg,int cliente_fd);
+void mensaje_caught_pokemon(void* msg,int cliente_fd);
+void mensaje_get_pokemon(void* msg,int cliente_fd);
+void mensaje_localized_pokemon(void* msg,int cliente_fd);
+mensaje* crear_mensaje(int tipo_msg,int socket,int nro_id,void* msg);
+void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t tipo);
+void enviar_mensajes(suscriber* sus,int tipo_cola);
+void enviar_confirmacion_suscripcion(suscriber* sus);
+void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio);
+void enviar_paquete(t_paquete* paquete, int socket_cliente);
+void eliminar_paquete(t_paquete* paquete);
+mq* cola_mensaje(uint32_t tipo);
+void borrar_mensaje(mensaje* m);
 //--------------------------------------------------------------------------------------------------------
 
 void iniciar_memoria();
