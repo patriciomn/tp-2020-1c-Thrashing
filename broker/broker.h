@@ -60,8 +60,8 @@ void esperar_cliente(int socket_servidor);
 void serve_client(int* socket);
 void process_request(int cod_op, int cliente_fd);
 void * recibir_mensaje(int socket_cliente, int* size);
-void atender_suscripcion(int cliente_fd );
-void atender_ack(int cliente_fd);
+void atender_suscripcion(int cliente_fd, void * msg );
+void atender_ack(int cliente_fd, void * msg);
 void enviar_cacheados(suscriber* sus, int queue_id);
-void* crear_paquete(int op, queue_item* queue_item, int* size);
+t_paquete* crear_paquete(int op, queue_item* queue_item);
 #endif /* CONEXIONES_H_ */

@@ -2,28 +2,23 @@
 
 
 void* serializar_paquete(t_paquete* paquete, int * bytes){
-	int size_serializado = sizeof(paquete->codigo_operacion) + sizeof(paquete->buffer->id) + sizeof(paquete->buffer->correlation_id);
+	int size_serializado = sizeof(paquete->codigo_operacion) + paquete->buffer->size + sizeof(paquete->buffer->size);
     
-	paquete->buffer->stream = serializar_any(paquete, & paquete->buffer->size, paquete->codigo_operacion);
-
-    size_serializado += paquete->buffer->size + sizeof(paquete->buffer->size);
 
 	void * magic = malloc(size_serializado );
 	int desplazamiento = 0;
 
 	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->id), sizeof(int));
-	desplazamiento+= sizeof(int);
-
-	memcpy(magic + desplazamiento, &(paquete->buffer->correlation_id), sizeof(int));
-	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
 	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-
+	memcpy(magic + desplazamiento, &(paquete->buffer->stream->id), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, &(paquete->buffer->stream->correlation_id), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, paquete->buffer->stream->package, paquete->buffer->size - sizeof(int)*2);
+	
 	(*bytes) = size_serializado;
-
 	return magic;
 }
 

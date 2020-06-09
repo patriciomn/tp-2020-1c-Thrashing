@@ -4,12 +4,10 @@ int main(){
     iniciar_broker();
 	log_info(logger,"creating server");
 	iniciar_servidor();
-
 	terminar_broker( logger, config);
 }
 
-void iniciar_servidor(void)
-{
+void iniciar_servidor(void){
 	int socket_servidor;
 
     struct addrinfo hints, *servinfo, *p;
@@ -55,7 +53,6 @@ void esperar_cliente(int socket_servidor)
 
 }
 
-
 void serve_client(int* socket)
 {
 	int cod_op;
@@ -83,15 +80,14 @@ void process_request(int cod_op, int cliente_fd) {
 	
 	log_info(logger,"Processing request, cod_op: %d", cod_op);
 	
-
-	if (cod_op == SUSCRITO) atender_suscripcion(cliente_fd );
-	
-	else if (cod_op == ACK) atender_ack(  cliente_fd);
-
 	msg = recibir_mensaje(cliente_fd, &size);	
 
-	item->id = get_id();
+	if (cod_op == SUSCRITO) atender_suscripcion(cliente_fd, msg );
+	
+	else if (cod_op == ACK) atender_ack( cliente_fd,  msg);
 
+	item->id = get_id();
+	item->correlation_id = -1;
 	
 
 	if (cod_op == NEW_POKEMON){
@@ -143,8 +139,7 @@ void process_request(int cod_op, int cliente_fd) {
 }
 
 
-void atender_suscripcion( int cliente_fd ){
-	void * msg=malloc(sizeof(int)*2);
+void atender_suscripcion(int cliente_fd,  void * msg ){
 	int queue_id;
 	int pid;
 	
@@ -152,13 +147,15 @@ void atender_suscripcion( int cliente_fd ){
 	void * confirmation = malloc(sizeof(int)*2);
 
 
-	//recibo 8 bytes restantes
-	recv(cliente_fd, msg, sizeof(int) * 2, MSG_WAITALL);
-
-
 	memcpy(&(queue_id), msg, sizeof(int));
 	msg+=sizeof(int);
 	memcpy(&(pid), msg, sizeof(int));
+
+	log_info(logger,"Received, queue_id: %d, pid: %d", queue_id, pid);
+	if (queue_id>6 || queue_id<1 ){
+		log_error(logger, "Invalid queue_id %d. ", queue_id);
+		pthread_exit(NULL);
+	}
 
 	if (pid == -1){
 		//Esto pasa cuando entra por primera vez
@@ -194,16 +191,20 @@ void atender_suscripcion( int cliente_fd ){
 }
 
 
+
+
 void enviar_cacheados(suscriber * sus, int queue_id){
 	void enviar(queue_item* queue_item){
 		bool existe(suscriber * sus_aux){
 			return sus_aux->pid == sus->pid;
 		}
 		if (!list_any_satisfy(queue_item->recibidos,(void*)existe) ){
-			int size;
-			size =0;
-			void * paquete = crear_paquete(queue_id, queue_item, &size);
-			send(sus->cliente_fd, paquete, size, 0);
+			t_paquete * paquete = crear_paquete(queue_id, queue_item);
+
+			int size=0;
+			void * a_enviar = serializar_paquete(paquete, &size);
+
+			send(sus->cliente_fd, a_enviar, size, 0);
 			if(!list_any_satisfy(queue_item->enviados, (void*)existe)){
 				list_add(queue_item->enviados, sus);
 			}
@@ -213,37 +214,26 @@ void enviar_cacheados(suscriber * sus, int queue_id){
 	
 }
 
-void* crear_paquete(int op, queue_item * queue_item, int *size) {
-	int desplazamiento = 0;
-	void* stream = serializar_any(queue_item ->message ,size,  op);
-
-	void* paquete = malloc(*size + sizeof(int) * 3);
-
-	memcpy(paquete, &(op), sizeof(int) );
-	desplazamiento +=sizeof(int);
-	memcpy(paquete + desplazamiento, &(queue_item->id), sizeof(int) );
-	desplazamiento +=sizeof(int);
-	if (op == APPEARED_POKEMON || op == CAUGHT_POKEMON || op == LOCALIZED_POKEMON ){
-		memcpy(paquete + desplazamiento, &(queue_item->correlation_id), sizeof(int) );
-		desplazamiento +=sizeof(int);
-	}
-	memcpy(paquete + desplazamiento, stream, *size);
-
-	*size += desplazamiento;
-	
+t_paquete* crear_paquete(int op, queue_item * queue_item) {
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = op;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size=0;
+	paquete->buffer->stream = serializar_any(queue_item->message, &paquete->buffer->size, op);
+	paquete->buffer->size+= sizeof(queue_item->id) *2 ;
+	paquete->buffer->stream->id = queue_item->id;
+	paquete->buffer->stream->correlation_id = queue_item->correlation_id;
 	return paquete;
+
 }
 
-void atender_ack( int cliente_fd){
+
+void atender_ack(int cliente_fd,  void * msg){
 	int pid, queue_id, id;
-	void *msg=malloc(sizeof(int) * 3);
 	suscriber * sus = malloc(sizeof(suscriber));
 	queue_item * new;
 	//en msg viene id, correlation_id y queue_id
 
-
-	//recibo 12 bytes restantes
-	recv(cliente_fd, msg, sizeof(int) * 3, MSG_WAITALL);
 
 	memcpy(&(pid), msg, sizeof(int));
 	msg+=sizeof(int);

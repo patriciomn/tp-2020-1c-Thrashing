@@ -5,7 +5,7 @@
 
 	FORMA DE ENVIO DE MENSAJES:
 
-	SUSCRIBE: SUSCRITO | QUEUE_ID | PID  Dejar solo 12 bytes para la suscripcion. En caso de ser la primera suscripcion mandar un -1 en PID
+CAMBIAR ACA:	SUSCRIBE: SUSCRITO | SIZE | QUEUE_ID | PID  Dejar solo 12 bytes para la suscripcion. En caso de ser la primera suscripcion mandar un -1 en PID
 	-> respondo ack con pid que genero y guardo para identificar al proceso (ACK | PID) 
 
 	NEW : NEW_POKEMON  | SIZE | name_size | name | posx | posy | cantidad
@@ -19,20 +19,20 @@
 
 	ACK: ACK | ID broker responde
 
-
+a PARTIR DE ACA HAY QUE AGREGAR EL SIZE
 
 	FORMA DE RECEPCION DE MENSAJES DE LA COLA:
 
-	NEW : NEW_POKEMON | ID   | name_size | name | posx | posy | cantidad
-	APPEARED: APPEARED_POKEMON  | ID | CORRELATIONID  | name_size | name | posx | posy 
+	NEW : NEW_POKEMON | SIZE |  ID | -1   | name_size | name | posx | posy | cantidad
+	APPEARED: APPEARED_POKEMON  | SIZE | ID | CORRELATIONID  | name_size | name | posx | posy 
 
-	CATCH: CATCH_POKEMON | ID   | name_size | name | posx | posy
-	CAUGHT: CAUGHT_POKEMON  | ID | CORRELATIONID |  caught
+	CATCH: CATCH_POKEMON | SIZE | ID  | -1 | name_size | name | posx | posy
+	CAUGHT: CAUGHT_POKEMON  | SIZE | ID |  CORRELATIONID |  caught
 
-	GET: GET_POKEMON |ID   | name_size | name
-	LOCALIZED: LOCALIZED_POKEMON | ID | CORRELATIONID  | name_size | name | posx | posy | cantidad_posiciones
+	GET: GET_POKEMON | SIZE | ID | -1  | name_size | name
+	LOCALIZED: LOCALIZED_POKEMON | SIZE | ID | CORRELATIONID  | name_size | name | posx | posy | cantidad_posiciones
 
-	ACK RECEPCION: ACK | PID | QUEUE_ID | ID  broker recibe
+	ACK RECEPCION: ACK | SIZE | PID | QUEUE_ID | ID  broker recibe
 
 */
 
@@ -50,11 +50,16 @@ enum TIPO{
 	SUSCRITO = 7,
 	ACK = 8,
 };
+
 typedef struct{
 	int id;
 	int correlation_id;
+	void * package;
+} package;
+
+typedef struct{
 	int size;
-	void* stream;
+	package* stream;
 } t_buffer;
 
 typedef struct{
