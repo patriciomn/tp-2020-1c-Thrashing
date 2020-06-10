@@ -18,9 +18,10 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <uuid/uuid.h>
 #include "sockets.h"
 
-#include "../utils/utils.h"
+//#include "../utils/utils.h"
 
 #define IP_SERVIDOR		 "127.0.0.3"
 #define PUERTO_SERVIDOR  "4446"
@@ -80,6 +81,11 @@ struct config_tallGrass *datos_config; // este struct es para almacenar los dato
 
 // Hilos para gamecard
 pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servidor e interacturar con gameboy si el broker cae
+pthread_t cliente_gamecard; // este hilo es para iniciar gamecard como cliente del broker
+
+pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_pokemon
+pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
+pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
 //FUNCIONES
 

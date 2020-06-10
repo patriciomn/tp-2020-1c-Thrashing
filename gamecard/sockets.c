@@ -4,18 +4,56 @@ void suscripcion_colas_broker() {
 
 	log_info(logger, "ESTABLECIENDO CONEXION CON EL BROKER");
 	socket_cliente_np = crear_conexion();
-	socket_cliente_cp = crear_conexion();
-	socket_cliente_gp = crear_conexion();
+	//socket_cliente_cp = crear_conexion();
+	//socket_cliente_gp = crear_conexion();
 
-	if(socket_cliente_np == -1) { // puede ser cualquier socket_cliente, si uno no conecto el resto tampoco
+	if(socket_cliente_np == -1 && socket_cliente_cp == -1 && socket_cliente_gp == -1) {
 			log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
 			pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
-			pthread_join(servidor_gamecard, NULL);
-	}
-	//enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
-	//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
-	//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
+			pthread_detach(servidor_gamecard);
+	} else {
+		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
+		enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np);
+		int ack_broker;
+		recv(socket_cliente_np, &ack_broker, sizeof(int), MSG_WAITALL);
+		log_info(logger, "ACK RECIVIDO: %d", ack_broker);
+		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensaje_new_pokemon, NULL);
+		pthread_join(thread_new_pokemon, NULL);
+		//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp);
+		//pthread_create(&thread_catch_pokemon, NULL, NULL, NULL);
+
+		//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp);
+		//pthread_create(&thread_get_pokemon, NULL, NULL, NULL);
+	}
+}
+
+void recibir_mensaje_new_pokemon() {
+	log_info(logger, "ESPERANDO MENSAJE NEW_POKEMON DEL BROKER");
+
+	while(1) {
+		NPokemon *newPokemon = malloc(sizeof(NPokemon));
+		//new_pokemon *newPokemon = malloc(sizeof(new_pokemon));
+
+		int codigo_operacion;
+		recv(socket_cliente_np, &codigo_operacion, sizeof(int), MSG_WAITALL);
+		log_info(logger, "CODIGO DE OPERACION: %d", codigo_operacion);
+
+		int size_mensaje;
+		recv(socket_cliente_np, &size_mensaje, sizeof(int), MSG_WAITALL);
+		log_info(logger, "TAMAÑO STREAM: %d", size_mensaje);
+
+		void *stream = malloc(size_mensaje);
+		recv(socket_cliente_np, stream, size_mensaje, MSG_WAITALL);
+
+		//int id;
+		//memcpy(&id , stream, sizeof(int));
+		//printf("id: %d\n", id);
+		deserealizar_new_pokemon_broker(stream, newPokemon);
+		//newPokemon = deserializar_new(stream);
+		//printf("tamaño nombre: %d\n", newPokemon->name_size);
+		//printf("nombre: %s\n", newPokemon->name);
+	}
 }
 
 int crear_conexion() {
@@ -40,20 +78,31 @@ int crear_conexion() {
 	return socket_cliente;
 }
 
-/*
-void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 
+void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
+	char buf[1024];
+	int desplazamiento = 0;
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
-	//paquete->codigo_operacion = SUSCRITO;
+	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int);
+	paquete->buffer->size = sizeof(enum TIPO) + 1024;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream, &(cola), paquete->buffer->size);
+
+	uuid_t id_process;
+	uuid_generate(id_process);
+
+	uuid_parse(buf, id_process);
+
+	memcpy(paquete->buffer->stream + desplazamiento, &(cola), paquete->buffer->size);
+	desplazamiento += sizeof(enum TIPO);
+
+	memcpy(paquete->buffer->stream + desplazamiento, buf, 1024);
+	desplazamiento += 1024;
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
-	void* info_a_enviar = serializar_paquete_suscripcion(paquete, bytes);
+	void* info_a_enviar = serializar_paquete(paquete, bytes);
 
 	log_info(logger, "ENVIANDO MENSAJE DE SUSCRIPCION AL BROKER");
 	if(send(socket_cliente, info_a_enviar, bytes, MSG_WAITALL) == -1) {
@@ -66,7 +115,7 @@ void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente) {
 	free(paquete);
 }
 
-void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
+void* serializar_paquete(t_paquete* paquete, int bytes) {
 	void *magic = malloc(bytes);
 	int desplazamiento = 0;
 
@@ -79,7 +128,7 @@ void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes) {
 
 	return magic;
 }
-*/
+
 
 void iniciar_servidor(void) {
 
@@ -195,6 +244,8 @@ void atender_peticion(int socket_cliente, int cod_op) {
 	}
 }
 
+// Deserealizacion para Gameboy
+
 void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon) {
 	int desplazamiento = 0;
 
@@ -252,4 +303,47 @@ void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon) {
 	desplazamiento += size_name;
 }
 
+// Deserealizacion para Broker
 
+void deserealizar_new_pokemon_broker(void *stream, NPokemon *newPokemon) {
+	int desplazamiento = 0;
+
+	memcpy(&(newPokemon->id_mensaje) , stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+	printf("id mensaje: %d\n", newPokemon->id_mensaje);
+
+	int tamNombrePokemon;
+	memcpy(&(tamNombrePokemon), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+	printf("tamaño nombre: %d\n", tamNombrePokemon);
+
+	newPokemon->nombre = malloc(tamNombrePokemon);
+	memcpy(newPokemon->nombre, stream + desplazamiento, tamNombrePokemon);
+	desplazamiento += tamNombrePokemon;
+	printf("pokemon: %s\n", newPokemon->nombre);
+
+	memcpy(&(newPokemon->posicion), stream + desplazamiento, sizeof(Position));
+	desplazamiento += sizeof(Position);
+	printf("posX: %d\n", newPokemon->posicion.posX);
+	printf("posY: %d\n", newPokemon->posicion.posY);
+
+	memcpy(&(newPokemon->cantidad), stream + desplazamiento, sizeof(int));
+	desplazamiento += sizeof(int);
+	printf("cantidad: %d\n", newPokemon->cantidad);
+}
+
+new_pokemon* deserializar_new(void* buffer) {
+    new_pokemon* new = malloc(sizeof(new_pokemon));
+
+    void* stream = buffer;
+    memcpy(&(new->name_size), stream + sizeof(int), sizeof(int));
+    stream += sizeof(int);
+	new->name = malloc(new->name_size+1);
+	memcpy(new->name, stream, new->name_size+1);
+	stream += (new->name_size + 1);
+    memcpy(&(new->pos), stream, sizeof(Position));
+    stream += sizeof(Position);
+    memcpy(&(new->cantidad), stream, sizeof(int));
+
+    return new;
+}

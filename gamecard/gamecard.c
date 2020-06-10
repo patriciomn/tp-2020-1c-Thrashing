@@ -7,14 +7,14 @@ int main () {
 
     iniciar_logger_config();
 
-    obtener_datos_archivo_config();
+    //obtener_datos_archivo_config();
 
-    verificar_punto_de_montaje();
+    //verificar_punto_de_montaje();
 
-    //suscripcion_colas_broker();
+    suscripcion_colas_broker();
 
-    crear_archivos_pokemon("pepa", 200, 100, 100);
-    crear_archivos_pokemon("chancha",50,10,2);
+    //crear_archivos_pokemon("pepa", 200, 100, 100);
+    //crear_archivos_pokemon("chancha",50,10,2);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);
