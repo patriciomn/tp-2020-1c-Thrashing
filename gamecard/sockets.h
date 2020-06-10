@@ -66,12 +66,16 @@ void atender_peticion(int socket_cliente, int cod_op);
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
 void* serializar_paquete(t_paquete* paquete, int bytes);
 void recibir_mensaje_new_pokemon();
+void recibir_mensaje_catch_pokemon();
+void recibir_mensaje_get_pokemon();
 
 void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon);
 void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon);
 void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon);
 
-void deserealizar_new_pokemon_broker(void *stream, NPokemon *newPokemon);
+void deserealizar_new_pokemon_broker(void *stream);
+void deserealizar_catch_pokemon_broker(void *stream);
+void deserealizar_get_pokemon_broker(void *stream);
 
 new_pokemon* deserializar_new(void* buffer);
 
