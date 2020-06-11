@@ -1,6 +1,19 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include<commons/log.h>
+#include<math.h>
+#include<sys/socket.h>
+#include<unistd.h>
+#include<netdb.h>
+#include<commons/collections/list.h>
+#include<commons/collections/queue.h>
+#include<commons/config.h>
+#include<commons/string.h>
+#include<pthread.h>
+#include<assert.h>
+#include<signal.h>
+#include<semaphore.h>
 /*
 
 	FORMA DE ENVIO DE MENSAJES:
@@ -67,7 +80,6 @@ typedef struct{
 	t_buffer* buffer;
 } t_paquete;
 
-
 typedef struct{
 	int posx;
 	int posy;
@@ -107,12 +119,12 @@ typedef struct{ //Este no lo entendi
 	int name_size;
 	char* name;
 	int cantidad_posiciones;
-	position * pos;
+	position pos[];
 	
 }localized_pokemon;
 
-
-void* serializar_paquete(t_paquete* paquete, int * bytes);
+void* serializar_paquete(t_paquete* paquete, int bytes);
+void* serializar_paq(t_paquete* paquete, int * bytes);
 void* serializar_any(void* paquete, int * bytes, int cod_op);
 void* serializar_new(new_pokemon* paquete, int * bytes);
 void* serializar_appeared(appeared_pokemon* paquete, int * bytes);

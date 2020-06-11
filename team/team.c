@@ -71,7 +71,10 @@ void iniciar_config(char* teamConfig){
 //CREACION---------------------------------------------------------------------------------------------------------------------
 void crear_team(){
 	equipo = malloc(sizeof(team));
-	equipo->pid = getpid();
+	uuid_generate(equipo->pid);
+	char buf[1024];
+	uuid_unparse(equipo->pid,buf);
+	printf("Pid:%s\n",buf);
 	equipo->entrenadores = list_create();
 	equipo->objetivos = list_create();
 	equipo->poks_requeridos = list_create();
@@ -81,22 +84,24 @@ void crear_team(){
 	char** pos = string_get_string_as_array(datos_config->posiciones);
 	char** poks = string_get_string_as_array(datos_config->pokemones);
 	char** objs = string_get_string_as_array(datos_config->objetivos);
+	char** posicion;
 	int j = 0;
 	for(int i=0;i<cant_pokemones(poks);i++){
-		char** posicion = string_split(pos[i],"|");
+		posicion = string_split(pos[i],"|");
 		int posx = atoi(posicion[0]);
 		int posy = atoi(posicion[1]);
 		int tid = j;
 		char* pok = poks[i];
 		char* obj = objs[i];
 		crear_entrenador(tid,posx,posy,pok,obj);
+		free(posicion[0]);
+		free(posicion[1]);
 		free(posicion);
 		free(poks[i]);
 		free(objs[i]);
 		free(pos[i]);
 		j++;
 	}
-
 	free(poks);
 	free(objs);
 	free(pos);
@@ -138,6 +143,8 @@ void crear_entrenador(int tid,int posx,int posy,char* pokemones,char* objetivos)
 		list_add(entre->objetivos,crear_pokemon(objs[i]));
 		list_add(equipo->objetivos,crear_pokemon(objs[i]));
 	}
+	free(poks);
+	free(objs);
 
 	list_add(equipo->entrenadores,entre);
 	printf("Entrenador%d En Posicion: [%d,%d]\n",entre->tid,entre->posx,entre->posy);
@@ -151,23 +158,7 @@ void salir_equipo(){
 	}
 	list_iterate(equipo->entrenadores,(void*)cant_ciclos);
 
-	void free_entrenador(entrenador* aux){
-		free(aux);
-	}
 
-	list_destroy_and_destroy_elements(equipo->entrenadores,(void*)free_entrenador);
-	list_destroy(equipo->objetivos);
-	list_destroy(equipo->poks_requeridos);
-	free(equipo);
-	free(datos_config->log_file);
-	free(datos_config->algoritmo);
-	free(datos_config->ip_broker);
-	free(datos_config->objetivos);
-	free(datos_config->pokemones);
-	free(datos_config->puerto_broker);
-	free(datos_config->posiciones);
-	free(datos_config);
-	log_destroy(logger);
 	exit(0);
 }
 
@@ -376,10 +367,10 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 	pokemon* pok1 = pokemon_a_intercambiar(entre1);
 	pokemon* pok2 = pokemon_a_intercambiar(entre2);
 	bool by_name1(pokemon* aux){
-		return aux->name = pok1->name;
+		return aux->name == pok1->name;
 	}
 	bool by_name2(pokemon* aux){
-		return aux->name = pok2->name;
+		return aux->name == pok2->name;
 	}
 	list_add(entre1->pokemones,pok2);
 	list_add(entre2->pokemones,pok1);
@@ -725,7 +716,7 @@ void get_pokemon(char* pokemon){
 void appeared_pokemon(int cliente_fd){//gameboy
 	int size;
 	int desplazamiento = 0;
-	int posx,posy,cant;
+	int posx,posy;
 	char* pokemon_name = recibir_buffer(cliente_fd, &size);
 	desplazamiento += strlen(pokemon_name)+1;
 	memcpy(&posx,pokemon_name+desplazamiento,sizeof(int));
@@ -754,7 +745,7 @@ void recibir_localized_pokemon(int cliente_fd){//IMPLEMENTAR
 
 	int size;
 	int desplazamiento = 0;
-	int posx,posy,cant;
+	int posx,posy;//cant;
 	char* pokemon = recibir_buffer(cliente_fd, &size);
 	desplazamiento += strlen(pokemon)+1;
 	memcpy(&posx,pokemon+desplazamiento,sizeof(int));
@@ -864,15 +855,14 @@ void enviar_ack(int id,int socket_cliente){
 	free(buf);
 }
 
-
 void enviar_info_suscripcion(int tipo,int socket_cliente){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = SUSCRITO;
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2;
+	paquete->buffer->size = sizeof(int) + sizeof(uuid_t);
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&equipo->pid,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&equipo->pid,sizeof(uuid_t));
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
@@ -951,8 +941,9 @@ void recibir_confirmacion_suscripcion(int cliente_fd){
 	int cod_op;
 	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
-
-	printf("Se Ha Suscripto A La Cola\n");
+	if(cod_op != -1){
+		printf("Se Ha Suscripto A La Cola\n");
+	}
 }
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
@@ -1074,7 +1065,6 @@ void esperar_cliente(int socket_servidor){
 	struct sockaddr_in dir_cliente;
 
 	int tam_direccion = sizeof(struct sockaddr_in);
-
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
 	log_info(logger,"GAMEBOY Conectado!",socket_cliente);
 
@@ -1130,7 +1120,7 @@ msg* crear_mensaje(int id,int tipo,pokemon* pok){
 }
 
 t_list* recibir_paquete(int socket_cliente){
-	uint32_t size;
+	int size;
 	uint32_t desplazamiento = 0;
 	void * buffer;
 	t_list* valores = list_create();

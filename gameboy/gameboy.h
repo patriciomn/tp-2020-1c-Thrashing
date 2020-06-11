@@ -1,6 +1,7 @@
 #ifndef GAMEBOY_H_
 #define GAMEBOY_H_
 
+#include"../utils/utils.c"
 #include<stdio.h>
 #include<stdlib.h>
 #include<commons/log.h>
@@ -14,38 +15,16 @@
 #include<netdb.h>
 #include<string.h>
 #include<sys/time.h>
+#include <uuid/uuid.h>
 
-enum TIPO{
-
-	//QUEUE_ID
-	NEW_POKEMON = 1,
-	APPEARED_POKEMON = 2,
-	CATCH_POKEMON = 3,
-	CAUGHT_POKEMON = 4,
-	GET_POKEMON = 5,
-	LOCALIZED_POKEMON = 6,
-
-	//ACTION
-	SUSCRITO = 7,
-	ACK = 8,
-};
 
 enum TIPO_PROCESO{
+	SUSCRIPTOR = 9,
 	TEAM = 10,
 	GAMECARD = 11,
 	GAMEBOY = 12,
-	BROKER,
+	BROKER = 13,
 };
-
-typedef struct{
-	int size;
-	void* stream;
-} t_buffer;
-
-typedef struct{
-	enum TIPO codigo_operacion;
-	t_buffer* buffer;
-} t_paquete;
 
 struct option{
 	const char* name;
@@ -54,17 +33,11 @@ struct option{
 	int val;
 };
 
-typedef struct{
-	int posx;
-	int posy;
-}position;
-
 t_log* logger;
 t_config* config;
 int conexion;
 
 t_log* iniciar_logger(void);
-t_config* leer_config(void);
 void iniciar_gameboy(int argc,char* argv[]);
 void conectar_proceso(int proceso);
 int proceso(char* proceso);
@@ -82,13 +55,10 @@ void enviar_mensaje_get_pokemon(char* pokemon,int,int socket_cliente);
 void enviar_mensaje_get_pokemon_broker(char* pokemon,int socket_cliente);
 void enviar_mensaje_catch_pokemon_broker(char* pokemon,int posx,int posy,int socket_cliente);
 void enviar_info_suscripcion(int tipo,int socket_cliente);
-void eliminar_paquete(t_paquete* paquete);
 void liberar_conexion(int socket_cliente);
-void* serializar_paquete(t_paquete* paquete, int bytes);
 void recibir_confirmacion_suscripcion(int cliente_fd);
 void* recibir_buffer(int socket_cliente, uint32_t* size);
-void enviar_ack(int id,int socket_cliente);
-t_paquete* crear_paquete(int accion);
+void enviar_ack(int,int id);
 t_list* recibir_paquete(int socket_cliente);
 void recibir_get_pokemon();
 void recibir_new_pokemon();

@@ -18,8 +18,13 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <uuid/uuid.h>
+#include "sockets.h"
 
-#include "../utils/utils.h"
+//#include "../utils/utils.h"
+
+#define IP_SERVIDOR		 "127.0.0.3"
+#define PUERTO_SERVIDOR  "4446"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 //#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
@@ -27,20 +32,17 @@
 #define METADATA_FILE "/metadata.txt"
 #define BLOCKS_DIR "/blocks"
 #define FILES_DIR "/files"
-#define POKEMON_DIR "/Pokemon"
+#define POKEMON_DIR "/files/"
 #define METADATA_TXT_PATH "/metadata/metadata.txt"
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
 #define POKEMON_FILE_EXT ".txt"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
+#define PATH_POKECARPETA "/home/utnso/desktop/tall-grass/files/"
 
 #define GUION "-"
 #define IGUAL "="
-
-#define IP_SERVIDOR		 "127.0.0.3"
-#define PUERTO_SERVIDOR  "4446"
-
 
 t_log *logger;
 t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
@@ -71,58 +73,19 @@ struct mensaje {
     int id;
     void* message;
 } ;
-/*
-enum TIPO {
-	//QUEUE_ID
-	NEW_POKEMON = 1,
-	APPEARED_POKEMON = 2,
-	CATCH_POKEMON = 3,
-	CAUGHT_POKEMON = 4,
-	GET_POKEMON = 5,
-	LOCALIZED_POKEMON = 6,
-};
- /*
-typedef struct{
-	int id;
-	int correlation_id;
-	int size;
-	void* stream;
-} t_buffer;
 
-
-typedef struct {
-	int size;
-	void* stream;
-} t_buffer;
-
-typedef struct {
-	enum TIPO codigo_operacion;
-	t_buffer* buffer;
-} t_paquete;
-*/
-typedef struct {
-	int posX;
-	int posY;
-}Position;
-
-typedef struct {
-	int correlational_id;
-	int size_name;
-	char *name;
-	Position posicion;
-	int cantidad;
-}NPokemon;
-
-
-int socket_cliente_np;
-int socket_cliente_cp;
-int socket_cliente_gp;
+// Los siguientes structs son para recibir mensajes del gameboy
 
 struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
 struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
 
 // Hilos para gamecard
 pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servidor e interacturar con gameboy si el broker cae
+pthread_t cliente_gamecard; // este hilo es para iniciar gamecard como cliente del broker
+
+pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_pokemon
+pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
+pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
 //FUNCIONES
 
@@ -138,6 +101,7 @@ void crear_directorio_blocks(char *path_pto_montaje);
 void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
 int existe_archivo_pokemon(char *path);
+char* crear_directorio_pokemon(char *path_pto_montaje, char* pokemon);
 void crear_archivos_pokemon(char *path_pokefile, int posX, int posY, int cantidad);
 void crear_metadata_pokemon(char *path_pokeflie);
 
@@ -146,28 +110,14 @@ int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
-
+int fileSize(char* file);
+FILE* existePokemon(char* nombrePokemon);
+char *read_file_into_buf (char **filebuf, long *fplen, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 void newPokemon(char* pokemon,int posx,int posy,int cant);
 void catchPokemon(char* pokemon,int posx,int posy);
-void getPokemon(char*pokemon);
-
-// Funciones Sockets
-
-int crear_conexion_broker();
-int crear_conexion();
-void esperar_cliente(int socket_servidor);
-void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
-void* serializar_paquete_suscripcion(t_paquete* paquete, int bytes);
-void atender_peticion(int socket);
-void iniciar_servidor();
-void suscripcion_colas_broker();
-int ceilT(double numero);
-
-// serializaciones y deserealizaciones
-
-void deserealizar_new_pokemon(void *stream, NPokemon *newPokemon);
+rtaGet* getPokemon(int idMensaje, char* pokemon);
 
 
 

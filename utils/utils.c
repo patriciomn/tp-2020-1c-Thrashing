@@ -1,8 +1,70 @@
 #include"utils.h"
 
+t_config* leer_config(char* config){
+	return config_create(config);
+}
 
-void* serializar_paquete(t_paquete* paquete, int * bytes){
-	int size_serializado = sizeof(paquete->codigo_operacion) + paquete->buffer->size + sizeof(paquete->buffer->size);
+void* recibir_mensaje(int socket_cliente){
+	int size;
+	void * buffer;
+	recv(socket_cliente,&size, sizeof(int), MSG_WAITALL);
+	buffer = malloc(size);
+	recv(socket_cliente, buffer,size, MSG_WAITALL);
+	return buffer;
+}
+
+void* serializar_paquete(t_paquete* paquete, int bytes){
+	void * magic = malloc(bytes);
+	int desplazamiento = 0;
+
+	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
+	desplazamiento+= sizeof(int);
+	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
+	desplazamiento+= paquete->buffer->size;
+
+	return magic;
+}
+
+void crear_buffer(t_paquete* paquete){
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = 0;
+	paquete->buffer->stream = NULL;
+}
+
+t_paquete* crear_paquete(int op){
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	crear_buffer(paquete);
+	paquete->codigo_operacion = op;
+	return paquete;
+}
+
+void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio){
+	paquete->buffer->stream = realloc(paquete->buffer->stream, paquete->buffer->size + tamanio + sizeof(int));
+
+	memcpy(paquete->buffer->stream + paquete->buffer->size, &tamanio, sizeof(int));
+	memcpy(paquete->buffer->stream + paquete->buffer->size + sizeof(int), valor, tamanio);
+
+	paquete->buffer->size += tamanio + sizeof(int);
+}
+
+void enviar_paquete(t_paquete* paquete, int socket_cliente){
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+	void* a_enviar = serializar_paquete(paquete, bytes);
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	free(a_enviar);
+}
+
+void eliminar_paquete(t_paquete* paquete){
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void* serializar_paq(t_paquete* paquete, int * bytes){
+	int size_serializado = sizeof(paquete->codigo_operacion) + sizeof(paquete->buffer->id) + sizeof(paquete->buffer->correlation_id);
     
 
 	void * magic = malloc(size_serializado );
@@ -173,14 +235,11 @@ new_pokemon* deserializar_new(void* buffer) {
     void* stream = buffer;
     memcpy(&(new->name_size), stream, sizeof(int));
     stream += sizeof(int);
-	new->name = malloc(new->name_size);
-
-	memcpy(new->name, stream, new->name_size);
-	stream += sizeof(new->name_size);
-	
+	new->name = malloc(new->name_size+1);
+	memcpy(new->name, stream, new->name_size+1);
+	stream += (new->name_size + 1);
     memcpy(&(new->pos), stream, sizeof(position));
     stream += sizeof(position);
-
     memcpy(&(new->cantidad), stream, sizeof(int));
 	
     return new;
@@ -189,15 +248,13 @@ new_pokemon* deserializar_new(void* buffer) {
 appeared_pokemon* deserializar_appeared(void* buffer) {
     appeared_pokemon* appeared = malloc(sizeof(appeared_pokemon));
     
-    void* stream = buffer;
+    void* stream = buffer+sizeof(int);
     memcpy(&(appeared->name_size), stream, sizeof(int));
     stream += sizeof(int);
-	appeared->name = malloc(appeared->name_size);
-	memcpy(appeared->name, stream, appeared->name_size);
-	stream += sizeof(appeared->name_size);
-
+	appeared->name = malloc(appeared->name_size+1);
+	memcpy(appeared->name, stream, appeared->name_size+1);
+	stream += (appeared->name_size+1);
     memcpy(&(appeared->pos), stream, sizeof(position));
-    stream += sizeof(position);
 
     return appeared;
 }
@@ -208,50 +265,46 @@ catch_pokemon* deserializar_catch(void* buffer) {
     void* stream = buffer;
     memcpy(&(catch->name_size), stream, sizeof(int));
     stream += sizeof(int);
-	catch->name = malloc(catch->name_size);
-	memcpy(catch->name, stream, catch->name_size);
-	stream += sizeof(catch->name_size);
+	catch->name = malloc(catch->name_size+1);
+	memcpy(catch->name, stream, catch->name_size+1);
+	stream += (catch->name_size+1);
     memcpy(&(catch->pos), stream, sizeof(position));
-    stream += sizeof(position);
 		
     return catch;
 }
 
 caught_pokemon* deserializar_caught(void* buffer) {
     caught_pokemon* caught = malloc(sizeof(caught_pokemon));
-    
-    memcpy(&(caught->caught), buffer, sizeof(int));
+    memcpy(&(caught->caught), buffer+sizeof(int), sizeof(int));
 		
     return caught;
 }
 
 get_pokemon* deserializar_get(void* buffer) {
     get_pokemon* get = malloc(sizeof(get_pokemon));
-    
-    void* stream = buffer;
-    memcpy(&(get->name_size), stream, sizeof(int));
-    stream += sizeof(int);
-	get->name = malloc(get->name_size);
-	memcpy(get->name, stream, get->name_size);
+
+    memcpy(&(get->name_size),buffer, sizeof(int));
+	get->name = malloc(get->name_size+1);
+	memcpy(get->name,buffer+sizeof(int), get->name_size+1);
 		
     return get;
 }
 
-
 localized_pokemon* deserializar_localized(void* buffer) {
     localized_pokemon* localized = malloc(sizeof(localized_pokemon));
     
-    void* stream = buffer;
+    void* stream = buffer+sizeof(int);
     memcpy(&(localized->name_size), stream, sizeof(int));
     stream += sizeof(int);
-	localized->name = malloc(localized->name_size);
-
-	memcpy(localized->name, stream, localized->name_size);
-	stream += sizeof(localized->name_size);
-    memcpy(&(localized->pos), stream, sizeof(position));
-    stream += sizeof(position);
-
-    memcpy(&(localized->cantidad_posiciones), stream, sizeof(int));
+	localized->name = malloc(localized->name_size+1);
+	memcpy(localized->name, stream, localized->name_size+1);
+	stream += sizeof(localized->name_size+1);
+	memcpy(&localized->cantidad_posiciones,stream,sizeof(int));
+	stream += sizeof(int);
+	for(int i=0;i<localized->cantidad_posiciones;i++){
+		memcpy(&(localized->pos[i]), stream, sizeof(position));
+		stream += sizeof(position);
+	}
 	
     return localized;
 }
