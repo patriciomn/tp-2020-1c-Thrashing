@@ -514,10 +514,73 @@ int fileSize(char* file) {
     fclose(fp); 
     return (res/BITS); 
 } 
+FILE* existePokemon(char* nombrePokemon){
+    char* pathArchivo = string_new();
+    string_append(&pathArchivo,PATH_POKECARPETA);
+    string_append_with_format(&pathArchivo,"%s%s%s", nombrePokemon, "/",nombrePokemon);
+    FILE *fp = fopen(pathArchivo,"r");
+    return fp;
+
+}
+char *read_file_into_buf (char **filebuf, long *fplen, FILE *fp)
+{
+    fseek (fp, 0, SEEK_END);
+    if ((*fplen = ftell (fp)) == -1) {  /* get file length */
+        fprintf (stderr, "error: unable to determine file length.\n");
+        return NULL;
+    }
+    fseek (fp, 0, SEEK_SET);  /* allocate memory for file */
+    if (!(*filebuf = calloc (*fplen, sizeof *filebuf))) {
+        fprintf (stderr, "error: virtual memory exhausted.\n");
+        return NULL;
+    }
+
+    /* read entire file into filebuf */
+    if (!fread (*filebuf, sizeof *filebuf, *fplen, fp)) {
+        fprintf (stderr, "error: file read failed.\n");
+        return NULL;
+    }
+
+    return *filebuf;
+}
 
 //CAMBIE  NOMBRE PORQUE ROMPE AHORA QUE ESTAN LOS UTILS :)
 void newPokemon(char* pokemon,int posx,int posy,int cant){}
 
 void catchPokemon(char* pokemon,int posx,int posy){}
 
-void getPokemon(char*pokemon){}
+/*rtaGet* getPokemon(int idMensaje, char* pokemon){
+    rtaGet* respuesta = malloc(sizeof(rtaGet));
+    respuesta->id_mensaje = idMensaje;
+    respuesta->name = pokemon;
+    FILE *fp = existePokemon(pokemon);
+    if(fp != NULL){
+        char* pathMetadata = string_new();
+        string_append(&pathMetadata,PATH_POKECARPETA);
+        string_append_with_format(&pathMetadata,"%s%s%s", pokemon, "/",METADATA_FILE);
+        t_config *metadata_pokemon = config_create(pathMetadata);
+        
+        char* abierto = string_new();
+        string_append(abierto, config_get_string_value(metadata_pokemon,"OPEN"));
+        if(abierto == "Y"){
+            //finalizar hilo y reintentar despues del tiempo que dice el config
+        } else{
+            //settear OPEN = Y
+            char* pathFILE = string_new();
+            string_append(&pathFILE,PATH_POKECARPETA);
+            string_append_with_format(&pathFILE,"%s%s%s", pokemon, "/",pokemon);
+            char** scaneo = NULL;
+            long fplen = (long) fileSize(pathFILE);
+            scaneo = read_file_into_buf (scaneo, fplen, fp);
+            //settear OPEN = N
+            //falta separar uno a uno las lineas
+            //setear la respuesta
+
+            free(scaneo);
+        }
+    
+    free(abierto);
+    }
+
+    return respuesta;
+}*/

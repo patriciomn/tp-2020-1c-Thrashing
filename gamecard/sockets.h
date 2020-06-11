@@ -58,6 +58,17 @@ typedef struct{
 	int cantidad;
 }new_pokemon;
 
+typedef struct{
+	Position pos;
+	int cant;
+}posiYcant;
+
+typedef struct{
+	int id_mensaje;
+	char* name;
+	posiYcant pos[];
+}rtaGet;
+
 void suscripcion_colas_broker();
 int crear_conexion();
 void iniciar_servidor(void);
