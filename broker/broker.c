@@ -14,7 +14,6 @@ mq* cola_appeared;
 
 pthread_t thread_servidor;
 pthread_t thread_suscripcion;
-pthread_t thread_ack;
 
 int cant_busqueda;
 int inicio;
@@ -31,6 +30,7 @@ pthread_rwlock_t lockParticion = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockImprimir = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t mutexMensaje = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexParticion = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexDump = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t lockId = PTHREAD_RWLOCK_INITIALIZER;
 sem_t semHayEspacio;
 sem_t semACK;
@@ -101,7 +101,7 @@ void iniciar_config(char* memoria_config){
 	datos_config->ip_broker = config_get_string_value(config,"IP_BROKER");
 	datos_config->puerto_broker = config_get_string_value(config,"PUERTO_BROKER");
 	datos_config->tamanio_memoria = atoi(config_get_string_value(config,"TAMANO_MEMORIA"));
-	datos_config->tamanio_min_compactacion = atoi(config_get_string_value(config,"TAMANO_MINIMO_PARTICION"));
+	datos_config->tamanio_min_particion = atoi(config_get_string_value(config,"TAMANO_MINIMO_PARTICION"));
 	datos_config->algoritmo_memoria = config_get_string_value(config,"ALGORITMO_MEMORIA");
 	datos_config->algoritmo_particion_libre = config_get_string_value(config,"ALGORITMO_PARTICION_LIBRE");
 	datos_config->algoritmo_reemplazo = config_get_string_value(config,"ALGORITMO_REEMPLAZO");
@@ -178,7 +178,7 @@ void process_request(int cod_op, int cliente_fd) {
 		atender_suscripcion(cliente_fd);
 	}
 	else{
-		if(mem_total-mem_asignada >= datos_config->tamanio_min_compactacion){
+		if(mem_total-mem_asignada >= datos_config->tamanio_min_particion){
 			sem_post(&semHayEspacio);
 		}
 
@@ -362,7 +362,7 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
-		log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%p",item->id,part_aux->inicio);
+		log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
 		list_add(cola_new->mensajes,item);
 		enviar_id(item,cliente_fd);
 		sem_post(&semNew);
@@ -398,7 +398,7 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,APPEARED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
-		log_warning(logger,"Mensaje APPEARED_POKEMON ID:%d Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+		log_warning(logger,"Mensaje APPEARED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		list_add(cola_appeared->mensajes,item);
 		enviar_id(item,cliente_fd);
 	}
@@ -420,7 +420,7 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
-		log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+		log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		list_add(cola_catch->mensajes,item);
 		enviar_id(item,cliente_fd);
 		sem_post(&semCatch);
@@ -455,7 +455,7 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(sizeof(uint32_t));
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),sizeof(uint32_t));
-		log_warning(logger,"Mensaje CAUGHT_POKEMON ID:%d Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+		log_warning(logger,"Mensaje CAUGHT_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		list_add(cola_caught->mensajes,item);
 		enviar_id(item,cliente_fd);
 	}
@@ -517,7 +517,7 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
-		log_warning(logger,"Mensaje LOCALIZED_POKEMON ID:%d Almacenado En El Cache. Inicio:%p",item->id,part_aux->inicio);
+		log_warning(logger,"Mensaje LOCALIZED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		list_add(cola_localized->mensajes,item);
 		enviar_id(item,cliente_fd);
 	}
@@ -714,13 +714,11 @@ particion* malloc_cache(uint32_t size){
 }
 
 void* memcpy_cache(particion* part,uint32_t id_buf,uint32_t tipo_cola,void* destino,void* buf,uint32_t size){
-	pthread_rwlock_wrlock(&lockParticion);
 	if(part != NULL){
 		part->id_buffer = id_buf;
 		part->tipo_cola = tipo_cola;
 		part->libre = 0;
 	}
-	pthread_rwlock_unlock(&lockParticion);
 	return memcpy(destino,buf,size);
 }
 
@@ -774,8 +772,8 @@ particion* particiones_dinamicas(uint32_t size){
 	pthread_mutex_lock(&mutexParticion);
 	particion* elegida;
 	uint32_t part_size = size;
-	if(size < datos_config->tamanio_min_compactacion){
-		part_size =  datos_config->tamanio_min_compactacion;
+	if(size < datos_config->tamanio_min_particion){
+		part_size =  datos_config->tamanio_min_particion;
 	}
 	elegida = algoritmo_particion_libre(part_size);
 	particion* ultima =  list_get(cache,list_size(cache)-1);
@@ -839,6 +837,7 @@ particion* particiones_dinamicas(uint32_t size){
 		}
 		else{
 			free_cache();
+			cant_busqueda = 0;
 		}
 	}
 	pthread_mutex_unlock(&mutexParticion);
@@ -847,6 +846,9 @@ particion* particiones_dinamicas(uint32_t size){
 
 particion* buddy_system(uint32_t size){
 	uint32_t size_particion = calcular_size_potencia_dos(size);
+	if(size_particion < datos_config->tamanio_min_particion){
+		size_particion =  datos_config->tamanio_min_particion;
+	}
 	particion* elegida;
 	bool libre_suficiente(particion* aux){
 		return aux->libre == 1 && aux->size >= size_particion;
@@ -866,7 +868,7 @@ particion* buddy_system(uint32_t size){
 			uint32_t pow_pri = log_dos(primera->size);
 			void aplicar(particion* aux){
 				bool libre_suficiente(particion* p){
-					return p->libre == 1 && p->size >= size_particion && p->size >= datos_config->tamanio_min_compactacion;
+					return p->libre == 1 && p->size >= size_particion && p->size >= datos_config->tamanio_min_particion;
 				}
 				particion* vic = list_find(cache,(void*)libre_suficiente);
 				particion* ultima = list_get(cache,list_size(cache)-1);
@@ -874,7 +876,7 @@ particion* buddy_system(uint32_t size){
 					uint32_t s = aux->size/2;
 					vic->size = s ;
 					vic->fin = vic->inicio+vic->size;
-					vic->end = vic->size+vic->size;
+					vic->end = vic->start+vic->size;
 					particion* next = malloc(sizeof(particion));
 					next->size = s;
 					next->inicio = vic->fin;
@@ -895,11 +897,13 @@ particion* buddy_system(uint32_t size){
 					uint32_t s = aux->size/2;
 					vic->size = s ;
 					vic->fin = vic->inicio+vic->size;
+					vic->end = vic->start+vic->size;
 					particion* next = malloc(sizeof(particion));
 					next->size = s;
 					next->inicio = vic->fin;
 					next->start = vic->end;
 					next->fin = next->inicio+next->size;
+					next->end = next->start+next->size;
 					next->libre = 1;
 					next->id_buffer = -1;
 					next->tipo_cola = -1;
@@ -925,7 +929,7 @@ particion* buddy_system(uint32_t size){
 particion* algoritmo_particion_libre(uint32_t size){
 	particion* elegida;
 	bool libre_suficiente(particion* aux){
-		return aux->libre == 1 && aux->size >= datos_config->tamanio_min_compactacion && aux->size >= size;
+		return aux->libre == 1 && aux->size >= datos_config->tamanio_min_particion && aux->size >= size;
 	}
 	if(string_equals_ignore_case(datos_config->algoritmo_particion_libre,"FF")){
 		printf("==========FIRST FIT==========\n");
@@ -990,7 +994,7 @@ uint32_t calcular_size_potencia_dos(uint32_t size){
 	uint32_t res = 0;
 	potencia = log_dos(size);
 	res = pow(2,potencia);
-	if(res < datos_config->tamanio_min_compactacion){
+	if(res < datos_config->tamanio_min_particion){
 		res ++;
 	}
 	return res;
@@ -1015,7 +1019,7 @@ void handler_dump(int signo){//.txt|.log
 		log_info(logger,"Dump De Cache ...");
 		//FILE *dump;
 		//dump = fopen("dump.txt","w+");
-
+		pthread_mutex_lock(&mutexDump);
 		time_t tiempo;
 		time(&tiempo);
 		struct tm* p;
@@ -1060,11 +1064,8 @@ void handler_dump(int signo){//.txt|.log
 			}
 			return res;
 		}
-		pthread_rwlock_wrlock(&lockImprimir);
 		void imprimir(void* ele){
-			pthread_rwlock_rdlock(&lockParticion);
 			particion* aux = ele;
-			pthread_rwlock_unlock(&lockParticion);
 			if(aux->libre == 0){
 				log_info(dump,"Paricion %d:%d-%d   [%c]   Size:%db   %s:<%d>   Cola:<%d>   ID:<%d>\n",
 							aux->id_particion,aux->start,aux->end,caracter(aux->libre),aux->size,
@@ -1074,11 +1075,11 @@ void handler_dump(int signo){//.txt|.log
 				log_info(dump,"Espacio    :%d-%d   [%c]   Size:%db\n",aux->start,aux->end,caracter(aux->libre),aux->size);
 			}
 		}
-		pthread_rwlock_unlock(&lockImprimir);
 		pthread_rwlock_rdlock(&lockCache);
 		list_iterate(cache,(void*)imprimir);
 		pthread_rwlock_unlock(&lockCache);
 		log_info(dump,"---------------------------------------------------------------------------------------------------------------------------------------------\n");
+		pthread_mutex_unlock(&mutexDump);
 
 		printf("SIGUSR1 RUNNING...\n");
 		exit(0);

@@ -25,7 +25,7 @@ typedef struct{
 	char* ip_broker;
 	char* puerto_broker;
 	uint32_t tamanio_memoria;
-	uint32_t tamanio_min_compactacion;
+	uint32_t tamanio_min_particion;
 	char* algoritmo_memoria;
 	char* algoritmo_reemplazo;
 	char* algoritmo_particion_libre;
