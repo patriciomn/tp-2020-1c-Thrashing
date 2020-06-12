@@ -1,6 +1,7 @@
 #ifndef TEAM_H_
 #define TEAM_H_
 
+#include"../utils/utils.c"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -25,7 +26,7 @@
 #define CICLOS_MOVER 1
 #define CICLOS_ENVIAR 1
 #define CICLOS_INTERCAMBIAR 5
-#define CANT_ENTRE 10
+#define CANT_ENTRE 20
 
 
 enum ESTADO{
@@ -35,32 +36,6 @@ enum ESTADO{
 	EXEC,
 	EXIT,
 };
-
-enum TIPO{
-	NEW_POKEMON = 1,
-	APPEARED_POKEMON = 2,
-	CATCH_POKEMON = 3,
-	CAUGHT_POKEMON = 4,
-	GET_POKEMON = 5,
-	LOCALIZED_POKEMON = 6,
-	SUSCRITO = 7,
-	ACK = 8,
-};
-
-typedef struct{
-	int size;
-	void* stream;
-} t_buffer;
-
-typedef struct{
-	enum TIPO codigo_operacion;
-	t_buffer* buffer;
-} t_paquete;
-
-typedef struct{
-	int posx;
-	int posy;
-}position;
 
 typedef struct{
 	int tid;
@@ -81,10 +56,11 @@ typedef struct{
 }entrenador;
 
 typedef struct{
-	uuid_t pid;
+	pid_t pid;
 	entrenador* exec;
 	t_list* entrenadores;
 	t_list* objetivos;
+	t_list* exit;
 	int cant_ciclo;
 	t_list* poks_requeridos;
 	t_list* cola_ready;
@@ -127,87 +103,84 @@ typedef struct{
 	void* buf_msg;
 }msg;
 
-void crear_team();
-void iniciar_servidor(void);
-void esperar_cliente(int);
-void* recibir_buffer(int socket_cliente, int* size);
-int recibir_operacion(int);
-void process_request(int cod_op, int cliente_fd);
-void serve_client(int *socket);
-void* serializar_paquete(t_paquete* paquete, int bytes);
-void devolver_mensaje(void* payload, int size, int socket_cliente);
-void appeared_pokemon(int cliente_fd);
-bool catch_pokemon(entrenador*,pokemon*);
-t_config* leer_config(char* config);
-void crear_entrenador(int,int posx,int posy,char* pokemones,char* objetivos);
-int cant_pokemones(char**);
-bool verificar_cantidad_pokemones(entrenador* entrenador);
-int cant_especie_team(team*,char* especie);
-float distancia_pokemon(entrenador* entrenador,pokemon*);
 void iniciar_config(char* teamConfig);
-void get_pokemon(char*pokemon);
-void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente);
-void enviar_info_suscripcion(int tipo,int socket_cliente);
-void localized_pokemon(int cliente_fd);
-int crear_conexion(char *ip, char* puerto);
-void recibir_confirmacion_suscripcion(int cliente_fd);
-pokemon* crear_pokemon(char* name);
-void set_pokemon(pokemon* pok,int posx,int posy);
+void iniciar_team(char* teamConfig);
+void crear_team();
+bool cumplir_objetivo_team();
+void iniciar_team(char* teamConfig);
+void ejecutar_equipo();
+void salir_equipo();
+
+void crear_entrenador(int,int posx,int posy,char* pokemones,char* objetivos);
 void ejecutar_entrenador(entrenador*);
 void activar_entrenador(entrenador* entre);
 void bloquear_entrenador(entrenador* entre);
 void despertar_entrenador(entrenador* entre);
 void salir_entrenador(entrenador* entre);
 void move_entrenador(entrenador* entre,int,int);
-void iniciar_team(char* teamConfig);
+bool atrapar_pokemon(entrenador*,pokemon*);
+void intercambiar_pokemon(entrenador* entre1,entrenador* entre2);
+
+pokemon* crear_pokemon(char* name);
+void set_pokemon(pokemon* pok,int posx,int posy);
+
+bool verificar_pokemon_exceso_no_necesario(entrenador* entre);
+bool verificar_espera_circular();
+bool pokemon_exceso(entrenador* entre,char* name);
+bool verificar_deadlock_equipo();
+pokemon* pokemon_a_intercambiar(entrenador* entre,entrenador*);
+
 bool contener_pokemon(entrenador* entre,char* name);
 bool cumplir_objetivo_entrenador(entrenador* entre);
 int cant_especie_pokemon(entrenador* entre,char* name);
 int cant_especie_objetivo(entrenador* entre,char* name);
-bool cumplir_objetivo_team();
-entrenador* algoritmo_corto_plazo();
+int cant_pokemones(char**);
+bool verificar_cantidad_pokemones(entrenador* entrenador);
+int cant_especie_team(team*,char* especie);
+float distancia_pokemon(entrenador* entrenador,pokemon*);
 int cant_especie_objetivo_team(char* name);
-void algoritmo_largo_plazo(pokemon* pok);
 void remove_pokemon_requeridos(pokemon* pok);
-void end_of_quantum_handler();
-void enviar_mensaje_catch_pokemon(char* pokemon,int,int,int socket_cliente);
-void reintento_conectar_broker();
-void reconexion();
 bool requerir_atrapar(char* pok);
-int recibir_id_mensaje(int cliente_fd);
 t_list* especies_objetivo_team();
 bool hay_repetidos(t_list* especies);
 void crear_hilo_entrenador(entrenador*);
 bool necesitar_pokemon(entrenador* entre,char* name);
 bool equipo_en_blocked();
 bool verificar_deadlock_entrenador(entrenador*);
-void salir_equipo();
-void liberar_conexion(int socket_cliente);
 pokemon* pokemon_a_atrapar();
 pokemon* pokemon_no_necesario(entrenador* entre);
-void intercambiar_pokemon(entrenador* entre1,entrenador* entre2);
-void ejecutar_equipo();
 bool verificar_cpu_libre();
 void sumar_ciclos(entrenador* entre,int ciclos);
-bool verificar_pokemon_exceso_no_necesario(entrenador* entre);
-bool verificar_espera_circular(entrenador*);
-bool pokemon_exceso(entrenador* entre,char* name);
-bool verificar_deadlock_equipo();
+bool verificar_espera_caught(entrenador* entre);
+int cant_entrenadores(char** posiciones);
+
+double estimacion(entrenador* entre);
+void algoritmo_largo_plazo(pokemon* pok);
+entrenador* algoritmo_corto_plazo();
+void algoritmo_fifo(t_list* cola_ready);
+void algoritmo_round_robin(t_list* cola_ready);
+void fin_de_quantum();
+void algoritmo_sjf_sin_desalojo(t_list* cola_ready);
+void algoritmo_sjf_con_desalojo(t_list* cola_ready);
 msg* crear_mensaje(int id,int tipo,pokemon*);
+
+void iniciar_servidor(void);
+void esperar_cliente(int);
+void process_request(int cod_op, int cliente_fd);
+void serve_client(int *socket);
 void suscribirse_appeared();
 void suscribirse_localized();
 void suscribirse_caught();
 void suscribirse_broker();
 void enviar_mensajes_get_pokemon();
+void enviar_mensajes_get_pokemon();
+void enviar_get_pokemon_broker(char* pokemon);
+void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente);
+void enviar_mensaje_catch_pokemon(char* pokemon,int,int,int socket_cliente);
 void recibir_caught_pokemon();
 void recibir_appeared_pokemon();
-void enviar_confirmacion(int socket_cliente);
-t_list* recibir_paquete(int socket_cliente);
-double estimacion(entrenador* entre);
-void algoritmo_fifo(t_list* cola_ready);
-void fin_de_quantum();
-void algoritmo_round_robin(t_list* cola_ready);
-void algoritmo_sjf_sin_desalojo(t_list* cola_ready);
-void algoritmo_sjf_con_desalojo(t_list* cola_ready);
-bool verificar_espera_caught(entrenador* entre);
+void recibir_localized_pokemon();
+void recibir_appeared_pokemon_gameboy(int cliente_fd);
+void end_of_quantum_handler();
+void reintento_conectar_broker();
 #endif /* TEAM_H_ */

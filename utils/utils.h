@@ -14,11 +14,12 @@
 #include<assert.h>
 #include<signal.h>
 #include<semaphore.h>
+#include <uuid/uuid.h>
 /*
 
 	FORMA DE ENVIO DE MENSAJES:
 
-CAMBIAR ACA:	SUSCRIBE: SUSCRITO | SIZE | QUEUE_ID | PID  Dejar solo 12 bytes para la suscripcion. En caso de ser la primera suscripcion mandar un -1 en PID
+	SUSCRIBE: SUSCRITO | QUEUE_ID | PID  Dejar solo 12 bytes para la suscripcion. En caso de ser la primera suscripcion mandar un -1 en PID
 	-> respondo ack con pid que genero y guardo para identificar al proceso (ACK | PID) 
 
 	NEW : NEW_POKEMON  | SIZE | name_size | name | posx | posy | cantidad
@@ -32,25 +33,24 @@ CAMBIAR ACA:	SUSCRIBE: SUSCRITO | SIZE | QUEUE_ID | PID  Dejar solo 12 bytes par
 
 	ACK: ACK | ID broker responde
 
-a PARTIR DE ACA HAY QUE AGREGAR EL SIZE
+
 
 	FORMA DE RECEPCION DE MENSAJES DE LA COLA:
 
-	NEW : NEW_POKEMON | SIZE |  ID | -1   | name_size | name | posx | posy | cantidad
-	APPEARED: APPEARED_POKEMON  | SIZE | ID | CORRELATIONID  | name_size | name | posx | posy 
+	NEW : NEW_POKEMON | ID   | name_size | name | posx | posy | cantidad
+	APPEARED: APPEARED_POKEMON  | ID | CORRELATIONID  | name_size | name | posx | posy 
 
-	CATCH: CATCH_POKEMON | SIZE | ID  | -1 | name_size | name | posx | posy
-	CAUGHT: CAUGHT_POKEMON  | SIZE | ID |  CORRELATIONID |  caught
+	CATCH: CATCH_POKEMON | ID   | name_size | name | posx | posy
+	CAUGHT: CAUGHT_POKEMON  | ID | CORRELATIONID |  caught
 
-	GET: GET_POKEMON | SIZE | ID | -1  | name_size | name
-	LOCALIZED: LOCALIZED_POKEMON | SIZE | ID | CORRELATIONID  | name_size | name | posx | posy | cantidad_posiciones
+	GET: GET_POKEMON |ID   | name_size | name
+	LOCALIZED: LOCALIZED_POKEMON | ID | CORRELATIONID  | name_size | name | posx | posy | cantidad_posiciones
 
-	ACK RECEPCION: ACK | SIZE | PID | QUEUE_ID | ID  broker recibe
+	ACK RECEPCION: ACK | PID | QUEUE_ID | ID  broker recibe
 
 */
 
 enum TIPO{
-
 	//QUEUE_ID
 	NEW_POKEMON = 1,
 	APPEARED_POKEMON = 2,
@@ -58,21 +58,15 @@ enum TIPO{
 	CAUGHT_POKEMON = 4,
 	GET_POKEMON = 5,
 	LOCALIZED_POKEMON = 6,
-
 	//ACTION
 	SUSCRITO = 7,
 	ACK = 8,
 };
-
 typedef struct{
 	int id;
 	int correlation_id;
-	void * package;
-} package;
-
-typedef struct{
 	int size;
-	package* stream;
+	void* stream;
 } t_buffer;
 
 typedef struct{
@@ -98,16 +92,14 @@ typedef struct{
 	position pos;
 }appeared_pokemon;
 
-
 typedef struct{
 	int name_size;
 	char* name;
 	position pos;
-
 }catch_pokemon;
 
 typedef struct{
-	int caught; // 1 o 0 en funcion de si se atrapo o no (respectivamente)
+	bool caught;
 }caught_pokemon;
 
 typedef struct{
@@ -115,26 +107,32 @@ typedef struct{
 	char* name;
 }get_pokemon;
 
-typedef struct{ //Este no lo entendi
+typedef struct{
+	int posx;
+	int posy;
+	int cant;
+}pos_cant;
+
+typedef struct{
 	int name_size;
 	char* name;
 	int cantidad_posiciones;
-	position pos[];
-	
+	t_list* pos_cant;
 }localized_pokemon;
 
 void* serializar_paquete(t_paquete* paquete, int bytes);
-void* serializar_paq(t_paquete* paquete, int * bytes);
-void* serializar_any(void* paquete, int * bytes, int cod_op);
-void* serializar_new(new_pokemon* paquete, int * bytes);
-void* serializar_appeared(appeared_pokemon* paquete, int * bytes);
-void* serializar_catch(catch_pokemon* paquete, int * bytes);
-void* serializar_caught(caught_pokemon* paquete, int * bytes);
-void* serializar_get(get_pokemon* paquete, int * bytes);
-void* serializar_localized(localized_pokemon* paquete, int * bytes);
 new_pokemon* deserializar_new(void* buffer) ;
 appeared_pokemon* deserializar_appeared(void* buffer) ;
 catch_pokemon* deserializar_catch(void* buffer);
 caught_pokemon* deserializar_caught(void* buffer);
 get_pokemon* deserializar_get(void* buffer) ;
 localized_pokemon* deserializar_localized(void* buffer) ;
+void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd);
+t_list* recibir_paquete(int socket_cliente);
+void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid);
+void* recibir_buffer(int socket_cliente, int* size);
+int crear_conexion(char *ip, char* puerto);
+void recibir_confirmacion_suscripcion(int cliente_fd,int);
+void liberar_conexion(int socket_cliente);
+bool check_socket(int sock);
+int recibir_id_mensaje(int cliente_fd);

@@ -1,6 +1,9 @@
 #include "gameboy.h"
 
-uuid_t pid;
+pid_t pid;
+t_log* logger;
+t_config* config;
+int conexion;
 
 int main(int argc,char* argv[]){
 	iniciar_gameboy(argc,argv);
@@ -8,9 +11,11 @@ int main(int argc,char* argv[]){
 }
 
 void iniciar_gameboy(int argc,char* argv[]){
-	logger = iniciar_logger();
+	logger = log_create("gameboy.log","gameboy",1,LOG_LEVEL_INFO);
 	config = leer_config("gameboy.config");
-	uuid_generate(pid);
+	pid = getpid();
+	printf("Pid:%d\n",pid);
+
 	//argv[1]:proceso argv[2]:tipo_mensaje
 	int process,tipo_msg;
 	if(argv[1]!=NULL &&argv[2]!=NULL){
@@ -156,6 +161,9 @@ int tipo_mensaje(char* tipo_mensaje){
 	else if(strcmp(tipo_mensaje,"GET_POKEMON") == 0){
 		return GET_POKEMON;
 	}
+	else{
+		return LOCALIZED_POKEMON;
+	}
 	return -1;
 }
 
@@ -191,13 +199,28 @@ void conectar_proceso(int proceso){
 }
 
 
-void suscriptor(int tipo){//falta localized
-	enviar_info_suscripcion(tipo,conexion);
-	recibir_confirmacion_suscripcion(conexion);
+void suscriptor(int tipo){
+	enviar_info_suscripcion(tipo,conexion,pid);
+	recibir_confirmacion_suscripcion(conexion,tipo);
+}
+
+void fin_tiempo_handler(){
+	printf("GAMEBOY Desconectado\n");
+	exit(0);
+}
+
+void fin_tiempo(int tiempo){
+	struct sigaction action;
+	action.sa_handler = (void*)fin_tiempo_handler;
+	action.sa_flags = SA_RESTART|SA_NODEFER;
+	sigemptyset(&action.sa_mask);
+	sigaction(SIGALRM, &action, 0);
+	alarm(tiempo);
 }
 
 void recibir_mensajes(int tiempo){
-	alarm(tiempo);
+	fin_tiempo(tiempo);
+
 	while(1){
 		int cod_op;
 		if(recv(conexion, &cod_op, sizeof(int), MSG_WAITALL) == -1)
@@ -218,18 +241,18 @@ void recibir_mensajes(int tiempo){
 			case APPEARED_POKEMON:
 				recibir_appeared_pokemon();
 				break;
+			case LOCALIZED_POKEMON:
+				recibir_localized_pokemon();
+				break;
 		}
 	}
-}
-
-t_log* iniciar_logger(void){
-	return log_create("gameboy.log","gameboy",1,LOG_LEVEL_INFO);
 }
 
 void terminar_gameboy(int conexion, t_log* logger, t_config* config){
 	log_destroy(logger);
 	config_destroy(config);
 	liberar_conexion(conexion);
+	printf("GAMEBOY Desconectado\n");
 }
 
 //ENVIAR--------------------------------------------------------------------------------------------------------------------
@@ -348,7 +371,7 @@ void enviar_mensaje_appeared_pokemon(char* pokemon,int posx,int posy,int socket_
 	free(paquete);
 }
 
-void enviar_mensaje_caught_pokemon(int id_mensaje,int ok_fail,int socket_cliente){
+void enviar_mensaje_caught_pokemon(int id_mensaje,bool ok_fail,int socket_cliente){
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
 	paquete->codigo_operacion = CAUGHT_POKEMON;
@@ -356,7 +379,7 @@ void enviar_mensaje_caught_pokemon(int id_mensaje,int ok_fail,int socket_cliente
 	paquete->buffer->size = sizeof(int)*2 ;
 	paquete->buffer->stream = malloc(paquete->buffer->size);
 	memcpy(paquete->buffer->stream,&id_mensaje,sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&ok_fail,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&ok_fail,sizeof(bool));
 
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 
@@ -482,51 +505,6 @@ void enviar_mensaje_get_pokemon(char* pokemon,int id_correlacional,int socket_cl
 	free(paquete);
 }
 
-void enviar_info_suscripcion(int tipo,int socket_cliente){
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = SUSCRITO;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int) + sizeof(uuid_t);
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(int),&pid,sizeof(uuid_t));
-
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(socket_cliente, a_enviar, bytes, 0);
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
-void enviar_ack(int tipo,int id){
-	conectar_proceso(BROKER);
-	t_paquete* paquete = malloc(sizeof(t_paquete));
-	paquete->codigo_operacion = ACK;
-	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = sizeof(int)*2 + sizeof(uuid_t);
-	paquete->buffer->stream = malloc(paquete->buffer->size);
-	memcpy(paquete->buffer->stream,&pid, sizeof(uuid_t));
-	memcpy(paquete->buffer->stream+sizeof(uuid_t),&tipo, sizeof(int));
-	memcpy(paquete->buffer->stream+sizeof(uuid_t)+sizeof(int),&id,sizeof(int));
-
-	int bytes = paquete->buffer->size + 2*sizeof(int);
-
-	void* a_enviar = serializar_paquete(paquete, bytes);
-
-	send(conexion, a_enviar, bytes, 0);
-	printf("ACK enviado\n");
-
-	free(a_enviar);
-	free(paquete->buffer->stream);
-	free(paquete->buffer);
-	free(paquete);
-}
-
 //RECIBIR-----------------------------------------------------------------------------------------------------------------
 void recibir_get_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
@@ -534,17 +512,12 @@ void recibir_get_pokemon(){
 		int id;
 		memcpy(&id,valor,sizeof(int));
 		get_pokemon* get = deserializar_get(valor+sizeof(int));
-		/*int id,tam;
-		memcpy(&id,valor,sizeof(int));
-		memcpy(&tam,valor+sizeof(int),sizeof(int));
-		char* n = (char*)valor+sizeof(int)*2;
-		char* name = malloc(tam+1);
-		strcpy(name,n);
-		log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n",id,name);
-		free(name);*/
 		log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n",id,get->name);
 		free(valor);
-		enviar_ack(GET_POKEMON,id);
+		//conectar_proceso(BROKER);
+		enviar_ack(GET_POKEMON,id,pid,conexion);
+		free(get->name);
+		free(get);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -554,20 +527,15 @@ void recibir_new_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 
 	void display(void* valor){
-		int id,tam,posx,posy,cant;
+		int id;
 		memcpy(&id,valor,sizeof(int));
-		memcpy(&tam,valor+sizeof(int),sizeof(int));
-		char* n = (char*)valor+sizeof(int)*2;
-		int len = tam+1;
-		char* name = malloc(len);
-		strcpy(name,n);
-		memcpy(&posx,valor+sizeof(int)*2+len,sizeof(int));
-		memcpy(&posy,valor+sizeof(int)*3+len,sizeof(int));
-		memcpy(&cant,valor+sizeof(int)*4+len,sizeof(int));
-		log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n",id,name,posx,posy,cant);
-		free(name);
+		new_pokemon* new = deserializar_new(valor+sizeof(int));
+		log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n",id,new->name,new->pos.posx,new->pos.posy,new->cantidad);
 		free(valor);
-		enviar_ack(NEW_POKEMON,id);
+		//conectar_proceso(BROKER);
+		enviar_ack(NEW_POKEMON,id,pid,conexion);
+		free(new->name);
+		free(new);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -577,19 +545,15 @@ void recibir_catch_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 
 	void display(void* valor){
-		int id,tam,posx,posy;
+		int id;
 		memcpy(&id,valor,sizeof(int));
-		memcpy(&tam,valor+sizeof(int),sizeof(int));
-		char* n = (char*)valor+sizeof(int)*2;
-		int len = tam+1;
-		char* name = malloc(len);
-		strcpy(name,n);
-		memcpy(&posx,valor+sizeof(int)*2+len,sizeof(int));
-		memcpy(&posy,valor+sizeof(int)*3+len,sizeof(int));
-		log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n",id,name,posx,posy);
-		free(name);
+		catch_pokemon* catch = deserializar_catch(valor+sizeof(int));
+		log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n",id,catch->name,catch->pos.posx,catch->pos.posy);
 		free(valor);
-		enviar_ack(CATCH_POKEMON,id);
+		//conectar_proceso(BROKER);
+		enviar_ack(CATCH_POKEMON,id,pid,conexion);
+		free(catch->name);
+		free(catch);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -598,12 +562,14 @@ void recibir_catch_pokemon(){
 void recibir_caught_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 	void display(void* valor){
-		int id,resultado;
+		int id;
 		memcpy(&id,valor,sizeof(int));
-		memcpy(&resultado,valor+sizeof(int),sizeof(int));
-		log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID_Correlacional:%d Resultado:%d\n",id,resultado);
+		caught_pokemon* caught = deserializar_caught(valor+sizeof(int));
+		log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID_Correlacional:%d Resultado:%d\n",id,caught->caught);
 		free(valor);
-		enviar_ack(CAUGHT_POKEMON,id);
+		//conectar_proceso(BROKER);
+		enviar_ack(CAUGHT_POKEMON,id,pid,conexion);
+		free(caught);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -613,84 +579,40 @@ void recibir_appeared_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 
 	void display(void* valor){
-		int id,tam,posx,posy;
+		int id;
 		memcpy(&id,valor,sizeof(int));
-		memcpy(&tam,valor+sizeof(int),sizeof(int));
-		char* n = (char*)valor+sizeof(int)*2;
-		int len = tam+1;
-		char* name = malloc(len);
-		strcpy(name,n);
-		memcpy(&posx,valor+sizeof(int)*2+len,sizeof(int));
-		memcpy(&posy,valor+sizeof(int)*3+len,sizeof(int));
-		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,name,posx,posy);
-		free(name);
+		appeared_pokemon* appeared = deserializar_appeared(valor);
+		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,appeared->name,appeared->pos.posx,appeared->pos.posy);
 		free(valor);
-		enviar_ack(APPEARED_POKEMON,id);
+		//conectar_proceso(BROKER);
+		enviar_ack(APPEARED_POKEMON,id,pid,conexion);
+		free(appeared->name);
+		free(appeared);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
 }
 
-//UTILS-----------------------------------------------------------------------------------------------------------------
-void* recibir_buffer(int socket_cliente, uint32_t* size){
-	void * buffer;
+void recibir_localized_pokemon(){
+	t_list* paquete = recibir_paquete(conexion);
 
-	recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
-	buffer = malloc(*size);
-	recv(socket_cliente, buffer, *size, MSG_WAITALL);
-
-	return buffer;
-}
-
-void recibir_confirmacion_suscripcion(int cliente_fd){
-	int cod_op;
-	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
-		cod_op = -1;
-
-	log_info(logger,"Se Ha suscripto A La Cola De Mensaje");
-}
-
-t_list* recibir_paquete(int socket_cliente){
-	uint32_t size;
-	uint32_t desplazamiento = 0;
-	void * buffer;
-	t_list* valores = list_create();
-	uint32_t tamanio;
-	buffer = recibir_buffer(socket_cliente,&size);
-	while(desplazamiento < size){
-		memcpy(&tamanio, buffer + desplazamiento, sizeof(uint32_t));
-		desplazamiento+=sizeof(uint32_t);
-		void* valor = malloc(tamanio);
-		memset(valor,0,tamanio);
-		memcpy(valor, buffer+desplazamiento, tamanio);
-		desplazamiento+=tamanio;
-		list_add(valores, valor);
+	void display(void* valor){
+		int id;
+		memcpy(&id,valor,sizeof(int));
+		localized_pokemon* localized = deserializar_localized(valor);
+		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s \n",id,localized->name);
+		void show(pos_cant* pos){
+			log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
+			free(pos);
+		}
+		list_iterate(localized->pos_cant,(void*)show);
+		free(valor);
+		//conectar_proceso(BROKER);
+		enviar_ack(LOCALIZED_POKEMON,id,pid,conexion);
+		list_destroy(localized->pos_cant);
+		free(localized->name);
+		free(localized);
 	}
-	free(buffer);
-	return valores;
-}
-
-int crear_conexion(char *ip, char* puerto){
-	struct addrinfo hints;
-	struct addrinfo *server_info;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-
-	getaddrinfo(ip, puerto, &hints, &server_info);
-
-	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
-
-	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1)
-		printf("error");
-
-	freeaddrinfo(server_info);
-
-	return socket_cliente;
-}
-
-void liberar_conexion(int socket_cliente){
-	close(socket_cliente);
+	list_iterate(paquete,(void*)display);
+	list_destroy(paquete);
 }

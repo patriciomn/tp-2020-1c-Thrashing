@@ -16,13 +16,13 @@ void* recibir_mensaje(int socket_cliente){
 void* serializar_paquete(t_paquete* paquete, int bytes){
 	void * magic = malloc(bytes);
 	int desplazamiento = 0;
+	memset(magic,0,bytes);
 
 	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
 	desplazamiento+= sizeof(int);
 	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-	desplazamiento+= paquete->buffer->size;
 
 	return magic;
 }
@@ -63,175 +63,9 @@ void eliminar_paquete(t_paquete* paquete){
 	free(paquete);
 }
 
-void* serializar_paq(t_paquete* paquete, int * bytes){
-	int size_serializado = sizeof(paquete->codigo_operacion) + sizeof(paquete->buffer->id) + sizeof(paquete->buffer->correlation_id);
-    
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->stream->id), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, &(paquete->buffer->stream->correlation_id), sizeof(int));
-	desplazamiento+= sizeof(int);
-	memcpy(magic + desplazamiento, paquete->buffer->stream->package, paquete->buffer->size - sizeof(int)*2);
-	
-	(*bytes) = size_serializado;
-	return magic;
-}
-
-void* serializar_any(void* paquete, int * bytes, int cod_op){
-	if (cod_op == NEW_POKEMON)				return serializar_new(paquete, bytes);
-	else if (cod_op == APPEARED_POKEMON)	return serializar_appeared(paquete, bytes);
-	else if (cod_op == CATCH_POKEMON)		return serializar_catch(paquete, bytes);
-	else if (cod_op == CAUGHT_POKEMON)		return serializar_caught(paquete, bytes);
-	else if (cod_op == GET_POKEMON)			return serializar_get(paquete, bytes);
-	else if (cod_op == LOCALIZED_POKEMON)	return serializar_localized(paquete, bytes);
-	else return paquete;
-}
-
-
-
-void* serializar_new(new_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->name_size)  + paquete->name_size + sizeof(position) + sizeof(paquete->cantidad);
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
-	desplazamiento+= sizeof(paquete->name_size);
-
-    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
-	desplazamiento+= paquete->name_size;
-
-	memcpy(magic + desplazamiento, &(paquete->pos), sizeof(position));
-	desplazamiento+= sizeof(position);
-
-    memcpy(magic + desplazamiento, &(paquete->cantidad), sizeof(paquete->cantidad));
-	desplazamiento+= sizeof(paquete->cantidad);
-	
-
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-void* serializar_appeared(appeared_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->name_size)  + paquete->name_size + sizeof(position) ;
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
-	desplazamiento+= sizeof(paquete->name_size);
-
-    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
-	desplazamiento+= paquete->name_size;
-
-	memcpy(magic + desplazamiento, &(paquete->pos), sizeof(position));
-	desplazamiento+= sizeof(position);
-	
-
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-void* serializar_catch(catch_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->name_size)  + paquete->name_size + sizeof(position) ;
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
-	desplazamiento+= sizeof(paquete->name_size);
-
-    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
-	desplazamiento+= paquete->name_size;
-
-	memcpy(magic + desplazamiento, &(paquete->pos), sizeof(position));
-	desplazamiento+= sizeof(position);
-
-	
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-void* serializar_caught(caught_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->caught);
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->caught), sizeof(paquete->caught));
-	desplazamiento+= sizeof(paquete->caught);
-	
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-
-
-
-void* serializar_get(get_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->name_size)  + paquete->name_size ;
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
-	desplazamiento+= sizeof(paquete->name_size);
-
-    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
-	desplazamiento+= paquete->name_size;
-
-
-	
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-void* serializar_localized(localized_pokemon* paquete, int * bytes){
-
-	int size_serializado = sizeof(paquete->name_size)  + paquete->name_size + sizeof(position) + sizeof(paquete->cantidad_posiciones);
-
-	void * magic = malloc(size_serializado );
-	int desplazamiento = 0;
-
-	memcpy(magic + desplazamiento, &(paquete->name_size), sizeof(paquete->name_size));
-	desplazamiento+= sizeof(paquete->name_size);
-
-    memcpy(magic + desplazamiento, paquete->name, paquete->name_size);
-	desplazamiento+= paquete->name_size;
-
-	memcpy(magic + desplazamiento, &(paquete->pos), sizeof(position));
-	desplazamiento+= sizeof(position);
-
-    memcpy(magic + desplazamiento, &(paquete->cantidad_posiciones), sizeof(paquete->cantidad_posiciones));
-	desplazamiento+= sizeof(paquete->cantidad_posiciones);
-	
-	(*bytes) = size_serializado;
-
-	return magic;
-}
-
-
-
 new_pokemon* deserializar_new(void* buffer) {
     new_pokemon* new = malloc(sizeof(new_pokemon));
-    
+
     void* stream = buffer;
     memcpy(&(new->name_size), stream, sizeof(int));
     stream += sizeof(int);
@@ -275,7 +109,8 @@ catch_pokemon* deserializar_catch(void* buffer) {
 
 caught_pokemon* deserializar_caught(void* buffer) {
     caught_pokemon* caught = malloc(sizeof(caught_pokemon));
-    memcpy(&(caught->caught), buffer+sizeof(int), sizeof(int));
+    void* stream = buffer+sizeof(int);
+    memcpy(&(caught->caught),stream, sizeof(bool));
 		
     return caught;
 }
@@ -292,19 +127,144 @@ get_pokemon* deserializar_get(void* buffer) {
 
 localized_pokemon* deserializar_localized(void* buffer) {
     localized_pokemon* localized = malloc(sizeof(localized_pokemon));
-    
+    localized->pos_cant = list_create();
+
     void* stream = buffer+sizeof(int);
     memcpy(&(localized->name_size), stream, sizeof(int));
     stream += sizeof(int);
 	localized->name = malloc(localized->name_size+1);
 	memcpy(localized->name, stream, localized->name_size+1);
-	stream += sizeof(localized->name_size+1);
+	stream += (localized->name_size+1);
 	memcpy(&localized->cantidad_posiciones,stream,sizeof(int));
 	stream += sizeof(int);
 	for(int i=0;i<localized->cantidad_posiciones;i++){
-		memcpy(&(localized->pos[i]), stream, sizeof(position));
-		stream += sizeof(position);
+		pos_cant* pc = malloc(sizeof(pos_cant));
+		memcpy(pc,stream, sizeof(pos_cant));
+		list_add(localized->pos_cant,pc);
+		stream += sizeof(pos_cant);
 	}
 	
     return localized;
+}
+
+void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = tipo;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)+sizeof(pid_t);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream,&id,sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&pid, sizeof(pid_t));
+
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(cliente_fd, a_enviar, bytes, 0);
+	printf("ACK enviado\n");
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid){
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+	paquete->codigo_operacion = SUSCRITO;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int)+sizeof(pid_t);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+	memcpy(paquete->buffer->stream, &tipo, sizeof(int));
+	memcpy(paquete->buffer->stream+sizeof(int),&pid,sizeof(pid_t));
+
+	int bytes = paquete->buffer->size + 2*sizeof(int);
+	void* a_enviar = serializar_paquete(paquete, bytes);
+
+	send(socket_cliente, a_enviar, bytes, 0);
+
+	free(a_enviar);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+t_list* recibir_paquete(int socket_cliente){
+	int size;
+	uint32_t desplazamiento = 0;
+	void * buffer;
+	t_list* valores = list_create();
+	uint32_t tamanio;
+	buffer = recibir_buffer(socket_cliente,&size);
+	while(desplazamiento < size){
+		memcpy(&tamanio, buffer + desplazamiento, sizeof(uint32_t));
+		desplazamiento+=sizeof(uint32_t);
+		void* valor = malloc(tamanio);
+		memset(valor,0,tamanio);
+		memcpy(valor, buffer+desplazamiento, tamanio);
+		desplazamiento+=tamanio;
+		list_add(valores, valor);
+	}
+	free(buffer);
+	return valores;
+}
+
+void* recibir_buffer(int socket_cliente, int* size){
+	void * buffer;
+
+	recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
+	buffer = malloc(*size);
+	recv(socket_cliente, buffer, *size, MSG_WAITALL);
+
+	return buffer;
+}
+
+void recibir_confirmacion_suscripcion(int cliente_fd,int tipo){
+	int cod_op;
+	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
+		cod_op = -1;
+	if(cod_op != -1){
+		printf("Se Ha Suscrito A La Cola %d\n",tipo);
+	}
+}
+
+int crear_conexion(char *ip, char* puerto){
+	struct addrinfo hints;
+	struct addrinfo *server_info;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	getaddrinfo(ip, puerto, &hints, &server_info);
+
+	int socket_cliente = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
+
+	if(connect(socket_cliente, server_info->ai_addr, server_info->ai_addrlen) == -1){
+		socket_cliente = -1;
+	}
+
+	freeaddrinfo(server_info);
+	return socket_cliente;
+}
+
+void liberar_conexion(int socket_cliente){
+	close(socket_cliente);
+}
+
+bool check_socket(int sock){
+    unsigned char buf;
+    int err = recv(sock,&buf,1,MSG_DONTWAIT|MSG_PEEK);
+    fflush(stdin);
+    return err;
+}
+
+int recibir_id_mensaje(int cliente_fd){
+	int id;
+	void* buffer = malloc(sizeof(int));
+	recv(cliente_fd,buffer,sizeof(buffer),MSG_WAITALL);
+	memcpy(&id,buffer,sizeof(int));
+	free(buffer);
+	return id;
 }

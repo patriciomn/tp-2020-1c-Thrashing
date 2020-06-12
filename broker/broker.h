@@ -30,12 +30,13 @@ typedef struct{
 	char* algoritmo_reemplazo;
 	char* algoritmo_particion_libre;
 	uint32_t frecuencia_compactacion;
+	char* log_file;
 }config_broker;
 
 
 typedef struct{
 	int cliente_fd;
-	uuid_t pid;
+	pid_t pid;
 }suscriber;
 
 typedef struct _cache{
@@ -46,6 +47,8 @@ typedef struct _cache{
 	uint32_t tipo_cola;
 	void* inicio;
 	void* fin;
+	int start;
+	int end;
 	time_t tiempo;
 }particion;
 
@@ -70,8 +73,6 @@ void terminar_broker(t_log* logger, t_config* config);
 void iniciar_broker(void);
 void iniciar_colas_mensaje();
 mq* crear_cola_mensaje(int tipo);
-void start_sender_thread(void);
-void sender_thread(void);
 void iniciar_servidor(void);
 void esperar_cliente(int socket_servidor);
 void serve_client(int* socket);
@@ -79,8 +80,6 @@ void process_request(int cod_op, int cliente_fd);
 void * recibir_mensaje(int socket_cliente);
 void atender_suscripcion(int cliente_fd );
 void atender_ack(int cliente_fd);
-void enviar_cacheados(suscriber* sus, int queue_id);
-t_paquete* crear_paquete(int op);
 void enviar_id(mensaje *item,int socket_cliente);
 void mensaje_new_pokemon(void* msg,int cliente_fd);
 void mensaje_appeared_pokemon(void* msg,int cliente_fd);
@@ -92,15 +91,13 @@ mensaje* crear_mensaje(int tipo_msg,int socket,int nro_id,void* msg);
 void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t tipo);
 void enviar_mensajes(suscriber* sus,int tipo_cola);
 void enviar_confirmacion_suscripcion(suscriber* sus);
-void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio);
-void enviar_paquete(t_paquete* paquete, int socket_cliente);
-void eliminar_paquete(t_paquete* paquete);
 mq* cola_mensaje(uint32_t tipo);
 void borrar_mensaje(mensaje* m);
+bool confirmado_todos_susciptors_mensaje(mensaje* m);
+bool enviado_ack_suscriptor(mensaje* m,suscriber* sus);
 //--------------------------------------------------------------------------------------------------------
 
 void iniciar_memoria();
-t_config* leer_config(char* config);
 void iniciar_config(char* broker_config);
 void iniciar_semaforos();
 void iniciar_cache();
