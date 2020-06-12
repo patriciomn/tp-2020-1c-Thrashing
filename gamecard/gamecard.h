@@ -5,6 +5,7 @@
 #include <commons/string.h>
 #include <commons/config.h>
 #include <commons/log.h>
+#include <commons/collections/list.h>
 #include <math.h>
 #include <fcntl.h>
 #include <unistd.h>

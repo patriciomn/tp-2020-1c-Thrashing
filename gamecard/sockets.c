@@ -132,7 +132,7 @@ get_pokemon* deserializar_get(void* buffer) {
     get_pokemon* get = malloc(sizeof(get_pokemon));
 
     memcpy(&(get->name_size),buffer, sizeof(int));
-	get->name = malloc(get->name_size+1);
+	get->name = malloc(get->name_size+1); // para que esta este segundo malloc?
 	memcpy(get->name,buffer+sizeof(int), get->name_size+1);
 
     return get;
