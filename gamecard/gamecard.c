@@ -512,7 +512,7 @@ int fileSize(char* file) {
       fseek(fp, 0L, SEEK_END);  
     int res = (int) ftell(fp); 
     fclose(fp); 
-    return (res/BITS); 
+    return res; 
 } 
 FILE* existePokemon(char* nombrePokemon){
     char* pathArchivo = string_new();
@@ -522,21 +522,21 @@ FILE* existePokemon(char* nombrePokemon){
     return fp;
 
 }
-char *read_file_into_buf (char **filebuf, long *fplen, FILE *fp)
+char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
 {
     fseek (fp, 0, SEEK_END);
-    if ((*fplen = ftell (fp)) == -1) {  /* get file length */
+    if ((fplen = ftell (fp)) == -1) {  /* get file length */
         fprintf (stderr, "error: unable to determine file length.\n");
         return NULL;
     }
     fseek (fp, 0, SEEK_SET);  /* allocate memory for file */
-    if (!(*filebuf = calloc (*fplen, sizeof *filebuf))) {
+    if (!(*filebuf = calloc (fplen, sizeof *filebuf))) {
         fprintf (stderr, "error: virtual memory exhausted.\n");
         return NULL;
     }
 
     /* read entire file into filebuf */
-    if (!fread (*filebuf, sizeof *filebuf, *fplen, fp)) {
+    if (!fread (*filebuf, sizeof *filebuf, fplen, fp)) {
         fprintf (stderr, "error: file read failed.\n");
         return NULL;
     }
@@ -549,7 +549,7 @@ void newPokemon(char* pokemon,int posx,int posy,int cant){}
 
 void catchPokemon(char* pokemon,int posx,int posy){}
 
-/*rtaGet* getPokemon(int idMensaje, char* pokemon){
+rtaGet* getPokemon(int idMensaje, char* pokemon){
     rtaGet* respuesta = malloc(sizeof(rtaGet));
     respuesta->id_mensaje = idMensaje;
     respuesta->name = pokemon;
@@ -560,8 +560,7 @@ void catchPokemon(char* pokemon,int posx,int posy){}
         string_append_with_format(&pathMetadata,"%s%s%s", pokemon, "/",METADATA_FILE);
         t_config *metadata_pokemon = config_create(pathMetadata);
         
-        char* abierto = string_new();
-        string_append(abierto, config_get_string_value(metadata_pokemon,"OPEN"));
+        char* abierto = config_get_string_value(metadata_pokemon,"OPEN");
         if(abierto == "Y"){
             //finalizar hilo y reintentar despues del tiempo que dice el config
         } else{
@@ -583,4 +582,4 @@ void catchPokemon(char* pokemon,int posx,int posy){}
     }
 
     return respuesta;
-}*/
+}

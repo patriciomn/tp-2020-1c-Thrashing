@@ -113,7 +113,7 @@ char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 int fileSize(char* file);
 FILE* existePokemon(char* nombrePokemon);
-char *read_file_into_buf (char **filebuf, long *fplen, FILE *fp);
+char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 void newPokemon(char* pokemon,int posx,int posy,int cant);
