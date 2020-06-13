@@ -15,17 +15,13 @@ void suscripcion_colas_broker() {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
 		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
-		pthread_detach(thread_catch_pokemon);
-		//pthread_join(thread_new_pokemon, NULL);
+		//pthread_detach(thread_new_pokemon);
 
 		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
-		pthread_detach(thread_catch_pokemon);
-		//pthread_join(thread_catch_pokemon, NULL);
+		//pthread_detach(thread_catch_pokemon);
 
 		pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
-		pthread_detach(thread_get_pokemon);
-		//pthread_join(thread_get_pokemon, NULL);
-
+		//pthread_detach(thread_get_pokemon);
 	}
 }
 
@@ -57,9 +53,7 @@ void suscribirse_a_get_pokemon() {
 }
 
 void recibir_mensajes_new_pokemon(){
-
 	while(1) {
-
 		int codigo_operacion;
 		recv(socket_cliente_np, &(codigo_operacion), sizeof(int), MSG_WAITALL);
 
@@ -128,13 +122,13 @@ void recibir_mensajes_catch_pokemon(){
 			desplazamiento += sizeof(int);
 
 			log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n", catch_pokemon->id_mensaje, catch_pokemon->nombre, catch_pokemon->posicion.posX, catch_pokemon->posicion.posY);
+			enviar_ack(CATCH_POKEMON, catch_pokemon->id_mensaje, pid_gamecard, socket_cliente_cp);
 			// pthread_create(&thread_new_pokemon, NULL , NULL, NULL);
 			// pthread_detach(thread_new_pokemon);
 
 			free(catch_pokemon->nombre);
 			free(catch_pokemon);
 			free(valor);
-			enviar_ack(CATCH_POKEMON, catch_pokemon->id_mensaje, pid_gamecard, socket_cliente_cp);
 		}
 		list_iterate(paquete,(void*)display);
 		list_destroy(paquete);
