@@ -3,7 +3,7 @@
 
 int main () {
 
-	//printf("Positions size: %d", sizeof(Position));
+	pid_gamecard = getpid();
 
     iniciar_logger_config();
 

@@ -28,6 +28,7 @@ typedef struct{
 	t_buffer* buffer;
 } t_paquete;
 
+
 typedef struct {
 	int posX;
 	int posY;
@@ -35,6 +36,7 @@ typedef struct {
 
 typedef struct {
 	int id_mensaje;
+	int size_nombre;
 	char *nombre;
 	Position posicion;
 	int cantidad;
@@ -42,12 +44,14 @@ typedef struct {
 
 typedef struct {
 	int id_mensaje;
+	int size_nombre;
 	char *nombre;
 	Position posicion;
 }CPokemon;
 
 typedef struct {
 	int id_mensaje;
+	int size_nombre;
 	char *nombre;
 }GPokemon;
 
@@ -55,6 +59,7 @@ typedef struct{
 	int name_size;
 	char* name;
 }get_pokemon;
+
 
 typedef struct{
 	Position pos;
@@ -68,19 +73,24 @@ typedef struct{
 }rtaGet;
 
 void suscripcion_colas_broker();
+void suscribirse_a_new_pokemon();
+void suscribirse_a_catch_pokemon();
+void suscribirse_a_get_pokemon();
+
 int crear_conexion();
 void iniciar_servidor(void);
 void esperar_cliente(int socket_servidor);
 void atender_peticion(int socket_cliente, int cod_op);
-void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente);
+void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente, pid_t pid);
 void* serializar_paquete(t_paquete* paquete, int bytes);
 
-void recibir_new_pokemon();
-void recibir_catch_pokemon();
-void recibir_get_pokemon();
+void recibir_mensajes_new_pokemon();
+void recibir_mensajes_catch_pokemon();
+void recibir_mensajes_get_pokemon();
 
 t_list* recibir_paquete(int socket_cliente);
 void* recibir_buffer(int socket_cliente, uint32_t* size);
+void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd);
 
 void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon);
 void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon);

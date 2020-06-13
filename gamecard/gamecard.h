@@ -73,7 +73,19 @@ struct dataServer{
 struct mensaje {
     int id;
     void* message;
-} ;
+};
+
+typedef struct {
+	int ack_new;
+	int ack_catch;
+	int ack_get;
+}ack_t;
+
+ack_t acks_gamecard;
+
+// el pid del proceso
+
+pid_t pid_gamecard;
 
 // Los siguientes structs son para recibir mensajes del gameboy
 
@@ -118,7 +130,7 @@ char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 int tipo_mensaje(char* tipo_mensaje);
 void newPokemon(char* pokemon,int posx,int posy,int cant);
 void catchPokemon(char* pokemon,int posx,int posy);
-rtaGet* getPokemon(int idMensaje, char* pokemon);
+//rtaGet* getPokemon(int idMensaje, char* pokemon);
 
 
 
