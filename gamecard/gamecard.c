@@ -11,7 +11,7 @@ int main () {
 
     //verificar_punto_de_montaje();
 
-    //suscripcion_colas_broker();
+    suscripcion_colas_broker();
     
     //crear_archivos_pokemon("pepa", 200, 100, 100);
     //crear_archivos_pokemon("chancha",50,10,2);
