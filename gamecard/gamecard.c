@@ -3,7 +3,7 @@
 
 int main () {
 
-	//printf("Positions size: %d", sizeof(Position));
+	pid_gamecard = getpid();
 
     iniciar_logger_config();
 
@@ -15,6 +15,10 @@ int main () {
     
     //crear_archivos_pokemon("pepa", 200, 100, 100);
     //crear_archivos_pokemon("chancha",50,10,2);
+
+    pthread_join(thread_new_pokemon, NULL);
+    pthread_join(thread_catch_pokemon, NULL);
+    pthread_join(thread_get_pokemon, NULL);
 
     bitarray_destroy(bitarray);
     log_destroy(logger);

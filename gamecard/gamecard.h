@@ -73,7 +73,19 @@ struct dataServer{
 struct mensaje {
     int id;
     void* message;
-} ;
+};
+
+typedef struct {
+	int ack_new;
+	int ack_catch;
+	int ack_get;
+}ack_t;
+
+ack_t acks_gamecard;
+
+// el pid del proceso
+
+pid_t pid_gamecard;
 
 // Los siguientes structs son para recibir mensajes del gameboy
 
@@ -84,6 +96,7 @@ struct config_tallGrass *datos_config; // este struct es para almacenar los dato
 pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servidor e interacturar con gameboy si el broker cae
 pthread_t cliente_gamecard; // este hilo es para iniciar gamecard como cliente del broker
 
+pthread_t servidor_gamecard;
 pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_pokemon
 pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon

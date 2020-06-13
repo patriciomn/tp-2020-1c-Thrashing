@@ -678,7 +678,7 @@ void iniciar_cache(){
 	memoria = malloc(mem_total);
 	cache = list_create();
 	particion* header = malloc(sizeof(particion));
-	header->libre = 1;
+	header->libre = 'L';
 	header->id_particion = id_particion;
 	header->size = mem_total;
 	header->start = inicio;
@@ -717,7 +717,7 @@ void* memcpy_cache(particion* part,uint32_t id_buf,uint32_t tipo_cola,void* dest
 	if(part != NULL){
 		part->id_buffer = id_buf;
 		part->tipo_cola = tipo_cola;
-		part->libre = 0;
+		part->libre = 'X';
 	}
 	return memcpy(destino,buf,size);
 }
@@ -728,7 +728,7 @@ void free_cache(){
 
 void delete_particion(particion* borrar){
 	log_warning(logger,"Particion: %d Eliminada  Inicio: %p",borrar->id_particion,borrar->inicio);
-	borrar->libre = 1;
+	borrar->libre = 'L';
 	borrar->tipo_cola = -1;
 	borrar->id_buffer = -1;
 	mem_asignada -= borrar->size;
@@ -738,7 +738,7 @@ void compactar_cache(){
 	log_warning(logger,"Compactando El Cache ...");
 	particion* ultima = list_get(cache,list_size(cache)-1);
 	bool libre_no_ultima(particion* aux){
-		return aux->libre && aux->fin != ultima->fin;
+		return aux->libre == 'L' && aux->fin != ultima->fin;
 	}
 
 	while(1){
@@ -781,13 +781,13 @@ particion* particiones_dinamicas(uint32_t size){
 		elegida->size = part_size;
 		elegida->fin = elegida->inicio+part_size;
 		elegida->end = elegida->start+part_size;
-		elegida->libre = 0;
+		elegida->libre = 'X';
 		elegida->tiempo = time(NULL);
 		id_particion++;
 		mem_asignada += part_size;
 		particion* next = malloc(sizeof(particion));
 		next->id_particion = id_particion;
-		next->libre = 1;
+		next->libre = 'L';
 		next->size = mem_total-mem_asignada;
 		next->inicio = elegida->fin;
 		next->start = elegida->end;
@@ -803,13 +803,13 @@ particion* particiones_dinamicas(uint32_t size){
 		elegida->size = part_size;
 		elegida->fin = elegida->inicio+elegida->size;
 		elegida->end = elegida->start+elegida->size;
-		elegida->libre = 0;
+		elegida->libre = 'X';
 		elegida->tiempo = time(NULL);
 		id_particion++;
 		mem_asignada += part_size;
 		if(size_original - size > 0){
 			particion* next = malloc(sizeof(particion));
-			next->libre = 1;
+			next->libre = 'X';
 			next->size = size_original - part_size;
 			next->inicio = elegida->fin;
 			next->start = elegida->end;
@@ -851,13 +851,13 @@ particion* buddy_system(uint32_t size){
 	}
 	particion* elegida;
 	bool libre_suficiente(particion* aux){
-		return aux->libre == 1 && aux->size >= size_particion;
+		return aux->libre == 'L' && aux->size >= size_particion;
 	}
 	if(size_particion < mem_total){
 		if(size_particion > (mem_total/2)){
 			elegida = list_find(cache,(void*)libre_suficiente);
 			if(elegida!=NULL){
-				elegida->libre = 0;
+				elegida->libre = 'X';
 				elegida->size = size_particion;
 				mem_asignada += elegida->size;
 			}
@@ -868,7 +868,7 @@ particion* buddy_system(uint32_t size){
 			uint32_t pow_pri = log_dos(primera->size);
 			void aplicar(particion* aux){
 				bool libre_suficiente(particion* p){
-					return p->libre == 1 && p->size >= size_particion && p->size >= datos_config->tamanio_min_particion;
+					return p->libre == 'L' && p->size >= size_particion && p->size >= datos_config->tamanio_min_particion;
 				}
 				particion* vic = list_find(cache,(void*)libre_suficiente);
 				particion* ultima = list_get(cache,list_size(cache)-1);
@@ -883,14 +883,14 @@ particion* buddy_system(uint32_t size){
 					next->start = vic->end;
 					next->fin = next->inicio+next->size;
 					next->end = next->start+next->size;
-					next->libre = 1;
+					next->libre = 'L';
 					next->id_buffer = -1;
 					next->tipo_cola = -1;
 					list_add(cache,next);
 				}
 				else if(aux->inicio==vic->inicio && aux->size==size_particion){
 					vic->size = size_particion;
-					vic->libre = 0;
+					vic->libre = 'X';
 					mem_asignada += elegida->size;
 				}
 				else if(aux->inicio==vic->inicio){
@@ -904,7 +904,7 @@ particion* buddy_system(uint32_t size){
 					next->start = vic->end;
 					next->fin = next->inicio+next->size;
 					next->end = next->start+next->size;
-					next->libre = 1;
+					next->libre = 'L';
 					next->id_buffer = -1;
 					next->tipo_cola = -1;
 					bool posicion(particion* aux){
@@ -929,7 +929,7 @@ particion* buddy_system(uint32_t size){
 particion* algoritmo_particion_libre(uint32_t size){
 	particion* elegida;
 	bool libre_suficiente(particion* aux){
-		return aux->libre == 1 && aux->size >= datos_config->tamanio_min_particion && aux->size >= size;
+		return aux->libre == 'L' && aux->size >= datos_config->tamanio_min_particion && aux->size >= size;
 	}
 	if(string_equals_ignore_case(datos_config->algoritmo_particion_libre,"FF")){
 		printf("==========FIRST FIT==========\n");
@@ -959,7 +959,7 @@ particion* algoritmo_reemplazo(){
 			return aux1->id_particion < aux2->id_particion;
 		}
 		bool ocupada(particion* aux){
-			return aux->libre == 0;
+			return aux->libre == 'X';
 		}
 		aux = list_sorted(cache,(void*)by_id);
 		victima = list_find(aux,(void*)ocupada);
@@ -1057,22 +1057,16 @@ void handler_dump(int signo){//.txt|.log
 
 		log_info(dump,"---------------------------------------------------------------------------------------------------------------------------------------------\n");
 		log_info(dump,"Dump:%d/%d/%d %d:%d:%d\n",p->tm_mday,p->tm_mon+1,p->tm_year+1900,p->tm_hour,p->tm_min,p->tm_sec);
-		char caracter(uint32_t nro){
-			char res = 'L';
-			if(nro != 1){
-				res = 'X';
-			}
-			return res;
-		}
+
 		void imprimir(void* ele){
 			particion* aux = ele;
-			if(aux->libre == 0){
+			if(aux->libre == 'X'){
 				log_info(dump,"Paricion %d:%d-%d   [%c]   Size:%db   %s:<%d>   Cola:<%d>   ID:<%d>\n",
-							aux->id_particion,aux->start,aux->end,caracter(aux->libre),aux->size,
+							aux->id_particion,aux->start,aux->end,aux->libre,aux->size,
 							datos_config->algoritmo_reemplazo,1,aux->tipo_cola,aux->id_buffer);
 			}
 			else{
-				log_info(dump,"Espacio    :%d-%d   [%c]   Size:%db\n",aux->start,aux->end,caracter(aux->libre),aux->size);
+				log_info(dump,"Espacio    :%d-%d   [%c]   Size:%db\n",aux->start,aux->end,aux->libre,aux->size);
 			}
 		}
 		pthread_rwlock_rdlock(&lockCache);
@@ -1084,37 +1078,6 @@ void handler_dump(int signo){//.txt|.log
 		printf("SIGUSR1 RUNNING...\n");
 		exit(0);
 	}
-}
-
-void display_cache(){
-	time_t tiempo;
-	time(&tiempo);
-	struct tm* p;
-	p = gmtime(&tiempo);
-
-	printf("------------------------------------------------------------------------------\n");
-	printf("Dump:%d/%d/%d %d:%d:%d\n",p->tm_mday,p->tm_mon+1,p->tm_year+1900,p->tm_hour-3,p->tm_min,p->tm_sec);
-	char caracter(uint32_t nro){
-		char res = 'L';
-		if(nro != 1){
-			res = 'X';
-		}
-		return res;
-	}
-	void imprimir(void* ele){
-		particion* aux = ele;
-		if(aux->libre == 0){
-			printf("Paticion %d:%p-%p   [%c]   Size:%db   %s:<%d>   Cola:<%d>   ID:<%d>\n",
-						aux->id_particion,aux->inicio,aux->fin,caracter(aux->libre),aux->size,
-						datos_config->algoritmo_reemplazo,1,aux->tipo_cola,aux->id_buffer);
-		}
-		else{
-			printf("Espacio   :%p-%p   [%c]   Size:%db\n",aux->inicio,aux->fin,caracter(aux->libre),aux->size);
-		}
-
-	}
-	list_iterate(cache,(void*)imprimir);
-	printf("------------------------------------------------------------------------------\n");
 }
 
 void limpiar_cache(){
