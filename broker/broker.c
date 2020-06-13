@@ -159,14 +159,14 @@ void serve_client(int* socket){
 	int cod_op;
 
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
-		log_error(logger,"ERROR: socket error" );
+		printf("ERROR: socket error" );
 		pthread_exit(NULL);	
 	}
-		
 	if (cod_op <= 0 ){
-		log_error(logger,"ERROR: Bad operation code: %d", cod_op);
+		printf("Se Desconectó El Socket: %d", *socket);
 		pthread_exit(NULL);
 	}	
+
 	int cliente_fd = *socket;
 	free(socket);
 	process_request(cod_op, cliente_fd);

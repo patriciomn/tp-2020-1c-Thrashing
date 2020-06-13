@@ -40,7 +40,7 @@ typedef struct{
 }suscriber;
 
 typedef struct _cache{
-	bool libre;
+	uint32_t libre;
 	uint32_t size;
 	uint32_t id_particion;
 	uint32_t id_buffer;
