@@ -10,6 +10,7 @@ pthread_t servidor_gameboy;
 pthread_t suscripcion_appeared;
 pthread_t suscripcion_localized;
 pthread_t suscripcion_caught;
+pthread_t reintento;
 t_list* mensajes;
 
 sem_t semExecTeam;
@@ -66,12 +67,13 @@ void iniciar_config(char* teamConfig){
 	datos_config->alpha = config_get_double_value(config,"ALPHA");
 	datos_config->estimacion_inicial = config_get_double_value(config,"ESTIMACION_INICIAL");
 	datos_config->quantum = config_get_int_value(config,"QUANTUM");
+	datos_config->id = config_get_int_value(config,"ID");
 }
 
 //CREACION---------------------------------------------------------------------------------------------------------------------
 void crear_team(){
 	equipo = malloc(sizeof(team));
-	equipo->pid = getpid();
+	equipo->pid = datos_config->id;
 	equipo->entrenadores = list_create();
 	equipo->objetivos = list_create();
 	equipo->poks_requeridos = list_create();
@@ -763,7 +765,7 @@ void enviar_mensaje_get_pokemon(char* pokemon,int socket_cliente){
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(socket_cliente, a_enviar, bytes, 0);
+	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
 
 	printf("GET_POKEMON: %s\n",pokemon);
 
@@ -794,7 +796,7 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cli
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(socket_cliente, a_enviar, bytes, 0);
+	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
 
 	log_info(logger,"CATCH_POKEMON:%s",pokemon);
 
@@ -849,41 +851,47 @@ void recibir_localized_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->localized, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		t_list* paquete = recibir_paquete(conexion_broker->localized);
-
-		void display(void* valor){
-			int id;
-			memcpy(&id,valor,sizeof(int));
-			localized_pokemon* localized = deserializar_localized(valor);
-			log_info(logger,"Llega Un Mensaje Tipo: LOCALIZED_POKEMON: ID: %d Pokemon: %s \n",id,localized->name);
-			void show(pos_cant* pos){
-				log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
-			}
-			list_iterate(localized->pos_cant,(void*)show);
-			enviar_ack(LOCALIZED_POKEMON,id,equipo->pid,conexion_broker->localized);
-
-			bool by_id(msg* m){
-				return m->id_recibido == id;
-			}
-			if(list_find(mensajes,(void*)by_id)){
-				for(int i=0;i<localized->cantidad_posiciones;i++){
-					pokemon* pok = crear_pokemon(localized->name);
-					pos_cant* aux = list_get(localized->pos_cant,i);
-					set_pokemon(pok,aux->posx,aux->posy);
-					pthread_rwlock_wrlock(&lockPoksRequeridos);
-					list_add(equipo->poks_requeridos,pok);
-					printf("%s Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name);
-					pthread_rwlock_unlock(&lockPoksRequeridos);
-					sem_post(&semPoks);
-				}
-			}
-			else{
-				printf("%s No Es Requerido\n",localized->name);
-			}
-			free(valor);
+		if(cod_op <= 0){
+			conexion_broker->localized = -1;
+			reintento_conectar_broker();
+			return;
 		}
-		list_iterate(paquete,(void*)display);
-		list_destroy(paquete);
+		else{
+			t_list* paquete = recibir_paquete(conexion_broker->localized);
+			void display(void* valor){
+				int id;
+				memcpy(&id,valor,sizeof(int));
+				localized_pokemon* localized = deserializar_localized(valor);
+				log_info(logger,"Llega Un Mensaje Tipo: LOCALIZED_POKEMON: ID: %d Pokemon: %s \n",id,localized->name);
+				void show(pos_cant* pos){
+					log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
+				}
+				list_iterate(localized->pos_cant,(void*)show);
+				enviar_ack(LOCALIZED_POKEMON,id,equipo->pid,conexion_broker->localized);
+
+				bool by_id(msg* m){
+					return m->id_recibido == id;
+				}
+				if(list_find(mensajes,(void*)by_id)){
+					for(int i=0;i<localized->cantidad_posiciones;i++){
+						pokemon* pok = crear_pokemon(localized->name);
+						pos_cant* aux = list_get(localized->pos_cant,i);
+						set_pokemon(pok,aux->posx,aux->posy);
+						pthread_rwlock_wrlock(&lockPoksRequeridos);
+						list_add(equipo->poks_requeridos,pok);
+						printf("%s Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name);
+						pthread_rwlock_unlock(&lockPoksRequeridos);
+						sem_post(&semPoks);
+					}
+				}
+				else{
+					printf("%s No Es Requerido\n",localized->name);
+				}
+				free(valor);
+			}
+			list_iterate(paquete,(void*)display);
+			list_destroy(paquete);
+		}
 	}
 }
 
@@ -892,7 +900,12 @@ void recibir_caught_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->caught, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		if(cod_op != -1){
+		if(cod_op <= 0){
+			conexion_broker->caught = -1;
+			reintento_conectar_broker();
+			return;
+		}
+		else{
 			t_list* paquete = recibir_paquete(conexion_broker->caught);
 			void display(void* valor){
 				int id,res;
@@ -937,7 +950,12 @@ void recibir_appeared_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->appeared, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		if(cod_op != -1){
+		if(cod_op <= 0){
+			conexion_broker->appeared = -1;
+			reintento_conectar_broker();
+			return;
+		}
+		else{
 			t_list* paquete = recibir_paquete(conexion_broker->appeared);
 			void display(void* valor){
 				int id;
@@ -968,51 +986,70 @@ void recibir_appeared_pokemon(){
 
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
-	suscribirse_appeared();
-	suscribirse_localized();
-	suscribirse_caught();
-	if(conexion_broker->appeared == -1 && conexion_broker->localized == -1 && conexion_broker->caught == -1){
+	if(suscribirse_appeared() == 1 && suscribirse_localized() == 1 && suscribirse_caught() == 1){
+		recibir_mensajes();
+		equipo->suscrito = 1;
+		printf("TEAM Se Ha Suscrito\n");
+	}
+	else{
 		log_error(logger,"No Se Puede Conectarse A Broker");
 		reintento_conectar_broker();
 	}
-	else{
-		pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
-		pthread_detach(suscripcion_caught);
-		pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
-		pthread_detach(suscripcion_appeared);
-		pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
-		pthread_detach(suscripcion_localized);
-	}
 }
 
-void suscribirse_appeared(){
+void conectar_broker(){
+	conexion_broker->localized = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
+	conexion_broker->caught = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
 	conexion_broker->appeared = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
+	recibir_mensajes();
+}
+
+void recibir_mensajes(){
+	pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
+	pthread_detach(suscripcion_caught);
+	pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
+	pthread_detach(suscripcion_appeared);
+	pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
+	pthread_detach(suscripcion_localized);
+}
+
+int suscribirse_appeared(){
+	conexion_broker->appeared = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
+	int res = 0;
 	if(conexion_broker->appeared != -1){
-		//pthread_cancel(servidor_gameboy);
 		log_warning(logger,"Conectado A Broker Suscribirse a APPEARED");
 		enviar_info_suscripcion(APPEARED_POKEMON,conexion_broker->appeared,equipo->pid);
-		recibir_confirmacion_suscripcion(conexion_broker->appeared,APPEARED_POKEMON);
+		if(recibir_confirmacion_suscripcion(conexion_broker->appeared,APPEARED_POKEMON) != -1){
+			res = 1;
+		}
 	}
+	return res;
 }
 
-void suscribirse_localized(){
+int suscribirse_localized(){
 	conexion_broker->localized = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
+	int res = 0;
 	if(conexion_broker->localized != -1){
-		//pthread_cancel(servidor_gameboy);
 		log_warning(logger,"Conectado A Broker Suscribirse a LOCALIZED");
 		enviar_info_suscripcion(LOCALIZED_POKEMON,conexion_broker->localized,equipo->pid);
-		recibir_confirmacion_suscripcion(conexion_broker->localized,LOCALIZED_POKEMON);
+		if(recibir_confirmacion_suscripcion(conexion_broker->localized,LOCALIZED_POKEMON) !=-1){
+			res = 1;
+		}
 	}
+	return res;
 }
 
-void suscribirse_caught(){
+int suscribirse_caught(){
 	conexion_broker->caught = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
+	int res = 0;
 	if(conexion_broker->localized != -1){
-		//pthread_cancel(servidor_gameboy);
 		log_warning(logger,"Conectado A Broker Suscribirse a CAUGHT");
 		enviar_info_suscripcion(CAUGHT_POKEMON,conexion_broker->caught,equipo->pid);
-		recibir_confirmacion_suscripcion(conexion_broker->caught,CAUGHT_POKEMON);
+		if(recibir_confirmacion_suscripcion(conexion_broker->caught,CAUGHT_POKEMON) != -1){
+			res = 1;
+		}
 	}
+	return res;
 }
 
 void reintento_conectar_broker(){
@@ -1025,9 +1062,14 @@ void reintento_conectar_broker(){
 }
 
 void end_of_quantum_handler(){
-	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1|| conexion_broker->caught == -1){
-		log_warning(logger,"Reconectando A Broker ...");
-		suscribirse_broker(equipo->pid);
+	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1 || conexion_broker->caught == -1){
+		log_warning(logger,"No Se Puede Conectar A Broker.Reconectando ...");
+		if(!equipo->suscrito){
+			suscribirse_broker(equipo->pid);
+		}
+		else{
+			conectar_broker();
+		}
 		alarm(datos_config->tiempo_reconexion);
 	}
 }

@@ -265,8 +265,11 @@ void atender_suscripcion(int cliente_fd){
 	}
 	if (!list_any_satisfy(cola->suscriptors,(void*)existe) ){
 		list_add(cola->suscriptors, sus);
-		log_info(logger,"Proceso %d Suscripto A La Cola %d SUSCRIPCION",pid,queue_id);
+		log_info(logger,"Proceso %d Suscrito A La Cola %d SUSCRIPCION",pid,queue_id);
 		enviar_confirmacion_suscripcion(sus);
+	}
+	else{
+		log_warning(logger,"Proceso %d Ya Habia Suscrito A La Cola %d",pid,queue_id);
 	}
 
 	if(!list_is_empty(cola->mensajes)){
@@ -658,13 +661,13 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 }
 
 void enviar_id(mensaje *item,int socket_cliente){
-	send(socket_cliente,&item->id, sizeof(int), 0);
+	send(socket_cliente,&item->id, sizeof(int), MSG_NOSIGNAL);
 	printf("ID_Mensaje:%d Enviado\n",item->id);
 }
 
 void enviar_confirmacion_suscripcion(suscriber* sus){
 	int ack = ACK;
-	send(sus->cliente_fd,&ack, sizeof(int), 0);
+	send(sus->cliente_fd,&ack, sizeof(int), MSG_NOSIGNAL);
 	printf("Confirmacion De Suscripcion Enviada\n");
 }
 

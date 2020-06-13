@@ -64,6 +64,7 @@ typedef struct{
 	int cant_ciclo;
 	t_list* poks_requeridos;
 	t_list* cola_ready;
+	bool suscrito;
 }team;
 
 typedef struct{
@@ -86,6 +87,7 @@ typedef struct{
 	double alpha;
 	double estimacion_inicial;
 	int quantum;
+	int id;
 }config_team;
 
 typedef struct{
@@ -168,9 +170,9 @@ void iniciar_servidor(void);
 void esperar_cliente(int);
 void process_request(int cod_op, int cliente_fd);
 void serve_client(int *socket);
-void suscribirse_appeared();
-void suscribirse_localized();
-void suscribirse_caught();
+int suscribirse_appeared();
+int suscribirse_localized();
+int suscribirse_caught();
 void suscribirse_broker();
 void enviar_mensajes_get_pokemon();
 void enviar_mensajes_get_pokemon();
@@ -183,4 +185,7 @@ void recibir_localized_pokemon();
 void recibir_appeared_pokemon_gameboy(int cliente_fd);
 void end_of_quantum_handler();
 void reintento_conectar_broker();
+void conectar_broker();
+void recibir_mensajes();
+
 #endif /* TEAM_H_ */

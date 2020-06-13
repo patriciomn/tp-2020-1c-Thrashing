@@ -52,7 +52,7 @@ void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio){
 void enviar_paquete(t_paquete* paquete, int socket_cliente){
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
-	send(socket_cliente, a_enviar, bytes, 0);
+	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
 
 	free(a_enviar);
 }
@@ -160,7 +160,7 @@ void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(cliente_fd, a_enviar, bytes, 0);
+	send(cliente_fd, a_enviar, bytes, MSG_NOSIGNAL);
 	printf("ACK enviado\n");
 
 	free(a_enviar);
@@ -181,7 +181,7 @@ void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid){
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(socket_cliente, a_enviar, bytes, 0);
+	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
 
 	free(a_enviar);
 	free(paquete->buffer->stream);
@@ -219,13 +219,14 @@ void* recibir_buffer(int socket_cliente, int* size){
 	return buffer;
 }
 
-void recibir_confirmacion_suscripcion(int cliente_fd,int tipo){
+int recibir_confirmacion_suscripcion(int cliente_fd,int tipo){
 	int cod_op;
 	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
 	if(cod_op != -1){
 		printf("Se Ha Suscrito A La Cola %d\n",tipo);
 	}
+	return cod_op;
 }
 
 int crear_conexion(char *ip, char* puerto){

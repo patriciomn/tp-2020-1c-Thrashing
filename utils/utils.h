@@ -132,7 +132,7 @@ t_list* recibir_paquete(int socket_cliente);
 void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid);
 void* recibir_buffer(int socket_cliente, int* size);
 int crear_conexion(char *ip, char* puerto);
-void recibir_confirmacion_suscripcion(int cliente_fd,int);
+int recibir_confirmacion_suscripcion(int cliente_fd,int);
 void liberar_conexion(int socket_cliente);
 bool check_socket(int sock);
 int recibir_id_mensaje(int cliente_fd);
