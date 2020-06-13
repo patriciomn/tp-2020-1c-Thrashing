@@ -1063,11 +1063,12 @@ void reintento_conectar_broker(){
 
 void end_of_quantum_handler(){
 	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1 || conexion_broker->caught == -1){
-		log_warning(logger,"No Se Puede Conectar A Broker.Reconectando ...");
+		log_warning(logger,"Reconectando A Broker...");
 		if(!equipo->suscrito){
 			suscribirse_broker(equipo->pid);
 		}
 		else{
+			log_error(logger,"No Se Puede Conectarse A Broker.");
 			conectar_broker();
 		}
 		alarm(datos_config->tiempo_reconexion);
