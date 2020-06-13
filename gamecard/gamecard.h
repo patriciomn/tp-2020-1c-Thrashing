@@ -118,7 +118,7 @@ char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 int tipo_mensaje(char* tipo_mensaje);
 void newPokemon(char* pokemon,int posx,int posy,int cant);
 void catchPokemon(char* pokemon,int posx,int posy);
-rtaGet* getPokemon(int idMensaje, char* pokemon);
+//rtaGet* getPokemon(int idMensaje, char* pokemon);
 
 
 

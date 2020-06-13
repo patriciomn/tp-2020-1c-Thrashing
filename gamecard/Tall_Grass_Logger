@@ -266,3 +266,4 @@
 [INFO] 17:02:49:662 TG/(5258:5258): CREANDO EL ARCHIVO CON RUTA /home/utnso/Escritorio/tall_grass/blocks/2.txt
 [INFO] 17:02:49:663 TG/(5258:5258): ESCRIBIENDO DATOS EN EL BLOQUE 2 EN EL DIRECTORIO /home/utnso/Escritorio/tall_grass/blocks/2.txt
 [INFO] 17:02:49:664 TG/(5258:5258): SE ESCRIBIERON LOS DATOS EN EL ARCHIVO CON RUTA /chancha.txt
+[ERROR] 20:50:06:472 TG/(9133:9133): No existe el archivo.

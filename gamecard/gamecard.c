@@ -11,8 +11,8 @@ int main () {
 
     //verificar_punto_de_montaje();
 
-    suscripcion_colas_broker();
-
+    //suscripcion_colas_broker();
+    
     //crear_archivos_pokemon("pepa", 200, 100, 100);
     //crear_archivos_pokemon("chancha",50,10,2);
 
@@ -517,8 +517,11 @@ int fileSize(char* file) {
 FILE* existePokemon(char* nombrePokemon){
     char* pathArchivo = string_new();
     string_append(&pathArchivo,PATH_POKECARPETA);
-    string_append_with_format(&pathArchivo,"%s%s%s", nombrePokemon, "/",nombrePokemon);
+    string_append_with_format(&pathArchivo,"%s%s%s%s", nombrePokemon, "/",nombrePokemon,POKEMON_FILE_EXT);
     FILE *fp = fopen(pathArchivo,"r");
+    printf("%s\n",pathArchivo);
+    printf("%p",fp);
+    printf("\nDeberia impreso el puntero\n");
     return fp;
 
 }
@@ -549,15 +552,16 @@ void newPokemon(char* pokemon,int posx,int posy,int cant){}
 
 void catchPokemon(char* pokemon,int posx,int posy){}
 
-rtaGet* getPokemon(int idMensaje, char* pokemon){
+/*rtaGet* getPokemon(int idMensaje, char* pokemon){
     rtaGet* respuesta = malloc(sizeof(rtaGet));
     respuesta->id_mensaje = idMensaje;
     respuesta->name = pokemon;
     FILE *fp = existePokemon(pokemon);
+    printf("%p",fp);
     if(fp != NULL){
         char* pathMetadata = string_new();
         string_append(&pathMetadata,PATH_POKECARPETA);
-        string_append_with_format(&pathMetadata,"%s%s%s", pokemon, "/",METADATA_FILE);
+        string_append_with_format(&pathMetadata,"%s%s", pokemon ,METADATA_FILE);
         t_config *metadata_pokemon = config_create(pathMetadata);
         
         char* abierto = config_get_string_value(metadata_pokemon,"OPEN");
@@ -565,21 +569,26 @@ rtaGet* getPokemon(int idMensaje, char* pokemon){
             //finalizar hilo y reintentar despues del tiempo que dice el config
         } else{
             //settear OPEN = Y
+            log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP");
             char* pathFILE = string_new();
             string_append(&pathFILE,PATH_POKECARPETA);
-            string_append_with_format(&pathFILE,"%s%s%s", pokemon, "/",pokemon);
-            char** scaneo = NULL;
+            string_append_with_format(&pathFILE,"%s%s%s%s", pokemon, "/",pokemon, POKEMON_FILE_EXT);
+            char* scaneo = NULL;
             long fplen = (long) fileSize(pathFILE);
-            scaneo = read_file_into_buf (scaneo, fplen, fp);
+            read_file_into_buf (&scaneo, fplen, fp);
+            log_info(logger, "AGREGANDO BLOQUE %d A LA ESTRUCTURA BLOCKS", string_length(scaneo));
+              printf("deberia saber el length\n");
             //settear OPEN = N
             //falta separar uno a uno las lineas
+
             //setear la respuesta
 
             free(scaneo);
         }
     
     free(abierto);
+    free(pathMetadata);
     }
 
     return respuesta;
-}
+}*/
