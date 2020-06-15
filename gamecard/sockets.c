@@ -1,3 +1,4 @@
+/*
 #include "sockets.h"
 
 void suscripcion_colas_broker() {
@@ -14,44 +15,48 @@ void suscripcion_colas_broker() {
 	} else {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
-		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
+		//pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
 		//pthread_detach(thread_new_pokemon);
 
-		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
+		//pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
 		//pthread_detach(thread_catch_pokemon);
 
-		pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
+		//pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
 		//pthread_detach(thread_get_pokemon);
 	}
 }
 
 void suscribirse_a_new_pokemon() {
-	socket_cliente_np = crear_conexion();
+	socket_cliente_np = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_np != -1) {
-		enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
+		//enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
+		enviar_info_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
 		recv(socket_cliente_np, &(acks_gamecard.ack_new), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA NEW_POKEMON: %d", acks_gamecard.ack_new);
 	}
 }
 
 void suscribirse_a_catch_pokemon() {
-	socket_cliente_cp = crear_conexion();
+	socket_cliente_cp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_cp != -1) {
-		enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
+		//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
+		enviar_info_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
 		recv(socket_cliente_cp, &(acks_gamecard.ack_catch), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA CATCH_POKEMON: %d", acks_gamecard.ack_catch);
 	}
 }
 
 void suscribirse_a_get_pokemon() {
-	socket_cliente_gp = crear_conexion();
+	socket_cliente_gp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_gp != -1) {
-		enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
+		//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
+		enviar_info_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
 		recv(socket_cliente_gp, &(acks_gamecard.ack_get), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA GET_POKEMON: %d", acks_gamecard.ack_get);
 	}
 }
 
+/*
 void recibir_mensajes_new_pokemon(){
 	while(1) {
 		int codigo_operacion;
@@ -301,7 +306,9 @@ void* serializar_paquete(t_paquete* paquete, int bytes) {
 
 	return magic;
 }
+*/
 
+/*
 void iniciar_servidor(void) {
 
 	int socket_servidor;
@@ -366,14 +373,20 @@ void atender_peticion(int socket_cliente, int cod_op) {
 	switch(cod_op) {
 		case NEW_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON");
-			NPokemon *newPokemon = malloc(sizeof(NPokemon));
-			deserealizar_new_pokemon_gameboy(stream, newPokemon);
+			new_pokemon *newPokemon = malloc(sizeof(new_pokemon));
+			int id_mensaje_new;
+			memcpy(&(id_mensaje_new), stream, sizeof(int));
+			printf("ID MENSAJE: %d\n", id_mensaje_new);
 
-			printf("ID MENSAJE: %d\n", newPokemon->id_mensaje);
-			printf("POKEMON: %s\n", newPokemon->nombre);
-			printf("PosX: %d\n", newPokemon->posicion.posX);
-			printf("PosY: %d\n", newPokemon->posicion.posY);
+			//deserealizar_new_pokemon_gameboy(stream, newPokemon);
+			newPokemon = deserializar_new(stream + sizeof(int));
+
+			printf("POKEMON: %s\n", newPokemon->name);
+			printf("PosX: %d\n", newPokemon->pos.posx);
+			printf("PosY: %d\n", newPokemon->pos.posy);
 			printf("Cantidad: %d\n", newPokemon->cantidad);
+
+			//pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 
 			free(newPokemon);
 			free(stream);
@@ -381,13 +394,16 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 		case CATCH_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON");
-			CPokemon *catchPokemon = malloc(sizeof(CPokemon));
-			deserealizar_catch_pokemon_gameboy(stream, catchPokemon);
+			catch_pokemon *catchPokemon = malloc(sizeof(catch_pokemon));
+			int id_mensaje_catch;
+			memcpy(&(id_mensaje_catch), stream, sizeof(int));
+			printf("ID MENSAJE: %d\n", id_mensaje_catch);
+			//deserealizar_catch_pokemon_gameboy(stream, catchPokemon);
+			catchPokemon = deserializar_catch(stream + sizeof(int));
 
-			printf("ID MENSAJE: %d\n", catchPokemon->id_mensaje);
-			printf("POKEMON: %s\n", catchPokemon->nombre);
-			printf("PosX: %d\n", catchPokemon->posicion.posX);
-			printf("PosY: %d\n", catchPokemon->posicion.posY);
+			printf("POKEMON: %s\n", catchPokemon->name);
+			printf("PosX: %d\n", catchPokemon->pos.posx);
+			printf("PosY: %d\n", catchPokemon->pos.posy);
 
 			free(catchPokemon);
 			free(stream);
@@ -395,11 +411,14 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 		case GET_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON");
-			GPokemon *getPokemon = malloc(sizeof(GPokemon));
-			deserealizar_get_pokemon_gameboy(stream, getPokemon);
+			get_pokemon *getPokemon = malloc(sizeof(get_pokemon));
+			int id_mensaje;
+			memcpy(&(id_mensaje), stream, sizeof(int));
+			printf("ID MENSAJE: %d\n", id_mensaje);
+			//deserealizar_get_pokemon_gameboy(stream, getPokemon);
+			getPokemon = deserializar_get(stream + sizeof(int));
 
-			printf("ID MENSAJE: %d\n", getPokemon->id_mensaje);
-			printf("POKEMON: %s\n", getPokemon->nombre);
+			//printf("POKEMON: %s\n", getPokemon->name);
 
 			free(getPokemon);
 			free(stream);
@@ -412,8 +431,8 @@ void atender_peticion(int socket_cliente, int cod_op) {
 }
 
 // Deserealizacion para Gameboy
-
-void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon) {
+/*
+void deserealizar_new_pokemon_gameboy(void *stream, new_pokemon *newPokemon) {
 	int desplazamiento = 0;
 
 	memcpy(&(newPokemon->id_mensaje), stream + desplazamiento, sizeof(int));
@@ -435,6 +454,7 @@ void deserealizar_new_pokemon_gameboy(void *stream, NPokemon *newPokemon) {
 	desplazamiento += sizeof(int);
 }
 
+/*
 void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon) {
 	int desplazamiento = 0;
 
@@ -469,3 +489,4 @@ void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon) {
 	memcpy(getPokemon->nombre, stream + desplazamiento, size_name);
 	desplazamiento += size_name;
 }
+*/

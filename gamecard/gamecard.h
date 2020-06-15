@@ -1,6 +1,7 @@
 #ifndef GAMECARD_H_
 #define GAMECARD_H_
 
+#include "../utils/utils.c"
 #include <commons/bitarray.h>
 #include <commons/string.h>
 #include <commons/config.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -19,10 +21,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
-#include <uuid/uuid.h>
-#include "sockets.h"
-
-//#include "../utils/utils.h"
+//#include "sockets.c"
 
 #define IP_SERVIDOR		 "127.0.0.3"
 #define PUERTO_SERVIDOR  "4446"
@@ -48,6 +47,10 @@
 t_log *logger;
 t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
 t_config *config_tall_grass;
+
+char *ruta_archivo_bitmap;
+
+void *bitmap_memoria;	// puntero para el mmap
 
 struct metadata_info {
     int block_size;
@@ -83,6 +86,8 @@ typedef struct {
 
 ack_t acks_gamecard;
 
+FILE *bitmapFilePointer;
+
 // el pid del proceso
 
 pid_t pid_gamecard;
@@ -101,6 +106,8 @@ pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_poke
 pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
+pthread_t atender_new_pokemon;      // hilo para hacer el new_pokemon
+
 //FUNCIONES
 
 int main ();
@@ -108,7 +115,7 @@ int main ();
 void verificar_punto_de_montaje();
 void iniciar_logger_config();
 void obtener_datos_archivo_config();
-void verificar_metadata_txt(char *path_pto_montaje);
+void verificar_metadata_fs(char *path_pto_montaje);
 void crear_pto_de_montaje(char *path_pto_montaje);
 void crear_directorio_files(char *path_pto_montaje);
 void crear_directorio_blocks(char *path_pto_montaje);
@@ -116,8 +123,13 @@ void crear_metadata_tall_grass(char *path_pto_montaje);
 void crear_archivos_metadata(char *path_metadata);
 int existe_archivo_pokemon(char *path);
 char* crear_directorio_pokemon(char *path_pto_montaje, char* pokemon);
-void crear_archivos_pokemon(char *path_pokefile, int posX, int posY, int cantidad);
-void crear_metadata_pokemon(char *path_pokeflie);
+
+//void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon);
+void crear_metadata_pokemon(char *path_pokeflie, char *pokemon, int file_size);
+
+void escribir_linea_en_archivo(FILE *punteroArchivo, int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
+
+bool hay_cantidad_de_bloques_libres(int cantidad_de_bloques_necesaria);
 
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
@@ -129,10 +141,38 @@ FILE* existePokemon(char* nombrePokemon);
 char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
-void newPokemon(char* pokemon,int posx,int posy,int cant);
+
+//void operacion_new_pokemon(new_pokemon *newPokemon);
 void catchPokemon(char* pokemon,int posx,int posy);
 //rtaGet* getPokemon(int idMensaje, char* pokemon);
 
+void escribir_nueva_linea_en_archivo(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
+void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
+
+// Funciones Extras
+
+void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *valor); //  la ruta tiene que ser: [pto_de_montaje]/files/[nombre_del_pokemon]
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+
+// Sockets
+
+// Funciones
+
+void suscripcion_colas_broker();
+void suscribirse_a_new_pokemon();
+void suscribirse_a_catch_pokemon();
+void suscribirse_a_get_pokemon();
+
+void iniciar_servidor(void);
+void esperar_cliente(int socket_servidor);
+void atender_peticion(int socket_cliente, int cod_op);
+
+// sockets para recibir los mensajes
+int socket_cliente_np;
+int socket_cliente_cp;
+int socket_cliente_gp;
 
 
 #endif /* GAMECARD_H_ */

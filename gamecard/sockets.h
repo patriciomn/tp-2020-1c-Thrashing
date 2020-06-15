@@ -1,8 +1,27 @@
+/*
 #ifndef SOCKETS_H_
 #define SOCKETS_H_
 
-#include "gamecard.h"
+#include "../utils/utils.c"
+#include "gamecard.c"
 
+void suscripcion_colas_broker();
+void suscribirse_a_new_pokemon();
+void suscribirse_a_catch_pokemon();
+void suscribirse_a_get_pokemon();
+
+// Funciones Servidor
+
+void iniciar_servidor(void);
+void esperar_cliente(int socket_servidor);
+void atender_peticion(int socket_cliente, int cod_op);
+
+// sockets para recibir los mensajes
+int socket_cliente_np;
+int socket_cliente_cp;
+int socket_cliente_gp;
+
+/*
 enum TIPO{
 	//QUEUE_ID
 	NEW_POKEMON = 1,
@@ -72,14 +91,6 @@ typedef struct{
 	posiYcant pos[];
 }rtaGet;
 
-void suscripcion_colas_broker();
-void suscribirse_a_new_pokemon();
-void suscribirse_a_catch_pokemon();
-void suscribirse_a_get_pokemon();
-
-int crear_conexion();
-void iniciar_servidor(void);
-void esperar_cliente(int socket_servidor);
 void atender_peticion(int socket_cliente, int cod_op);
 void enviar_mensaje_suscripcion(enum TIPO cola, int socket_cliente, pid_t pid);
 void* serializar_paquete(t_paquete* paquete, int bytes);
@@ -98,8 +109,11 @@ void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon);
 
 get_pokemon* deserializar_get(void* buffer);
 
+
+// sockets para recibir los mensajes
 int socket_cliente_np;
 int socket_cliente_cp;
 int socket_cliente_gp;
 
-#endif /* SOCKETS_H_ */
+
+//#endif /* SOCKETS_H_ */
