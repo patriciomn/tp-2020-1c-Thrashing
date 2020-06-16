@@ -13,7 +13,7 @@ int main(int argc,char* argv[]){
 void iniciar_gameboy(int argc,char* argv[]){
 	logger = log_create("gameboy.log","gameboy",1,LOG_LEVEL_INFO);
 	config = leer_config("gameboy.config");
-	pid = config_get_int_value(config,"ID");
+	pid = getpid();
 
 	//argv[1]:proceso argv[2]:tipo_mensaje
 	int process,tipo_msg;
@@ -205,7 +205,6 @@ void suscriptor(int tipo){
 
 void fin_tiempo_handler(){
 	printf("GAMEBOY Desconectado\n");
-	close(conexion);
 	exit(0);
 }
 
@@ -226,6 +225,7 @@ void recibir_mensajes(int tiempo){
 		if(recv(conexion, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
 		switch(cod_op){
+		sleep(1);
 			case GET_POKEMON:
 				recibir_get_pokemon();
 				break;
@@ -518,7 +518,6 @@ void recibir_get_pokemon(){
 		enviar_ack(GET_POKEMON,id,pid,conexion);
 		free(get->name);
 		free(get);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -537,7 +536,6 @@ void recibir_new_pokemon(){
 		enviar_ack(NEW_POKEMON,id,pid,conexion);
 		free(new->name);
 		free(new);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -556,7 +554,6 @@ void recibir_catch_pokemon(){
 		enviar_ack(CATCH_POKEMON,id,pid,conexion);
 		free(catch->name);
 		free(catch);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -565,15 +562,15 @@ void recibir_catch_pokemon(){
 void recibir_caught_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 	void display(void* valor){
-		int id;
+		int id,id_correlacional;
 		memcpy(&id,valor,sizeof(int));
+		memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
 		caught_pokemon* caught = deserializar_caught(valor+sizeof(int));
-		log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID_Correlacional:%d Resultado:%d\n",id,caught->caught);
+		log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID:%d,ID_Correlacional:%d Resultado:%d\n",id,id_correlacional,caught->caught);
 		free(valor);
 		//conectar_proceso(BROKER);
 		enviar_ack(CAUGHT_POKEMON,id,pid,conexion);
 		free(caught);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -583,16 +580,16 @@ void recibir_appeared_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 
 	void display(void* valor){
-		int id;
+		int id,id_correlacional;
 		memcpy(&id,valor,sizeof(int));
-		appeared_pokemon* appeared = deserializar_appeared(valor);
-		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,appeared->name,appeared->pos.posx,appeared->pos.posy);
+		memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
+		appeared_pokemon* appeared = deserializar_appeared(valor+sizeof(int));
+		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d ID_Correlacional: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,id_correlacional,appeared->name,appeared->pos.posx,appeared->pos.posy);
 		free(valor);
 		//conectar_proceso(BROKER);
 		enviar_ack(APPEARED_POKEMON,id,pid,conexion);
 		free(appeared->name);
 		free(appeared);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -602,10 +599,11 @@ void recibir_localized_pokemon(){
 	t_list* paquete = recibir_paquete(conexion);
 
 	void display(void* valor){
-		int id;
+		int id,id_correlacional;
 		memcpy(&id,valor,sizeof(int));
-		localized_pokemon* localized = deserializar_localized(valor);
-		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s \n",id,localized->name);
+		memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
+		localized_pokemon* localized = deserializar_localized(valor+sizeof(int));
+		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d ID_Correlacional: %d Pokemon: %s \n",id,id_correlacional,localized->name);
 		void show(pos_cant* pos){
 			log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
 			free(pos);
@@ -617,7 +615,6 @@ void recibir_localized_pokemon(){
 		list_destroy(localized->pos_cant);
 		free(localized->name);
 		free(localized);
-		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);

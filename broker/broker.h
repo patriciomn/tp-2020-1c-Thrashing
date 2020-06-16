@@ -107,8 +107,8 @@ void display_cache();
 void handler_dump(int signo);
 void free_cache();
 void* memcpy_cache(particion*,uint32_t id_buf,uint32_t tipo_cola,void* destion,void* buf,uint32_t);
-void compactar_cache_particiones_dinamicas();
-void compactar_cache_buddy_system();
+void compactar_particiones_dinamicas();
+void consolidar_buddy_system();
 particion* algoritmo_particion_libre(uint32_t size);
 particion* particiones_dinamicas(uint32_t size);
 uint32_t calcular_size_potencia_dos(uint32_t size);
@@ -118,5 +118,5 @@ particion* buddy_system(uint32_t size);
 void delete_particion(particion* borrar);
 void limpiar_cache();
 char* get_cola(uint32_t);
-void juntar_espacios_libres();
+void consolidar_particiones_dinamicas();
 #endif /* CONEXIONES_H_ */

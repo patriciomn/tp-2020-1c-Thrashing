@@ -52,7 +52,7 @@ void agregar_a_paquete(t_paquete* paquete, void* valor, int tamanio){
 void enviar_paquete(t_paquete* paquete, int socket_cliente){
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
-	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
+	send(socket_cliente, a_enviar, bytes, 0);
 
 	free(a_enviar);
 }
@@ -148,6 +148,7 @@ localized_pokemon* deserializar_localized(void* buffer) {
 }
 
 void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
+	sleep(1);
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = tipo;
 	paquete->buffer = malloc(sizeof(t_buffer));
@@ -160,7 +161,7 @@ void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(cliente_fd, a_enviar, bytes, MSG_NOSIGNAL);
+	send(cliente_fd, a_enviar, bytes,0);
 	printf("ACK enviado\n");
 
 	free(a_enviar);
@@ -181,7 +182,7 @@ void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid){
 	int bytes = paquete->buffer->size + 2*sizeof(int);
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(socket_cliente, a_enviar, bytes, MSG_NOSIGNAL);
+	send(socket_cliente, a_enviar, bytes,0);
 
 	free(a_enviar);
 	free(paquete->buffer->stream);
