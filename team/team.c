@@ -368,7 +368,7 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 	}
 	pokemon* pok1 = pokemon_a_intercambiar(entre1,entre2);
 	pokemon* pok2 = pokemon_a_intercambiar(entre2,entre1);
-	printf("Pokemones Involucrados %s Y %s...\n",pok1->name,pok2->name);
+	//printf("Pokemones Involucrados %s Y %s...\n",pok1->name,pok2->name);
 	bool by_name1(pokemon* aux){
 		return aux->name == pok1->name;
 	}

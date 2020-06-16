@@ -13,8 +13,7 @@ int main(int argc,char* argv[]){
 void iniciar_gameboy(int argc,char* argv[]){
 	logger = log_create("gameboy.log","gameboy",1,LOG_LEVEL_INFO);
 	config = leer_config("gameboy.config");
-	pid = getpid();
-	printf("Pid:%d\n",pid);
+	pid = config_get_int_value(config,"ID");
 
 	//argv[1]:proceso argv[2]:tipo_mensaje
 	int process,tipo_msg;
@@ -206,6 +205,7 @@ void suscriptor(int tipo){
 
 void fin_tiempo_handler(){
 	printf("GAMEBOY Desconectado\n");
+	close(conexion);
 	exit(0);
 }
 
@@ -518,6 +518,7 @@ void recibir_get_pokemon(){
 		enviar_ack(GET_POKEMON,id,pid,conexion);
 		free(get->name);
 		free(get);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -536,6 +537,7 @@ void recibir_new_pokemon(){
 		enviar_ack(NEW_POKEMON,id,pid,conexion);
 		free(new->name);
 		free(new);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -554,6 +556,7 @@ void recibir_catch_pokemon(){
 		enviar_ack(CATCH_POKEMON,id,pid,conexion);
 		free(catch->name);
 		free(catch);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -570,6 +573,7 @@ void recibir_caught_pokemon(){
 		//conectar_proceso(BROKER);
 		enviar_ack(CAUGHT_POKEMON,id,pid,conexion);
 		free(caught);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -588,6 +592,7 @@ void recibir_appeared_pokemon(){
 		enviar_ack(APPEARED_POKEMON,id,pid,conexion);
 		free(appeared->name);
 		free(appeared);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);
@@ -612,6 +617,7 @@ void recibir_localized_pokemon(){
 		list_destroy(localized->pos_cant);
 		free(localized->name);
 		free(localized);
+		free(valor);
 	}
 	list_iterate(paquete,(void*)display);
 	list_destroy(paquete);

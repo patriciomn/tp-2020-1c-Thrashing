@@ -1,6 +1,5 @@
-
-#ifndef CONEXIONES_H_
-#define CONEXIONES_H_
+#ifndef BROKER_H_
+#define BROKER_H_
 
 #include"../utils/utils.c"
 #include<stdio.h>
@@ -19,7 +18,6 @@
 #include<assert.h>
 #include<signal.h>
 #include<semaphore.h>
-#include <uuid/uuid.h>
 
 typedef struct{
 	char* ip_broker;
@@ -42,14 +40,17 @@ typedef struct{
 typedef struct _cache{
 	uint32_t libre;
 	uint32_t size;
+	uint32_t buddy_size;
 	uint32_t id_particion;
-	uint32_t id_buffer;
+	uint32_t id_mensaje;
 	uint32_t tipo_cola;
 	void* inicio;
 	void* fin;
 	int start;
 	int end;
-	time_t tiempo;
+	time_t tiempo_inicial;
+	time_t tiempo_actual;
+	int intervalo;
 }particion;
 
 typedef struct{
@@ -96,7 +97,7 @@ void borrar_mensaje(mensaje* m);
 bool confirmado_todos_susciptors_mensaje(mensaje* m);
 bool enviado_ack_suscriptor(mensaje* m,suscriber* sus);
 //--------------------------------------------------------------------------------------------------------
-
+void sig_handler();
 void iniciar_memoria();
 void iniciar_config(char* broker_config);
 void iniciar_semaforos();
@@ -106,7 +107,8 @@ void display_cache();
 void handler_dump(int signo);
 void free_cache();
 void* memcpy_cache(particion*,uint32_t id_buf,uint32_t tipo_cola,void* destion,void* buf,uint32_t);
-void compactar_cache();
+void compactar_cache_particiones_dinamicas();
+void compactar_cache_buddy_system();
 particion* algoritmo_particion_libre(uint32_t size);
 particion* particiones_dinamicas(uint32_t size);
 uint32_t calcular_size_potencia_dos(uint32_t size);
@@ -115,4 +117,6 @@ particion* algoritmo_reemplazo();
 particion* buddy_system(uint32_t size);
 void delete_particion(particion* borrar);
 void limpiar_cache();
+char* get_cola(uint32_t);
+void juntar_espacios_libres();
 #endif /* CONEXIONES_H_ */
