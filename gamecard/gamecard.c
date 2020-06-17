@@ -917,7 +917,7 @@ int fileSize(char* file) {
     fclose(fp); 
     return res; 
 } 
-FILE* existePokemon(char* nombrePokemon){
+/*FILE* existePokemon(char* nombrePokemon){
     char* pathArchivo = string_new();
     string_append(&pathArchivo,PATH_POKECARPETA);
     string_append_with_format(&pathArchivo,"%s%s%s%s", nombrePokemon, "/",nombrePokemon,POKEMON_FILE_EXT);
@@ -927,7 +927,7 @@ FILE* existePokemon(char* nombrePokemon){
     printf("\nDeberia impreso el puntero\n");
     return fp;
 
-}
+}*/
 char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
 {
     fseek (fp, 0, SEEK_END);
@@ -950,51 +950,69 @@ char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
     return *filebuf;
 }
 
-//CAMBIE  NOMBRE PORQUE ROMPE AHORA QUE ESTAN LOS UTILS :)
 
-void catchPokemon(char* pokemon,int posx,int posy){}
-
-/*rtaGet* getPokemon(int idMensaje, char* pokemon){
-    rtaGet* respuesta = malloc(sizeof(rtaGet));
+/*
+rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
+	rtaGet* respuesta = malloc(sizeof(rtaGet));
     respuesta->id_mensaje = idMensaje;
     respuesta->name = pokemon;
-    FILE *fp = existePokemon(pokemon);
-    printf("%p",fp);
-    if(fp != NULL){
-        char* pathMetadata = string_new();
-        string_append(&pathMetadata,PATH_POKECARPETA);
-        string_append_with_format(&pathMetadata,"%s%s", pokemon ,METADATA_FILE);
-        t_config *metadata_pokemon = config_create(pathMetadata);
-        
-        char* abierto = config_get_string_value(metadata_pokemon,"OPEN");
-        if(abierto == "Y"){
-            //finalizar hilo y reintentar despues del tiempo que dice el config
-        } else{
-            //settear OPEN = Y
-            log_warning(logger, "NO HAY ESPACIO SUFICIENTE EN EL BITMAP");
+	char *path_directorio_pokemon = string_new();
+		string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", pokemon);
+		log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
+
+		if(opendir(path_directorio_pokemon) == NULL) { // si existe o no el directorio (FAIL)
+			log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
+		    //si no existe se devuelve el nombre y el id, los cuales ya estan cargados
+		} else {
+			char *valor = valor_campo_directorio_metadata(path_directorio_pokemon);
+			if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
+		    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
+		    } else {
+		    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
+		    	//mutex_lock
+    		char *valor_open = valor_campo_directorio_metadata(path_directorio_pokemon);
+    		if(string_equals_ignore_case(valor_open, "N")) {
+
+    			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
+    			// mutex_unlock
+		
+            
             char* pathFILE = string_new();
-            string_append(&pathFILE,PATH_POKECARPETA);
-            string_append_with_format(&pathFILE,"%s%s%s%s", pokemon, "/",pokemon, POKEMON_FILE_EXT);
+            string_append(&pathFILE,path_directorio_pokemon);
+            string_append_with_format(&pathFILE,"%s%s%s", "/",pokemon, POKEMON_FILE_EXT);
+			FILE *fp =fopen(pathFILE, "r");
             char* scaneo = NULL;
             long fplen = (long) fileSize(pathFILE);
             read_file_into_buf (&scaneo, fplen, fp);
-            log_info(logger, "AGREGANDO BLOQUE %d A LA ESTRUCTURA BLOCKS", string_length(scaneo));
+            log_info(logger, "%d es la longitud del scaneo", string_length(scaneo));
               printf("deberia saber el length\n");
             //settear OPEN = N
+			//mutex_lock
+			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+    		// mutex_unlock
+			free(pathFILE);
+			free(fp);
+
+
             //falta separar uno a uno las lineas
 
             //setear la respuesta
 
             free(scaneo);
-        }
-    
-    free(abierto);
-    free(pathMetadata);
+			
+		    } else{// en caso de que este abierto
+				  //finalizar hilo y reintentar despues del tiempo que dice el config
+			}
+				
+		}
+
+		    free(path_directorio_pokemon);
+			
     }
 
     return respuesta;
-}*/
-
+}
+*/
 
 //-----------------------------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------------------------

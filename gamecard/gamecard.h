@@ -40,7 +40,7 @@
 #define POKEMON_FILE_EXT ".txt"
 #define TXT_FILE_EXT ".txt"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
-#define PATH_POKECARPETA "/home/utnso/desktop/tall-grass/files/"
+
 
 #define GUION "-"
 #define IGUAL "="
@@ -84,6 +84,19 @@ typedef struct {
 	int ack_catch;
 	int ack_get;
 }ack_t;
+
+
+typedef struct{
+	int posX;
+	int posY;
+	int cant;
+}posiYcant;
+
+typedef struct{
+	int id_mensaje;
+	char* name;
+	posiYcant pos[];
+}rtaGet;
 
 ack_t acks_gamecard;
 
@@ -151,14 +164,13 @@ void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 int fileSize(char* file);
-FILE* existePokemon(char* nombrePokemon);
+//FILE* existePokemon(char* nombrePokemon);
 char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 
 //void operacion_new_pokemon(new_pokemon *newPokemon);
-void catchPokemon(char* pokemon,int posx,int posy);
-//rtaGet* getPokemon(int idMensaje, char* pokemon);
+//rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
