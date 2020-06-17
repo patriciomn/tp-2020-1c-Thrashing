@@ -120,8 +120,12 @@ void bloquear_entrenador(entrenador* entre);
 void despertar_entrenador(entrenador* entre);
 void salir_entrenador(entrenador* entre);
 void move_entrenador(entrenador* entre,int,int);
+void movimiento_ejex_entrenador(entrenador* entre,int posx);
+void movimiento_ejey_entrenador(entrenador* entre,int posx);
 bool atrapar_pokemon(entrenador*,pokemon*);
 void intercambiar_pokemon(entrenador* entre1,entrenador* entre2);
+void actuar_intercambio(entrenador* entre1,entrenador* entre2,pokemon* pok1,pokemon* pok2);
+void agregar_eliminar_pokemon(entrenador* entre,pokemon* pok_agregar,pokemon* pok_eliminar);
 
 pokemon* crear_pokemon(char* name);
 void set_pokemon(pokemon* pok,int posx,int posy);
@@ -130,8 +134,8 @@ bool verificar_pokemon_exceso_no_necesario(entrenador* entre);
 bool verificar_espera_circular();
 bool pokemon_exceso(entrenador* entre,char* name);
 bool verificar_deadlock_equipo();
-pokemon* pokemon_a_intercambiar(entrenador* entre,entrenador*);
-
+pokemon* pokemon_retenido_espera(entrenador* entre1,entrenador* entre2);
+pokemon* pokemon_a_intercambiar(entrenador* entre);
 bool contener_pokemon(entrenador* entre,char* name);
 bool cumplir_objetivo_entrenador(entrenador* entre);
 int cant_especie_pokemon(entrenador* entre,char* name);

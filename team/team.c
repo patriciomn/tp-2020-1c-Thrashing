@@ -152,6 +152,7 @@ void crear_entrenador(int tid,int posx,int posy,char* pokemones,char* objetivos)
 	}
 	list_add(equipo->entrenadores,entre);
 	printf("Entrenador%c En Posicion: [%d,%d]\n",entre->tid,entre->posx,entre->posy);
+	sleep(1);
 }
 
 void salir_equipo(){
@@ -224,7 +225,7 @@ void ejecutar_entrenador(entrenador* entre){
 		}
 		else{//DEADLOCK
 			bool entrenador_espera_deadlock(entrenador* aux){
-				return aux->estado == BLOCKED && verificar_deadlock_entrenador(aux);
+				return aux->estado == BLOCKED && verificar_deadlock_entrenador(aux) && aux->tid != entre->tid;
 			}
 			t_list* entrenadores = equipo->entrenadores;
 			entrenador* entre2 = list_find(entrenadores,(void*)entrenador_espera_deadlock);
@@ -237,7 +238,6 @@ void ejecutar_entrenador(entrenador* entre){
 			else if(cumplir_objetivo_entrenador(entre2)){
 				log_info(logger,"Deadlock Del entrenador%c Ha Solucionado",entre2->tid);
 				salir_entrenador(entre2);
-				sem_post(&semExecTeam);
 			}
 			else if(cumplir_objetivo_entrenador(entre)){
 				log_info(logger,"Deadlock Del entrenador%c Ha Solucionado",entre->tid);
@@ -311,21 +311,54 @@ void salir_entrenador(entrenador* entre){
 		pthread_rwlock_wrlock(&lockEntrenadores);
 		list_remove_by_condition(equipo->entrenadores,(void*)by_tid);
 		list_add(equipo->exit,entre);
+		pthread_cancel(entre->hilo);
 		pthread_rwlock_unlock(&lockEntrenadores);
 	}
 }
 
 void move_entrenador(entrenador* entre,int posx,int posy){
 	log_info(logger,"entrenador%c Moviendose A Posicion: [%d,%d]",entre->tid,posx,posy);
-	int ciclos = abs(entre->posx-posx)+abs(entre->posy-posy) * CICLOS_MOVER;
-	for(int i=0;i<ciclos;i++){
-		printf("entrenador%c moviendose ...\n",entre->tid);
+
+	int ciclosx = abs(entre->posx-posx) * CICLOS_MOVER;
+	int ciclosy = abs(entre->posy-posy) * CICLOS_MOVER;
+	for(int i=0;i<ciclosx;i++){
+		printf("entrenador%c Moviendose Por Eje X ...\n",entre->tid);
+		movimiento_ejex_entrenador(entre,posx);
 		entre->service_time++;
 		sumar_ciclos(entre,1);
 		sleep(datos_config->retardo_cpu);
 	}
-	entre->posx = posx;
-	entre->posy = posy;
+	for(int i=0;i<ciclosy;i++){
+		printf("entrenador%c Moviendose Por Eje Y ...\n",entre->tid);
+		movimiento_ejey_entrenador(entre,posy);
+		entre->service_time++;
+		sumar_ciclos(entre,1);
+		sleep(datos_config->retardo_cpu);
+	}
+}
+
+void movimiento_ejex_entrenador(entrenador* entre,int posx){
+	if(entre->posx != posx){
+		if(entre->posx < posx){
+			entre->posx++;
+		}
+		else if(entre->posx > posx){
+			entre->posx--;
+		}
+	}
+	printf("entrenador%c En Posicion:[%d,%d]\n",entre->tid,entre->posx,entre->posy);
+}
+
+void movimiento_ejey_entrenador(entrenador* entre,int posy){
+	if(entre->posy != posy){
+		if(entre->posy < posy){
+			entre->posy++;
+		}
+		else if(entre->posy > posy){
+			entre->posy--;
+		}
+	}
+	printf("entrenador%c En Posicion:[%d,%d]\n",entre->tid,entre->posx,entre->posy);
 }
 
 bool atrapar_pokemon(entrenador* entre,pokemon* pok){
@@ -360,27 +393,51 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 
 void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
 	log_info(logger,"entrenador%c y entrenador%c Intercambian Pokemones",entre1->tid,entre2->tid);
+	pokemon* retenido1 = pokemon_retenido_espera(entre1,entre2);
+	pokemon* retenido2 = pokemon_retenido_espera(entre2,entre1);
+	if(retenido1 != NULL && retenido2 != NULL){
+		actuar_intercambio(entre1,entre2,retenido1,retenido2);
+		agregar_eliminar_pokemon(entre1,retenido2,retenido1);
+		agregar_eliminar_pokemon(entre2,retenido1,retenido2);
+	}
+	else if(retenido1 == NULL){
+		if(retenido2 == NULL){
+			pokemon* pok1 = pokemon_a_intercambiar(entre1);
+			pokemon* pok2 = pokemon_a_intercambiar(entre2);
+			actuar_intercambio(entre1,entre2,pok1,pok2);
+			agregar_eliminar_pokemon(entre1,pok2,pok1);
+			agregar_eliminar_pokemon(entre2,pok1,pok2);
+		}
+		else{
+			pokemon* pok1 = pokemon_a_intercambiar(entre1);
+			actuar_intercambio(entre1,entre2,pok1,retenido2);
+			agregar_eliminar_pokemon(entre1,retenido2,pok1);
+			agregar_eliminar_pokemon(entre2,pok1,retenido2);
+		}
+	}
+	else if(retenido2 == NULL){
+		pokemon* pok2 = pokemon_a_intercambiar(entre2);
+		actuar_intercambio(entre1,entre2,retenido1,pok2);
+		agregar_eliminar_pokemon(entre1,pok2,retenido1);
+		agregar_eliminar_pokemon(entre2,retenido1,pok2);
+	}
+}
+
+void actuar_intercambio(entrenador* entre1,entrenador* entre2,pokemon* pok1,pokemon* pok2){
 	for(int i=0;i<CICLOS_INTERCAMBIAR;i++){
-		printf("entrenador%c y entrenador%c intercambiando pokemones ...\n",entre1->tid,entre2->tid);
+		printf("entrenador%c y entrenador%c intercambiando pokemones %s Y %s...\n",entre1->tid,entre2->tid,pok1->name,pok2->name);
 		sleep(datos_config->retardo_cpu);
 		entre1->service_time++;
 		sumar_ciclos(entre1,1);
 	}
-	pokemon* pok1 = pokemon_a_intercambiar(entre1,entre2);
-	pokemon* pok2 = pokemon_a_intercambiar(entre2,entre1);
-	//printf("Pokemones Involucrados %s Y %s...\n",pok1->name,pok2->name);
-	bool by_name1(pokemon* aux){
-		return aux->name == pok1->name;
+}
+
+void agregar_eliminar_pokemon(entrenador* entre,pokemon* pok_agregar,pokemon* pok_eliminar){
+	bool by_name(pokemon* aux){
+		return aux->name == pok_eliminar->name;
 	}
-	bool by_name2(pokemon* aux){
-		return aux->name == pok2->name;
-	}
-	pthread_rwlock_wrlock(&lockEntrePoks);
-	list_add(entre1->pokemones,pok2);
-	list_add(entre2->pokemones,pok1);
-	list_remove_by_condition(entre1->pokemones,(void*)by_name1);
-	list_remove_by_condition(entre2->pokemones,(void*)by_name2);
-	pthread_rwlock_unlock(&lockEntrePoks);
+	list_add(entre->pokemones,pok_agregar);
+	list_remove_by_condition(entre->pokemones,(void*)by_name);
 }
 
 //PLANIFICACION----------------------------------------------------------------------------------------------------------------------
@@ -503,7 +560,7 @@ bool verificar_deadlock_entrenador(entrenador* entre){
 bool verificar_deadlock_equipo(){
 	return list_all_satisfy(equipo->entrenadores,(void*)verificar_deadlock_entrenador)
 			&& list_all_satisfy(equipo->entrenadores,(void*)verificar_pokemon_exceso_no_necesario)
-			&& list_all_satisfy(equipo->entrenadores,(void*)verificar_espera_circular);
+			&& verificar_espera_circular();
 }
 
 bool verificar_pokemon_exceso_no_necesario(entrenador* entre){
@@ -527,25 +584,46 @@ bool verificar_espera_circular(){
 	bool res = 0;
 	int size = list_size(equipo->entrenadores);
 	for(int i=0;i<size-1;i++){
-		pokemon* retenido = pokemon_a_intercambiar(list_get(equipo->entrenadores,i),list_get(equipo->entrenadores,i+1));
-		if(retenido != NULL){
+		entrenador* aux1 = list_get(equipo->entrenadores,i);
+		entrenador* aux2 = list_get(equipo->entrenadores,i+1);
+		bool retencion_espera(pokemon* pok){
+			return !necesitar_pokemon(aux1,pok->name) && necesitar_pokemon(aux2,pok->name);
+		}
+
+		if(list_any_satisfy(aux1->pokemones,(void*)retencion_espera)){
 			res = 1;
 		}
 		else{
 			res = 0;
 		}
 	}
-	pokemon* retenido = pokemon_a_intercambiar(list_get(equipo->entrenadores,size-1),list_get(equipo->entrenadores,0));
-	if(retenido != NULL){
+	entrenador* primero = list_get(equipo->entrenadores,0);
+	entrenador* ultimo = list_get(equipo->entrenadores,size-1);
+	bool retencion_espera(pokemon* pok){
+		return !necesitar_pokemon(ultimo,pok->name) && necesitar_pokemon(primero,pok->name);
+	}
+
+	if(list_any_satisfy(ultimo->pokemones,(void*)retencion_espera)){
 		res = 1;
 	}
 	return res;
 }
 
-pokemon* pokemon_a_intercambiar(entrenador* entre1,entrenador* entre2){
+pokemon* pokemon_a_intercambiar(entrenador* entre1){
 	t_list* elegidos;
 	bool elegir(pokemon* aux){
-		return necesitar_pokemon(entre2,aux->name) && !necesitar_pokemon(entre1,aux->name);
+		return !necesitar_pokemon(entre1,aux->name);
+	}
+	elegidos = list_filter(entre1->pokemones,(void*)elegir);
+	pokemon* pok = list_get(elegidos,0);
+	list_destroy(elegidos);
+	return pok;
+}
+
+pokemon* pokemon_retenido_espera(entrenador* entre1,entrenador* entre2){
+	t_list* elegidos;
+	bool elegir(pokemon* aux){
+		return !necesitar_pokemon(entre1,aux->name) && necesitar_pokemon(entre2,aux->name);
 	}
 	elegidos = list_filter(entre1->pokemones,(void*)elegir);
 	pokemon* pok = list_get(elegidos,0);
@@ -859,10 +937,11 @@ void recibir_localized_pokemon(){
 		else{
 			t_list* paquete = recibir_paquete(conexion_broker->localized);
 			void display(void* valor){
-				int id;
+				int id,id_correlacional;
 				memcpy(&id,valor,sizeof(int));
-				localized_pokemon* localized = deserializar_localized(valor);
-				log_info(logger,"Llega Un Mensaje Tipo: LOCALIZED_POKEMON: ID: %d Pokemon: %s \n",id,localized->name);
+				memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
+				localized_pokemon* localized = deserializar_localized(valor+sizeof(int));
+				log_info(logger,"Llega Un Mensaje Tipo: LOCALIZED_POKEMON: ID: %d ID_Correlacional: %d Pokemon: %s \n",id,id_correlacional,localized->name);
 				void show(pos_cant* pos){
 					log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
 				}
@@ -908,10 +987,11 @@ void recibir_caught_pokemon(){
 		else{
 			t_list* paquete = recibir_paquete(conexion_broker->caught);
 			void display(void* valor){
-				int id,res;
+				int id,id_correlacional,res;
 				memcpy(&id,valor,sizeof(int));
-				memcpy(&res,valor+sizeof(int),sizeof(int));
-				log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID:%d Resultado:%d \n",id,res);
+				memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
+				memcpy(&res,valor+sizeof(int)*2,sizeof(int));
+				log_info(logger,"Llega Un Mensaje Tipo: CAUGHT_POKEMON ID:%d ID_Correlacional: %d Resultado:%d \n",id,id_correlacional,res);
 				enviar_ack(CAUGHT_POKEMON,id,equipo->pid,conexion_broker->caught);
 
 				bool by_tipo_id(msg* aux){
@@ -958,10 +1038,11 @@ void recibir_appeared_pokemon(){
 		else{
 			t_list* paquete = recibir_paquete(conexion_broker->appeared);
 			void display(void* valor){
-				int id;
+				int id,id_correlacional;
 				memcpy(&id,valor,sizeof(int));
-				appeared_pokemon* appeared_pokemon = deserializar_appeared(valor);
-				log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,appeared_pokemon->name,appeared_pokemon->pos.posx,appeared_pokemon->pos.posy);
+				memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
+				appeared_pokemon* appeared_pokemon = deserializar_appeared(valor+sizeof(int));
+				log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d ID_Correlacional: %d Pokemon: %s  Pos X:%d  Pos Y:%d\n",id,id_correlacional,appeared_pokemon->name,appeared_pokemon->pos.posx,appeared_pokemon->pos.posy);
 				enviar_ack(APPEARED_POKEMON,id,equipo->pid,conexion_broker->appeared);
 
 				if(requerir_atrapar(appeared_pokemon->name)){

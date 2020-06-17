@@ -147,6 +147,7 @@ void esperar_cliente(int socket_servidor){
 	int socket_cliente = accept(socket_servidor, (void*) &dir_cliente, &tam_direccion);
 	int* cliente_fd = malloc(sizeof(int));
 	*cliente_fd = socket_cliente;
+	sleep(1);
 	log_info(logger,"Proceso Conectado Con Socket %d",*cliente_fd);
 	pthread_create(&thread_servidor,NULL,(void*)serve_client,cliente_fd);
 	pthread_detach(thread_servidor);
@@ -547,6 +548,7 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 
 	t_paquete* enviar = crear_paquete(tipo_cola);
 	void agregar(particion* aux){
+		sleep(1);
 		agregar_paquete(enviar,aux,sus,tipo_cola);
 		aux->tiempo_actual = time(NULL);
 	}
@@ -623,7 +625,6 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 		}
 	}
 	agregar_a_paquete(enviar,buffer,size);
-
 	bool by_id(mensaje* m){
 		return m->id == aux->id_mensaje;
 	}
@@ -632,7 +633,6 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 	list_add(m->suscriptors_enviados,sus);
 
 	free(buffer);
-	sleep(1);
 }
 
 void enviar_id(mensaje *item,int socket_cliente){
@@ -721,7 +721,6 @@ particion* malloc_cache(uint32_t size){
 		printf("Size Superado Al Size Maximo De La Memoria!\n");
 		return 0;
 	}
-	sleep(1);
 	elegida->tiempo_inicial = time(NULL);
 	elegida->tiempo_actual = time(NULL);
 	elegida->intervalo = 0;
@@ -970,10 +969,10 @@ void consolidar_particiones_dinamicas(){
 		particion* libre = list_find(cache,(void*)existe_hermano);
 		void aplicar(particion* aux){
 			bool anterior(particion* aux){
-				return aux->end == libre->start && aux->libre == 'L';
+				return aux->start != libre->start && aux->end == libre->start && aux->libre == 'L';
 			}
 			bool next(particion* aux){
-				return aux->start == libre->end && aux->libre == 'L';
+				return aux->start != libre->start && aux->start == libre->end && aux->libre == 'L';
 			}
 			particion* ant = list_find(cache,(void*)anterior);
 			particion* pos = list_find(cache,(void*)next);
@@ -1051,7 +1050,6 @@ void consolidar_buddy_system(){
 			}
 		}
 		aplicar(libre);
-		sleep(1);
 	}
 	else{
 		return;
@@ -1094,11 +1092,6 @@ particion* algoritmo_reemplazo(){
 			return aux1->intervalo > aux2->intervalo;
 		}
 		list_sort(ocupadas,(void*)by_intervalo);
-
-		void i(particion* aux){
-			printf("p %d intervalo %d\n",aux->id_particion,aux->intervalo);
-		}
-		list_iterate(ocupadas,(void*)i);
 		victima = list_get(ocupadas,0);
 		delete_particion(victima);
 	}
