@@ -38,6 +38,7 @@
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
 #define POKEMON_FILE_EXT ".txt"
+#define TXT_FILE_EXT ".txt"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 #define PATH_POKECARPETA "/home/utnso/desktop/tall-grass/files/"
 
@@ -124,12 +125,25 @@ void crear_archivos_metadata(char *path_metadata);
 int existe_archivo_pokemon(char *path);
 char* crear_directorio_pokemon(char *path_pto_montaje, char* pokemon);
 
-//void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon);
-void crear_metadata_pokemon(char *path_pokeflie, char *pokemon, int file_size);
+void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int nro_bloque_libre);
+
+void crear_metadata_pokemon(char *path_pokeflie, char *pokemon);
 
 void escribir_linea_en_archivo(FILE *punteroArchivo, int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 
-bool hay_cantidad_de_bloques_libres(int cantidad_de_bloques_necesaria);
+bool hay_cantidad_de_bloques_libres(char *path_dir_pokemon, char *datos_a_agregar);
+
+bool hay_espacio_ultimo_bloque(char *path_dir_pokemon, char *datos_a_agregar);
+
+void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon);
+
+void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon, char *linea);
+
+void escribir_archivo(char *path_archivo, char *linea);
+
+void escribir_blocks(int ultimo_bloque, int nuevo_bloque, char *linea);
+
+void escribir_block(int ultimo_bloque, char *linea);
 
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
@@ -146,12 +160,15 @@ int tipo_mensaje(char* tipo_mensaje);
 void catchPokemon(char* pokemon,int posx,int posy);
 //rtaGet* getPokemon(int idMensaje, char* pokemon);
 
-void escribir_nueva_linea_en_archivo(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
+void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
 
 // Funciones Extras
 
 void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *valor); //  la ruta tiene que ser: [pto_de_montaje]/files/[nombre_del_pokemon]
+char* valor_campo_directorio_metadata(char *ruta_dir_pokemon);
+int ultimo_bloque_array_blocks(char *path_directorio_pokemon);
+int valor_campo_size_metadata(char *ruta_dir_pokemon);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
