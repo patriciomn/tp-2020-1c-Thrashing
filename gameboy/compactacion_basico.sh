@@ -8,4 +8,4 @@
 
 ./gameboy SUSCRIPTOR CAUGHT_POKEMON 10
 
-./gameboy BROKER CATCH_POKEMON Vaporeon 4 5
+./gameboy BROKER NEW_POKEMON Vaporeon 4 5 2

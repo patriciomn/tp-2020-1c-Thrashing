@@ -36,7 +36,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_new_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			else{
@@ -45,7 +45,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_new_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),atoi(argv[7]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 
@@ -58,7 +58,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_catch_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			else{
@@ -67,7 +67,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_catch_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			break;
@@ -79,7 +79,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_appeared_pokemon_broker(argv[3],atoi(argv[4]),atoi(argv[5]),atoi(argv[6]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}else{
 				if(argv[3]!=NULL &&argv[4]!=NULL&&argv[5]!=NULL){
@@ -87,7 +87,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_appeared_pokemon(argv[3],atoi(argv[4]),atoi(argv[5]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			break;
@@ -98,7 +98,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 				enviar_mensaje_caught_pokemon(atoi(argv[3]),atoi(argv[4]),conexion);
 			}
 			else{
-				log_error(logger,"Parametros Incompletos");
+				printf("\033[1;31mParametros Incompletos\033[0m\n");
 			}
 			break;
 		case GET_POKEMON:
@@ -109,7 +109,7 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_get_pokemon_broker(argv[3],conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			else{
@@ -118,12 +118,12 @@ void iniciar_gameboy(int argc,char* argv[]){
 					enviar_mensaje_get_pokemon(argv[3],atoi(argv[4]),conexion);
 				}
 				else{
-					log_error(logger,"Parametros Incompletos");
+					printf("\033[1;31mParametros Incompletos\033[0m\n");
 				}
 			}
 			break;
 		default:
-			log_error(logger,"TIPO_MENSAJE INVALIDO!");
+			printf("\033[1;31mTIPO DE MENSAJE INVALIDO!\033[0m\n");
 			exit(0);
 	}
 }
@@ -191,7 +191,7 @@ void conectar_proceso(int proceso){
 			log_info(logger,"Conectado A GAMECARD");
 			break;
 		case -1:
-			log_error(logger,"PROCESO INVALIDO");
+			printf("\033[1;31mPROCESO INVALIDO\033[0m\n");
 			exit(0);
 	}
 	conexion = crear_conexion(ip,puerto);

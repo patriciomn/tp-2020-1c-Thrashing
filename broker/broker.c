@@ -49,7 +49,7 @@ void iniciar_broker(void){
 	logger = log_create(datos_config->log_file,"broker",1,LOG_LEVEL_INFO);
 	dump = log_create("dump.log","broker",1,LOG_LEVEL_INFO);
 	iniciar_colas_mensaje();
-	printf("BROKER START!\n");
+	printf("\033[1;33mBROKER START!\033[0m\n");
 	iniciar_cache();
 	iniciar_servidor();
 }
@@ -157,11 +157,11 @@ void serve_client(int* socket){
 	int cod_op;
 
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
-		printf("ERROR: socket error" );
+		printf("\033[0;31mERROR: socket error\033[0m\n" );
 		pthread_exit(NULL);	
 	}
 	if (cod_op <= 0 ){
-		printf("Se Desconectó El Socket: %d", *socket);
+		printf("\033[0;31mSe Desconectó El Socket: %d\033[0m\n", *socket);
 		pthread_exit(NULL);
 	}	
 
@@ -246,7 +246,7 @@ void atender_suscripcion(int cliente_fd){
 	pid_t pid;
 	memcpy(&queue_id,msg,sizeof(uint32_t));
 	memcpy(&pid,msg+sizeof(uint32_t),sizeof(pid_t));
-	printf("Suscripcion:Pid:%d|Queue_id:%d|Socket:%d\n",pid,queue_id,cliente_fd);
+	printf("\033[1;35mSuscripcion:Pid:%d|Queue_id:%d|Socket:%d\033[0m\n",pid,queue_id,cliente_fd);
 
 	suscriber * sus = malloc(sizeof(suscriber));
 	sus->cliente_fd = cliente_fd;
@@ -286,7 +286,7 @@ void atender_ack(int cliente_fd){
 		memcpy(&(id), msg, sizeof(int));
 		memcpy(&pid,msg+sizeof(int),sizeof(pid_t));
 
-		printf("ACK Recibido:Proceso:%d,Tipo:%s,ID:%d\n",pid,get_cola(tipo),id);
+		printf("\033[1;35mACK Recibido:Proceso:%d,Tipo:%s,ID:%d\033[0m\n",pid,get_cola(tipo),id);
 
 		bool by_id(mensaje* aux){
 			return aux->id == id;
@@ -305,7 +305,7 @@ void atender_ack(int cliente_fd){
 			return list_any_satisfy(item->suscriptors_ack,(void*)by_pid);
 		}
 		if(confirmado_todos_susciptors_mensaje(item) == 1){
-			printf("Mensaje Ya Ha Recibido Los ACKs De Todos Sus Suscriptors\n");
+			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs De Todos Sus Suscriptors\033[0m\n");
 			//borrar_mensaje(item);
 		}
 		free(msg);
@@ -348,7 +348,7 @@ void borrar_mensaje(mensaje* m){
 //recibir mensajes==================================================================================================================================================================
 void mensaje_new_pokemon(void* msg,int cliente_fd){
 	new_pokemon* new = deserializar_new(msg);
-	printf("Datos Recibidos: NEW_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]|Cantidad:%d\n",new->name,new->name_size,new->pos.posx,new->pos.posy,new->cantidad);
+	printf("\033[1;35mDatos Recibidos: NEW_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]|Cantidad:%d\033[0m\n",new->name,new->name_size,new->pos.posx,new->pos.posy,new->cantidad);
 
 	mensaje* item = crear_mensaje(NEW_POKEMON,cliente_fd,cola_new->id,new);
 
@@ -373,7 +373,7 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	int correlation_id;
 	memcpy(&correlation_id, msg, sizeof(int));
 	appeared_pokemon* appeared = deserializar_appeared(msg);
-	printf("Datos Recibidos:APPEARED_POKEMON:Correlation_ID:%d|Pokemon:%s|Size:%d|Pos:[%d,%d]\n",correlation_id,appeared->name,appeared->name_size,appeared->pos.posx,appeared->pos.posy);
+	printf("\033[1;35mDatos Recibidos:APPEARED_POKEMON:Correlation_ID:%d|Pokemon:%s|Size:%d|Pos:[%d,%d]\033[0m\n",correlation_id,appeared->name,appeared->name_size,appeared->pos.posx,appeared->pos.posy);
 
 	mensaje* item = crear_mensaje(APPEARED_POKEMON,cliente_fd,cola_appeared->id,appeared);
 	item->id_correlacional = correlation_id;
@@ -405,7 +405,7 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 
 void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	catch_pokemon* catch = deserializar_catch(msg);
-	printf("Datos Recibidos:CATCH_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]\n",catch->name,catch->name_size,catch->pos.posx,catch->pos.posy);
+	printf("\033[1;35mDatos Recibidos:CATCH_POKEMON:Pokemon:%s|Size:%d|Pos:[%d,%d]\033[0m\n",catch->name,catch->name_size,catch->pos.posx,catch->pos.posy);
 	mensaje* item = crear_mensaje(CATCH_POKEMON,cliente_fd,cola_catch->id,catch);
 
 	//almacena
@@ -429,7 +429,7 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	int correlation_id;
 	memcpy(&correlation_id, msg, sizeof(int));
 	caught_pokemon* caught = deserializar_caught(msg);
-	printf("Datos Recibidos:CAUGHT_POKEMON:Correlation_id:%d|Resultado:%d\n",correlation_id,caught->caught);
+	printf("\033[1;35mDatos Recibidos:CAUGHT_POKEMON:Correlation_id:%d|Resultado:%d\033[0m\n",correlation_id,caught->caught);
 
 	mensaje* item = crear_mensaje(CAUGHT_POKEMON,cliente_fd,cola_caught->id,caught);
 	item->id_correlacional = correlation_id;
@@ -459,7 +459,7 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 
 void mensaje_get_pokemon(void* msg,int cliente_fd){
 	get_pokemon* get = deserializar_get(msg);
-	printf("Datos Recibidos:GET_POKEMON:Pokemon:%s|Size:%d\n",get->name,get->name_size);
+	printf("\033[1;35mDatos Recibidos:GET_POKEMON:Pokemon:%s|Size:%d\033[0m\n",get->name,get->name_size);
 
 	mensaje* item = crear_mensaje(GET_POKEMON,cliente_fd,cola_get->id,get);
 
@@ -485,7 +485,7 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	int correlation_id;
 	memcpy(&correlation_id, msg, sizeof(int));
 	localized_pokemon* localized = deserializar_localized(msg);
-	printf("Datos Recibidos:LOCALIZED_POKEMON:Correlation_id:%d|Pokemon:%s|Size:%d|Cant_posiciones:%d\n",correlation_id,localized->name,localized->name_size,localized->cantidad_posiciones);
+	printf("\033[1;35mDatos Recibidos:LOCALIZED_POKEMON:Correlation_id:%d|Pokemon:%s|Size:%d|Cant_posiciones:%d\033[0m\n",correlation_id,localized->name,localized->name_size,localized->cantidad_posiciones);
 	void show(pos_cant* pos){
 		printf("Pos:[%d,%d]|Cantidad:%d\n",pos->posx,pos->posy,pos->cant);
 		free(pos);
@@ -682,13 +682,13 @@ particion* malloc_cache(uint32_t size){
 			bool libre_suficiente(particion* aux){
 				return aux->libre == 'L' && aux->size >= datos_config->tamanio_min_particion && aux->size >= size;
 			}
-			printf("==========PARTICIONES DINAMICAS==========\n");
+			printf("\033[1;37m==========PARTICIONES DINAMICAS==========\033[0m\n");
 			if(size <= mem_total - mem_asignada &&  list_any_satisfy(cache,(void*)libre_suficiente)){
 				elegida = particiones_dinamicas(size);
 			}
 			else{
 				while(!list_any_satisfy(cache,(void*)libre_suficiente)){
-					printf("No Hay Suficiente Espacio\n");
+					printf("\033[1;31mNo Hay Suficiente Espacio\033[0m\n");
 					free_cache();
 					cant_liberadas++;
 					printf("Cantidad De Liberadas:%d\n",cant_liberadas);
@@ -704,13 +704,13 @@ particion* malloc_cache(uint32_t size){
 			bool libre_suficiente(particion* aux){
 				return aux->libre == 'L' && aux->buddy_size >= datos_config->tamanio_min_particion && aux->buddy_size >= size;
 			}
-			printf("==========BUDDY SYSTEM==========\n");
+			printf("\033[1;37m==========BUDDY SYSTEM==========\033[0m\n");
 			if(size <= mem_total - mem_asignada &&  list_any_satisfy(cache,(void*)libre_suficiente)){
 				elegida = buddy_system(size);
 			}
 			else{
 				while(!list_any_satisfy(cache,(void*)libre_suficiente)){
-					printf("No Hay Suficiente Espacio\n");
+					printf("\033[1;31mNo Hay Suficiente Espacio\033[0m\n");
 					free_cache();
 				}
 				elegida = buddy_system(size);
@@ -718,7 +718,7 @@ particion* malloc_cache(uint32_t size){
 		}
 	}
 	else{
-		printf("Size Superado Al Size Maximo De La Memoria!\n");
+		printf("\033[1;31mSize Superado Al Size Maximo De La Memoria!\033[0m\n");
 		return 0;
 	}
 	elegida->tiempo_inicial = time(NULL);
@@ -886,13 +886,13 @@ particion* algoritmo_particion_libre(uint32_t size){
 		return aux->libre == 'L' && aux->size >= datos_config->tamanio_min_particion && aux->size >= size;
 	}
 	if(string_equals_ignore_case(datos_config->algoritmo_particion_libre,"FF")){
-		printf("==========ALGORITEMO DE PARTICION LIBRE:FIRST FIT==========\n");
+		printf("\33[1;37m==========ALGORITEMO DE PARTICION LIBRE:FIRST FIT==========\033[0m\n");
 		pthread_rwlock_rdlock(&lockCache);
 		elegida = list_find(cache,(void*)libre_suficiente);
 		pthread_rwlock_unlock(&lockCache);
 	}
 	else{
-		printf("==========ALGORITEMO DE PARTICION LIBRE:BEST FIT==========\n");
+		printf("\33[1;37m==========ALGORITEMO DE PARTICION LIBRE:BEST FIT==========\033[0m\n");
 		bool espacio_min(particion* aux1,particion* aux2){
 			return aux1->size < aux2->size;
 		}
@@ -965,7 +965,7 @@ void consolidar_particiones_dinamicas(){
 		return (aux->end == libre->start || aux->start == libre->end) && aux->libre == 'L';
 	}
 	if(list_any_satisfy(cache,(void*)existe_hermano)){
-		printf("Consolidando El Cache ...\n");
+		printf("\033[1;33mConsolidando El Cache ...033[0m\n");
 		particion* libre = list_find(cache,(void*)existe_hermano);
 		void aplicar(particion* aux){
 			bool anterior(particion* aux){
@@ -1064,7 +1064,7 @@ particion* algoritmo_reemplazo(){
 	}
 	t_list* ocupadas = list_filter(cache,(void*)ocupada);
 	if(string_equals_ignore_case(datos_config->algoritmo_reemplazo,"FIFO")){
-		printf("==========ALGORITMO DE REEMPLAZO:FIFO==========\n");
+		printf("\033[1;37m==========ALGORITMO DE REEMPLAZO:FIFO==========\033[0m\n");
 		bool by_id(particion* aux1,particion* aux2){
 			return aux1->tiempo_inicial <= aux2->tiempo_inicial;
 		}
@@ -1082,7 +1082,7 @@ particion* algoritmo_reemplazo(){
 		}
 	}
 	else{
-		printf("==========ALGORITMO DE REEMPLAZO:LRU==========\n");
+		printf("\033[1;37m==========ALGORITMO DE REEMPLAZO:LRU==========\033[0m\n");
 		time_t actual;
 		actual = time(NULL);
 
@@ -1115,7 +1115,7 @@ void delete_particion(particion* borrar){
 }
 
 void limpiar_cache(){
-	printf("LIMPIANDO CACHE ...\n");
+	printf("\033[1;33mLIMPIANDO CACHE ...\033[0m\n");
 	void limpiar(particion* aux){
 		free(aux);
 	}
@@ -1246,7 +1246,7 @@ void handler_dump(int signo){
 		log_info(dump,"---------------------------------------------------------------------------------------------------------------------------------------------\n");
 		pthread_mutex_unlock(&mutexDump);
 
-		printf("SIGUSR1 RUNNING...\n");
+		printf("\033[1;33mSIGUSR1 RUNNING...\033[0m\n");
 		limpiar_cache();
 		exit(0);
 	}

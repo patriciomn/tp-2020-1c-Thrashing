@@ -159,6 +159,7 @@ bool verificar_cpu_libre();
 void sumar_ciclos(entrenador* entre,int ciclos);
 bool verificar_espera_caught(entrenador* entre);
 int cant_entrenadores(char** posiciones);
+int cant_requerida_pokemon(char* name);
 
 double estimacion(entrenador* entre);
 void algoritmo_largo_plazo(pokemon* pok);
