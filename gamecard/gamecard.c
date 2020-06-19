@@ -52,6 +52,7 @@ void iniciar_logger_config() {
 }
 
 void obtener_datos_archivo_config() {
+
 	datos_config->tiempo_reintento_conexion = config_get_int_value(config_tall_grass, "TIEMPO_DE_REINTENTO_CONEXION");
 	datos_config->tiempo_reintento_operacion = config_get_int_value(config_tall_grass,"TIEMPO_DE_REINTENTO_OPERACION");
 	//datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
@@ -96,32 +97,19 @@ void verificar_metadata_fs(char *path_pto_montaje) {
     fclose(filePointer);
     free(path_metadata_txt);
 
-
     // creamos un nuevo string para armar el path del bitmap
     size_new_string = strlen(path_pto_montaje) + strlen(BITMAP_PATH) + 1;
     char *path_bitmap_bin = malloc(size_new_string);
     strcpy(path_bitmap_bin, path_pto_montaje);
     string_append(&path_bitmap_bin, BITMAP_PATH);
 
-    log_info(logger,"OBTENER BITARRAY DEL ARCHIVO bitmap.bin");
-    // abrimos el archivo bitmap.bin para obtener el bitmap
-    FILE *bitmap_fp = fopen(path_bitmap_bin, "rb+");
-    if(bitmap_fp == NULL) {
-    	log_error(logger, "ERROR AL ABRIR EL ARCHIVO bitmap.bin");
-    	exit(1);
-    }
+    int sizeBitmap = fileSize(path_bitmap_bin);
 
-    fseek(bitmap_fp, 0, SEEK_END);				// posiciono el puntero hasta el final del archivo (EOF)
-    int size_bitmap = (int) ftell(bitmap_fp);	// obtengo la posicion actual del puntero y lo casteo a un int. Lo hago para sacar el tamaño del archivo
-    fseek(bitmap_fp, 0, SEEK_SET);				// vuelvo a posicionar el puntero al inicio del archivo
-    //log_info(logger, "tamaño bitmap:%d",size_bitmap);
-    log_info(logger, "TAMAÑO DEL BITMAP: %d", size_bitmap);
-
-    fclose(bitmap_fp);
+    log_info(logger, "TAMAÑO DEL BITMAP: %d", sizeBitmap);
 
     int fd = open(path_bitmap_bin, O_RDWR , (mode_t)0600);
     if(fd != -1) {
-    	bitmap_memoria = mmap(0, size_bitmap, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    	bitmap_memoria = mmap(0, sizeBitmap, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     	if(bitmap_memoria == MAP_FAILED) {
     		log_error(logger, "ERROR AL CARGAR BITMAP A MEMORIA");
     		close(fd);
@@ -130,26 +118,15 @@ void verificar_metadata_fs(char *path_pto_montaje) {
 
     close(fd);
 
-    bitarray = bitarray_create_with_mode(bitmap_memoria, size_bitmap, LSB_FIRST);
+    bitarray = bitarray_create_with_mode(bitmap_memoria, sizeBitmap, LSB_FIRST);
 
     }
-
-    //void *buffer_bitmap = malloc(size_bitmap);
-
-    //log_info(logger, "LEYENDO BITMAP EXISTENTE");
-    //if(fread(buffer_bitmap, sizeof(char), size_bitmap, bitmap_fp) == 0) {
-    	//log_error(logger, "NO SE HA PODIDO LEER EL CONTENIDO DEL ARCHIVO bitmap.bin");
-    	//exit(1);
-    //}
-
-    //bitarray = bitarray_create_with_mode(buffer_bitmap, size_bitmap, LSB_FIRST);
 
     for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++) {
         printf("%d",bitarray_test_bit(bitarray,i));
     }
     printf("\n");
 
-    //fclose(bitmap_fp);
     free(path_bitmap_bin);
 }
 
@@ -353,8 +330,8 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
     			// mutex_unlock
     			buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
+    			// mutex_unlock
     		} else {
-    			//mutex_unlock
     			// hacer reintento de operacion
     		}
     	}
@@ -376,19 +353,19 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 
 	char *file_memory = mmap(0, tamanioArchivo, PROT_READ, MAP_SHARED, fdPokemon, 0);
 
-	log_info(logger, "contenido: %s",file_memory);
-
 	char *linea = string_new();
 	string_append_with_format(&linea, "%s%s%s", string_itoa(newPokemon->pos.posx), GUION, string_itoa(newPokemon->pos.posy));
-	log_info(logger, "COORDENADA <%s>", linea);
 
 	if(string_contains(file_memory, linea)) {
-		log_info(logger, "COORDENADA <%s> ENCONTRADO");
-		//modificar_linea_en_archivo(newPokemon, path_directorio_pokemon, linea);
+		log_info(logger, "COORDENADA <%s> ENCONTRADO", linea);
+		log_info(logger, "LINEA <%s>", linea);
+		munmap(file_memory, tamanioArchivo); // revisar, se puede seguir usando!
+		modificar_linea_en_archivo(newPokemon, path_directorio_pokemon, linea);
 	} else {
 		log_info(logger, "COORDENADA <%s> NO ENCONTRADO!");
 		string_append_with_format(&linea, "%s%s%s", IGUAL, string_itoa(newPokemon->cantidad), "\n");
 		log_info(logger, "LINEA <%s>", linea);
+		munmap(file_memory, tamanioArchivo);
 		insertar_linea_en_archivo(newPokemon, path_directorio_pokemon, linea);
 	}
 
@@ -404,7 +381,7 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 
 	if(hay_espacio_ultimo_bloque(path_directorio_pokemon, linea)) {
 		log_info(logger, "HAY ESPACIO EN EL ULTIMO BLOQUE");
-		escribir_archivo(path_archivo_pokemon, linea);
+		escribir_archivo(path_archivo_pokemon, linea, "a");
 
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
 		escribir_block(ultimo_bloque, linea);
@@ -427,7 +404,7 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 			// se muere el hilo
 		}
 
-		escribir_archivo(path_archivo_pokemon, linea);
+		escribir_archivo(path_archivo_pokemon, linea, "a");
 
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
 
@@ -443,9 +420,10 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 	}
 }
 
-void escribir_archivo(char *path_archivo, char *linea) {
 
-	FILE *pfPokemon = fopen(path_archivo, "a");
+void escribir_archivo(char *path_archivo, char *linea, char *modo) {
+
+	FILE *pfPokemon = fopen(path_archivo, modo);
 
 	int size_line = strlen(linea);
 
@@ -470,7 +448,7 @@ void escribir_blocks(int ultimo_bloque, int nuevo_bloque, char *linea) {
 	int start = 0;
 
 	char *primerosChars = string_duplicate(string_substring(linea, start, firstChars)); // los primeros n caracteres a agregar en el ultimo bloque
-	escribir_archivo(path_ultimo_bloque, primerosChars);
+	escribir_archivo(path_ultimo_bloque, primerosChars, "a");
 
 	start += firstChars;
 
@@ -480,7 +458,7 @@ void escribir_blocks(int ultimo_bloque, int nuevo_bloque, char *linea) {
 	int size_linea = strlen(linea);
 
 	char *restoChars = string_duplicate(string_substring(linea, start, size_linea - start)); // los ultimos n caracteres que restan agregar
-	escribir_archivo(path_nuevo_bloque, restoChars);
+	escribir_archivo(path_nuevo_bloque, restoChars, "a");
 
 	free(path_ultimo_bloque);
 	free(restoChars);
@@ -493,10 +471,11 @@ void escribir_block(int ultimo_bloque, char *linea) {
 	char *path_ultimo_bloque = string_new();
 	string_append_with_format(&path_ultimo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", string_itoa(ultimo_bloque), ".txt");
 
-	escribir_archivo(path_ultimo_bloque, linea);
+	escribir_archivo(path_ultimo_bloque, linea, "a");
 
 	free(path_ultimo_bloque);
 }
+
 
 char* valor_campo_directorio_metadata(char *ruta_dir_pokemon) { // se puede generalizar
 
@@ -509,6 +488,7 @@ char* valor_campo_directorio_metadata(char *ruta_dir_pokemon) { // se puede gene
 	return config_get_string_value(metadata_pokemon, "DIRECTORY");
 
 }
+
 
 int valor_campo_size_metadata(char *ruta_dir_pokemon) { // se puede generalizar
 
@@ -540,7 +520,7 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 
 	crear_metadata_pokemon(path_directorio_pokemon, newPokemon->name);
 
-	escribir_archivo(ruta_archivo_pokemon, linea);
+	escribir_archivo(ruta_archivo_pokemon, linea, "a");
 
 	escribir_block(nro_bloque_libre, linea);
 
@@ -554,34 +534,10 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	//int coordenadas_size = strlen(linea);
 	//int cant_blocks = (int) ceil((double)coordenadas_size / datos_config->size_block); // se divide el tamaño de la linea a agregar por el tamaño del bloque. Se redondea para arriba
 
-    // lo siguiente es para testear si hay la cantidad de bloques que se necesita. Si hay, que haga la escritura, si no muere el hilo
-
-	// semaforo
-	//if(hay_cantidad_de_bloques_libres(cant_blocks)) { // repensar esta parte, se puede revisar y devolver ya con el bitmap modificado asi otro hilo puede leerlo
-
-		//int tamanio_linea = strlen(linea);
-
-		//crear_metadata_pokemon(path_directorio_pokemon, newPokemon->name, tamanio_linea); // creamos la metadata del archivo pokemon y solo rellenamos el campo DIRECTORY y OPEN
-
-		//if(fwrite(linea, strlen(linea), 1, pointerFile) == 0) {
-			//log_error(logger, "NO SE PUDO ESCRIBIR LA LINEA <%s> ", linea);
-		    //exit(1);
-		//} else {
-			//log_info(logger, "LINEA ESCRITA CORRECTAMENTE <%s>", linea);
-			//fclose(pointerFile);
-		//}
-
-		//modificar_bitmap_crear_blocks(cant_blocks, path_directorio_pokemon, linea);
-    // liberar semaforo
-    //} else {
-        // aca muere el hilo
-    //}
-
-	//cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
-
 	free(linea);
     free(ruta_archivo_pokemon);
 }
+
 
 void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *valor) {
 
@@ -600,38 +556,6 @@ void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *va
 	free(ruta_metadata_pokemon);
 }
 
-
-void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea) {
-
-	int desplazamiento = 0;
-
-	if(cantidad_bloques_necesarios == 1) {
-		escribir_bitmap_metadata_block(ruta_directorio_pokemon, linea, desplazamiento);
-	} else {
-		for(int i = 0 ; i < cantidad_bloques_necesarios ; i++) {
-			escribir_bitmap_metadata_block(ruta_directorio_pokemon, linea, desplazamiento);
-			desplazamiento += datos_config->size_block;
-		}
-	}
-}
-
-void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento) {
-
-	int bloque = obtener_bloque_libre();
-
-	bitarray_set_bit(bitarray, bloque);
-
-	agregar_bloque_metadata_pokemon(ruta_directorio_pokemon, bloque);
-
-	char *auxiliar = strdup(string_substring(linea, desplazamiento, datos_config->size_block)); //strlen(linea)
-
-	char *ruta_directorio_blocks = string_new();
-	string_append_with_format(&ruta_directorio_blocks, "%s%s", datos_config->pto_de_montaje, BLOCKS_DIR);
-
-	escribir_datos_bloque(ruta_directorio_blocks, auxiliar, bloque);
-
-	free(ruta_directorio_blocks);
-}
 
 // nos devuelve el nro de bloque libre
 int obtener_bloque_libre() {
@@ -686,6 +610,7 @@ bool hay_espacio_ultimo_bloque(char *path_dir_pokemon, char *datos_a_agregar) { 
 	// hacer free de path_metadata_file, free de path_block y config_destroy
 }
 
+
 int ultimo_bloque_array_blocks(char *path_directorio_pokemon) { // nos devuelve el ultimo bloque del array blocks de la metadata
 
 	int size_new_string = strlen(path_directorio_pokemon) + strlen(METADATA_FILE) + 1;
@@ -702,33 +627,11 @@ int ultimo_bloque_array_blocks(char *path_directorio_pokemon) { // nos devuelve 
 		i++;
 	}
 
+	//free(path_metadata_file);
+
 	return atoi(array_blocks[i - 1]);
 }
 
-
-
-void escribir_datos_bloque(char *ruta_directorio_blocks, char *datos_a_agregar, int nro_bloque) {
-
-	char *ruta_archivo_bloque = string_new();
-	string_append(&ruta_archivo_bloque, ruta_directorio_blocks);
-    string_append(&ruta_archivo_bloque, "/");
-	string_append(&ruta_archivo_bloque, string_itoa(nro_bloque));
-	string_append(&ruta_archivo_bloque, ".txt"); //por ahora txt para ver que los datos se escribieron correctamente, despues se cambia a bin
-
-	log_info(logger, "CREANDO ARCHIVO CON RUTA <%s>", ruta_archivo_bloque);
-	FILE *pf = fopen(ruta_archivo_bloque, "w"); //ab
-	if(pf == NULL) {
-		log_error(logger, "ERROR AL CREAR EL ARCHIVO POKEMON");
-		exit(1);
-	}
-
-	log_info(logger, "ESCRIBIENDO DATOS EN EL BLOQUE <%d> EN EL DIRECTORIO <%s>", nro_bloque, ruta_archivo_bloque);
-	if(fwrite(datos_a_agregar, strlen(datos_a_agregar), 1, pf) == 0)
-		log_error(logger, "NO SE HA PODIDO ESCRIBIR DATOS EN EL DIRECTORIO <%s>", ruta_archivo_bloque);
-
-	fclose(pf);
-	free(ruta_archivo_bloque);
-}
 
 void agregar_bloque_metadata_pokemon(char *ruta_directorio_pokemon, int nro_bloque) { // agregar un nro de bloque al campo blocks de la metadata
 
@@ -761,7 +664,6 @@ void agregar_bloque_metadata_pokemon(char *ruta_directorio_pokemon, int nro_bloq
 		posicion += size_nro_bloque;
 		strcpy(newBlocks + posicion, "]");
 	} else {
-		// revisar aca
 		char *auxiliar = strdup(string_substring(blocks, 1, strlen(blocks) - 2)); // se resta 2 por los corchetes []
 		strcpy(newBlocks + posicion, "[");
 		posicion ++;
@@ -815,6 +717,271 @@ void crear_metadata_pokemon(char *ruta_directorio_pokemon, char *pokemon) {
     free(ruta_metadata_pokemon);
 }
 
+
+void modificar_linea_en_archivo(new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada) {
+
+	char *ruta_archivo_pokemon = string_new();
+	string_append(&ruta_archivo_pokemon, ruta_directorio_pokemon);
+	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s", "/", newPokemon->name, ".txt");
+
+	int tamArchivo = fileSize(ruta_archivo_pokemon);
+
+	int fdPokemon = open(ruta_archivo_pokemon, O_RDWR);
+
+	char *fileMemory = mmap(0, tamArchivo, PROT_READ | PROT_WRITE, MAP_SHARED, fdPokemon, 0);
+
+	close(fdPokemon);
+
+	int posicionLinea = get_posicion_linea_en_archivo(coordenada, fileMemory);
+
+	int tamanioLineaVieja = get_tamanio_linea(fileMemory + posicionLinea);
+	log_info(logger, "tamanio vieja linea: %d", tamanioLineaVieja);
+
+	char *viejaLinea = string_duplicate(string_substring(fileMemory, posicionLinea, tamanioLineaVieja));
+	log_info(logger, "vieja linea: %s", viejaLinea);
+
+	char *lineaActualizada = get_linea_nueva_cantidad(viejaLinea, coordenada, newPokemon->cantidad); // devuelve la linea actualizada pero sin el \n
+	log_info(logger, "linea actualizada: %s", lineaActualizada);
+
+	int diferencia = strlen(lineaActualizada) - tamanioLineaVieja;
+	log_info(logger, "diferencia vieja y nueva: %d", diferencia);
+
+	if(hay_espacio_ultimo_bloque(ruta_directorio_pokemon, lineaActualizada)) {
+		// se escribe sin nuevo bloque
+		modificar_linea_pokemon(fileMemory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
+	} else {
+		// buscamos un bloque libre y si lo hay, se lo asignamos a la metadata
+		int nuevo_nro_bloque = obtener_bloque_libre();
+		// luego hacemos el resto
+		if(nuevo_nro_bloque == -1) {
+			log_error(logger, "NO HAY SUFICIENTE ESPACIO PARA ALMACENAR NUEVOS DATOS");
+			// MATAR EL HILO
+		}
+
+		agregar_bloque_metadata_pokemon(ruta_directorio_pokemon, nuevo_nro_bloque);
+	}
+
+	free(lineaActualizada);
+	free(viejaLinea);
+	free(ruta_archivo_pokemon);
+}
+
+int get_posicion_linea_en_archivo(char *linea, char *mmaped) { // devuelve la posicion donde esta situada la linea dentro del mmap (se contabiliza el \n)
+
+	int i = 0;
+	int sizeLinea = 0;
+
+	char **lineas = string_split(mmaped, "\n");
+
+	while(!string_contains(lineas[i], linea)) {
+		sizeLinea += strlen(lineas[i]) + 1; // el + 1 por el \n
+		i++;
+	}
+
+	log_info(logger, "Posicion Linea: %d", sizeLinea);
+
+	return sizeLinea;
+}
+
+int get_tamanio_linea(char *mapped) {
+
+	int i = 0;
+
+	while(mapped[i] != '\n') {
+		i++;
+	}
+	i++;
+
+	return i++;
+}
+
+char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agregar) { // nos devuelve un char* que tiene la cantidad modificada
+
+	int sizeCoordenada = strlen(coordenada) + 1; // 1 por el caracter '='
+
+	int sizeLinea = strlen(linea);
+
+	char *viejaCantidad = string_duplicate(string_substring(linea, sizeCoordenada, sizeLinea - sizeCoordenada));
+
+	int oldCantidad = atoi(viejaCantidad);
+
+	int nuevaCantidad = oldCantidad + cantidad_a_agregar;
+
+	char *newCantidad = string_itoa(nuevaCantidad);
+
+	char *lineaModificada = string_new();
+	string_append_with_format(&lineaModificada, "%s%s%s%s", coordenada, IGUAL, newCantidad, "\n");
+	printf("size nueva linea: %d\n", strlen(lineaModificada));
+
+	return lineaModificada;
+}
+
+void actualizar_contenido_blocks(char *path_directorio_pokemon, char *mapped) {
+
+	int desplazamiento = 0;
+
+	char **array_blocks_metadata = get_array_blocks_metadata(path_directorio_pokemon);
+
+	int cantidadBloques = cantidad_de_bloques(array_blocks_metadata);
+
+	for(int i = 0 ; i < cantidadBloques ; i++) {
+		actualizar_bloque(mapped, desplazamiento, array_blocks_metadata[i]);
+		desplazamiento += datos_config->size_block;
+	}
+
+	// hacer free del array_blocks_metadata
+}
+
+
+char** get_array_blocks_metadata(char *path_directorio_pokemon) {
+
+	char *path_metadata_pokemon = string_new();
+	string_append_with_format(&path_metadata_pokemon, "%s%s%s", path_directorio_pokemon,"/", METADATA_FILE);
+
+	t_config *metadata_pokemon = config_create(path_metadata_pokemon);
+
+	return config_get_array_value(metadata_pokemon, "BLOCKS");
+}
+
+
+int cantidad_de_bloques(char **arrayBlocks) {
+
+	int i = 0;
+
+	while(arrayBlocks[i] != NULL) {
+		i++;
+	}
+
+	return i;
+}
+
+
+void actualizar_bloque(char *mapped, int desplazamiento, char *bloque) {
+
+	log_info(logger, "ACTUALIZANDO BLOQUES");
+
+	char * path_archivo_bloque = string_new();
+	string_append_with_format(&path_archivo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", bloque, ".txt");
+	log_info(logger, "RUTA ARCHIVO BLOQUE <%s>", path_archivo_bloque);
+
+	char *contenido = string_duplicate(string_substring(mapped, desplazamiento, datos_config->size_block));
+
+	escribir_archivo(path_archivo_bloque, contenido, "w+");
+
+	free(path_archivo_bloque);
+	free(contenido);
+
+}
+
+// modifica el archivo pokemon con la nueva cantidad (sin importar si se agrando o no el tamaño)
+
+void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon) {
+
+	char *ruta_archivo_pokemon = string_new();
+	string_append(&ruta_archivo_pokemon, path_directorio_pokemon);
+	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s", "/", pokemon, ".txt");
+
+	int tamArchivo = fileSize(ruta_archivo_pokemon);
+
+	int sizeViejaLinea = strlen(viejaLinea);
+
+	int sizeNuevaLinea = strlen(lineaActualizada);
+
+	int diferencia = sizeNuevaLinea - sizeViejaLinea;
+
+	if(diferencia == 0) {
+
+		log_info(logger, "NO ES NECESARIO MOVER LAS LINEAS DE DATOS");
+		// no hace falta mover bytes para adelante
+		memcpy(fileMemory + posicionLinea, lineaActualizada, strlen(lineaActualizada));
+		actualizar_contenido_blocks(path_directorio_pokemon, fileMemory);
+		munmap(fileMemory, tamArchivo);
+
+	} else {
+
+		log_info(logger, "ES NECESARIO MOVER LAS LINEAS DE DATOS");
+		int desplazamiento = 0;
+			// mover los bloques para adelante
+		char *buffer = malloc(tamArchivo + diferencia + 1); // + 1 por el \0
+
+		if(posicionLinea == 0) { // esta en la primera linea
+
+			memcpy(buffer, lineaActualizada, sizeNuevaLinea);
+			desplazamiento += sizeNuevaLinea;
+
+			memcpy(buffer + desplazamiento, fileMemory + sizeViejaLinea, tamArchivo - sizeViejaLinea);
+			desplazamiento += tamArchivo - sizeViejaLinea;
+
+			buffer[desplazamiento] = '\0';
+
+			log_info(logger, "contenido actualizado:");
+			log_info(logger, "%s", buffer);
+
+			escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+			int oldValorSize = valor_campo_size_metadata(path_directorio_pokemon);
+			int newValorSize = oldValorSize + diferencia;
+			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(newValorSize));
+			// actualizamos el valod de los bloques
+			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+			// cambiamos el valor de OPEN a N
+
+			free(buffer);
+
+		} else if(posicionLinea + sizeViejaLinea == tamArchivo) { // esta en la ultima linea
+
+			memcpy(buffer, fileMemory, posicionLinea);
+			desplazamiento += posicionLinea;
+
+			memcpy(buffer + desplazamiento, lineaActualizada, sizeNuevaLinea);
+			desplazamiento += sizeNuevaLinea;
+
+			buffer[desplazamiento] = '\0';
+
+			log_info(logger, "contenido actualizado:");
+			log_info(logger, "%s", buffer);
+
+			escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+			int oldValorSize = valor_campo_size_metadata(path_directorio_pokemon);
+			int newValorSize = oldValorSize + diferencia;
+			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(newValorSize));
+			// actualizamos el valod de los bloques
+			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+			// cambiamos el valor de OPEN a N
+
+			free(buffer);
+
+		} else { // esta en el medio
+
+			memcpy(buffer, fileMemory, posicionLinea);
+			desplazamiento += posicionLinea;
+
+			memcpy(buffer + desplazamiento, lineaActualizada, sizeNuevaLinea);
+			desplazamiento += sizeNuevaLinea;
+
+			memcpy(buffer + desplazamiento, fileMemory + posicionLinea + sizeViejaLinea, tamArchivo - posicionLinea - sizeViejaLinea);
+			desplazamiento += tamArchivo - posicionLinea - sizeViejaLinea;
+
+			buffer[desplazamiento] = '\0';
+
+			log_info(logger, "contenido actualizado:");
+			log_info(logger, "%s", buffer);
+
+			escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+			int oldValorSize = valor_campo_size_metadata(path_directorio_pokemon);
+			int newValorSize = oldValorSize + diferencia;
+			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(newValorSize));
+			// actualizamos el valod de los bloques
+			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+				// cambiamos el valor de OPEN a N
+		}
+	}
+
+	munmap(fileMemory, tamArchivo);
+	free(ruta_archivo_pokemon);
+}
 
 //-------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------

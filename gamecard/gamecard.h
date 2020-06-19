@@ -144,7 +144,7 @@ void crear_metadata_pokemon(char *path_pokeflie, char *pokemon);
 
 void escribir_linea_en_archivo(FILE *punteroArchivo, int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 
-bool hay_cantidad_de_bloques_libres(char *path_dir_pokemon, char *datos_a_agregar);
+//bool hay_cantidad_de_bloques_libres(char *path_dir_pokemon, char *datos_a_agregar);
 
 bool hay_espacio_ultimo_bloque(char *path_dir_pokemon, char *datos_a_agregar);
 
@@ -152,11 +152,17 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 
 void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon, char *linea);
 
-void escribir_archivo(char *path_archivo, char *linea);
+void escribir_archivo(char *path_archivo, char *linea, char *modo);
+
+void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon);
 
 void escribir_blocks(int ultimo_bloque, int nuevo_bloque, char *linea);
 
 void escribir_block(int ultimo_bloque, char *linea);
+
+void actualizar_bloque(char *mapped, int desplazamiento, char *bloque);
+
+void modificar_linea_en_archivo(new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada);
 
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
@@ -181,6 +187,11 @@ void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *va
 char* valor_campo_directorio_metadata(char *ruta_dir_pokemon);
 int ultimo_bloque_array_blocks(char *path_directorio_pokemon);
 int valor_campo_size_metadata(char *ruta_dir_pokemon);
+char** get_array_blocks_metadata(char *path_directorio_pokemon);
+char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agregar);
+int cantidad_de_bloques(char **arrayBlocks);
+int get_posicion_linea_en_archivo(char *linea, char *mmaped);
+int get_tamanio_linea(char *mapped);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
