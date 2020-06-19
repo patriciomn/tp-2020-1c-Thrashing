@@ -90,12 +90,12 @@ typedef struct{
 	int posX;
 	int posY;
 	int cant;
-}posiYcant;
+}posYcant;
 
 typedef struct{
 	int id_mensaje;
 	char* name;
-	posiYcant pos[];
+	t_list* posiYcant;
 }rtaGet;
 
 ack_t acks_gamecard;
@@ -169,14 +169,13 @@ int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
-int fileSize(char* file);
-//FILE* existePokemon(char* nombrePokemon);
+
 char *read_file_into_buf (char **filebuf, long fplen, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 
 //void operacion_new_pokemon(new_pokemon *newPokemon);
-//rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
+rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);

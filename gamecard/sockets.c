@@ -1,4 +1,5 @@
-/*
+ /* ABAJO PUSE UNAS FUNCIONES DE MANEJO DE BLOQUES, LO DE MOVER LOS BOQUES POR SI CAMBIA DE 9 A 10 Y ASI..
+ IGUAL SEGUN LEI LO TENES BASTANTE MANEJADO...
 #include "sockets.h"
 
 void suscripcion_colas_broker() {
@@ -489,4 +490,171 @@ void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon) {
 	memcpy(getPokemon->nombre, stream + desplazamiento, size_name);
 	desplazamiento += size_name;
 }
+*/
+
+
+//---------------------------------------------------------------------------
+//QUIZAS SIRVE ES EL MANEJO DE BLOQUES 
+/*
+void escribirRegistroEnArchivo(char* direccionArchivo, nodo_memtable* registro){
+	t_config* archivo = config_create(direccionArchivo);
+	char** bloques = config_get_array_value(archivo, "BLOCKS");
+	int size = config_get_int_value(archivo, "SIZE");
+	int length = cantidadElementosCharAsteriscoAsterisco(bloques);
+	char* direccionBloque = direccionDeBloque(bloques[length - 1]);
+	FILE* bloque = fopen(direccionBloque, "a");
+	printf("REGISTRO: Timestamp = %s, Key = %s, Value = %s\n", string_itoa(registro->timestamp),  string_itoa(registro->key), registro->value);
+	char* registroString = pasarRegistroAString(registro);
+	printf("DIRECCION DEL BLOQUE: %s\n", direccionArchivo);
+	int longitudRegistro = string_length(registroString) + 1;
+	int sobrante;
+	int indice = 0;
+	char* registroAuxiliar;
+
+	while( longitudRegistro > 0){
+		sobrante = tamanioMaximoDeArchivo - size%tamanioMaximoDeArchivo;
+		printf("sobrante = %i\n",sobrante);
+
+		if( sobrante - longitudRegistro >= 0 ){
+			//printf("HOLA123\n");
+			strcat(registroString, "\n");
+			fwrite(registroString, strlen(registroString), 1,bloque);
+			//fprintf(bloque, "%s\n", registroString);
+			//printf("HOLA123\n");
+			fclose(bloque);
+			//printf("HOLA123\n");
+			//free(registroString);
+			size += longitudRegistro;
+			longitudRegistro = 0;
+		}
+		else{
+			char* registroRecortado = string_substring(registroString, indice, sobrante);
+			fwrite(registroRecortado, strlen(registroRecortado), 1,  bloque);
+			//fprintf(bloque, "%s", registroRecortado);
+			//fprintf(bloque, "%s", string_substring(registroString, indice, sobrante));
+			indice += sobrante;
+			fclose(bloque);
+			asignarBloqueAConfig(archivo);
+			//char* sizeString =  string_itoa(size);
+			//config_set_value(archivo, "SIZE", sizeString);
+			config_save(archivo);
+			config_destroy(archivo);
+			free(direccionBloque);
+
+			archivo = config_create(direccionArchivo);
+
+			bloques = config_get_array_value(archivo, "BLOCKS");
+			length = cantidadElementosCharAsteriscoAsterisco(bloques);
+			printf("bloque = %s\n", bloques[length - 1]);
+			direccionBloque = direccionDeBloque(bloques[length - 1]);
+			printf("direccion del bloque = %s\n",direccionBloque);
+			bloque = fopen(direccionBloque, "a");
+
+			//registroAuxiliar = malloc(longitudRegistro-sobrante+1);
+			registroAuxiliar = string_substring_from(registroString, indice);
+			free(registroString);
+
+			registroString = string_duplicate(registroAuxiliar);
+			//registroString = malloc(strlen(registroAuxiliar) + 1);
+			//strcpy(registroString, registroAuxiliar);
+			free(registroAuxiliar);
+			size += sobrante;
+			longitudRegistro -= sobrante;
+			printf("LONGITUD REGISTRO = %i\n", longitudRegistro);
+			printf("Registro String = %s\n", registroString);
+		}
+	}
+
+
+
+	char* sizeString =  string_itoa(size);
+
+	//printf("DIRECCION DEL ARCHIVO: %s\n", direccionArchivo);
+	//printf("size = %s\n", sizeString);
+
+	//printf("HOLA FEDE\n");
+
+	config_set_value(archivo, "SIZE", sizeString);
+	//printf("HOLA FEDE\n");
+	//config_save(archivo);
+	config_save_in_file(archivo,archivo->path);
+	//printf("HOLA FEDE\n");
+	config_destroy(archivo);
+	//printf("terminaste tu funcion?\n");
+}
+
+char* direccionDeBloque(char* numeroDeBloque){
+
+	char* direccion_Bloques = obtenerDireccionDirectorio("Bloques/");
+
+	int length = strlen(direccion_Bloques) + strlen(numeroDeBloque) + 5;
+	char* direccion = malloc(length);
+	int posicion = 0;
+	strcpy(direccion, direccion_Bloques);
+	posicion += strlen(direccion_Bloques);
+	strcpy(direccion + posicion, numeroDeBloque);
+	posicion += strlen(numeroDeBloque);
+	strcpy(direccion + posicion, ".bin");
+
+	free(direccion_Bloques);
+
+	return direccion;
+}
+
+void escanearBloques(char** listaDeBloques, t_list* listaDeRegistros){
+	int lengthListaDeBloques = cantidadElementosCharAsteriscoAsterisco(listaDeBloques);
+	char* registroIncompleto = malloc(tamanioMaximoDeRegistro);
+	char* registro = NULL;
+	bool completo = true;
+	size_t len = 0;
+	ssize_t read;
+	for(int i=0;i<lengthListaDeBloques;i++){
+		char* direccionDelBloque = direccionDeBloque(listaDeBloques[i]);
+		FILE* archivo = fopen(direccionDelBloque, "r");
+		if(archivo){
+			while((read = getline(&registro, &len, archivo)) != EOF){
+
+				if(!completo){
+					strcpy(registroIncompleto + strlen(registroIncompleto), registro);
+					free(registro);
+					registro = string_duplicate(registroIncompleto);
+				}
+				if(registro != NULL && registroCompleto(registro)){ // registro != NULL && registroCompleto(registro)
+					printf("registro = %s\n", registro);
+					insertarRegistroEnLaLista(listaDeRegistros, registro);
+					completo = true;
+				}else{
+					strcpy(registroIncompleto, registro);
+					completo = false;
+				}
+
+
+				//else if(!completo){
+			//		strcpy(registroIncompleto + strlen(registroIncompleto), registro);
+			//	}else{
+			//		strcpy(registroIncompleto, registro);
+			//		completo = false;
+			//	}
+
+				free(registro);
+				registro = NULL;
+			}
+			fclose(archivo);
+		}
+		else{
+			error_show("No se pudo abrir el archivo");
+		}
+
+		free(direccionDelBloque);
+	}
+
+	return;
+}
+
+ESTRUCTURAS
+typedef struct {
+	uint32_t timestamp;
+	uint16_t key;
+	char* value;
+} nodo_memtable;
 */

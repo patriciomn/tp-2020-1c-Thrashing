@@ -10,12 +10,15 @@ int main () {
 
     verificar_punto_de_montaje();
 
-    suscripcion_colas_broker();
+   suscripcion_colas_broker();
 
     pthread_join(thread_new_pokemon, NULL);
     pthread_join(thread_catch_pokemon, NULL);
     pthread_join(thread_get_pokemon, NULL);
 
+///Area para probar cosas
+	
+//-----***------***-----
 
     munmap(bitmap_memoria, 2);
     bitarray_destroy(bitarray);
@@ -1084,17 +1087,7 @@ int fileSize(char* file) {
     fclose(fp); 
     return res; 
 } 
-/*FILE* existePokemon(char* nombrePokemon){
-    char* pathArchivo = string_new();
-    string_append(&pathArchivo,PATH_POKECARPETA);
-    string_append_with_format(&pathArchivo,"%s%s%s%s", nombrePokemon, "/",nombrePokemon,POKEMON_FILE_EXT);
-    FILE *fp = fopen(pathArchivo,"r");
-    printf("%s\n",pathArchivo);
-    printf("%p",fp);
-    printf("\nDeberia impreso el puntero\n");
-    return fp;
 
-}*/
 char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
 {
     fseek (fp, 0, SEEK_END);
@@ -1117,8 +1110,9 @@ char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
     return *filebuf;
 }
 
+/*rtaGet* prueba = malloc(sizeof(rtaGet));
+	prueba = operacion_get_Pokemon(99, "pepa");*/
 
-/*
 rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 	rtaGet* respuesta = malloc(sizeof(rtaGet));
     respuesta->id_mensaje = idMensaje;
@@ -1150,21 +1144,39 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 			FILE *fp =fopen(pathFILE, "r");
             char* scaneo = NULL;
             long fplen = (long) fileSize(pathFILE);
+			//revisar como entran las cosas al buffer
             read_file_into_buf (&scaneo, fplen, fp);
             log_info(logger, "%d es la longitud del scaneo", string_length(scaneo));
-              printf("deberia saber el length\n");
+              printf("%d deberia saber el length\n", string_length(scaneo));
             //settear OPEN = N
 			//mutex_lock
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
     		// mutex_unlock
 			free(pathFILE);
 			free(fp);
-
-
             //falta separar uno a uno las lineas
-
-            //setear la respuesta
-
+			respuesta->posiYcant = list_create();
+/*for (int i = 0; i < 5; ++i){
+	printf("  scaneo[%d] = %d ,", i,    scaneo[i]);
+}*/
+       
+			int desplazamiento = 0;
+			while(desplazamiento < fplen){
+	//memcpy(destino, fuente, tamaño);
+	//memcpy(&(catch_pokemon->id_mensaje), valor + desplazamiento, sizeof(int));
+	//desplazamiento += sizeof(int);
+			posYcant* posicionesCant = malloc(sizeof(posYcant));
+			memcpy(&(posicionesCant->posX), scaneo, sizeof(int));
+			printf("%d deberia ser la posicion en x",posicionesCant->posX);
+			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del -
+			memcpy(&(posicionesCant->posY), scaneo, sizeof(int));
+			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del =
+			memcpy(&(posicionesCant->cant), scaneo, sizeof(int));
+			list_add(respuesta->posiYcant, posicionesCant);
+			desplazamiento = desplazamiento + sizeof(int) + 1; //por el /n
+			free(posicionesCant);
+			}
+            
             free(scaneo);
 			
 		    } else{// en caso de que este abierto
@@ -1179,7 +1191,7 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 
     return respuesta;
 }
-*/
+
 
 //-----------------------------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------------------------
