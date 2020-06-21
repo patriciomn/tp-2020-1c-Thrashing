@@ -162,7 +162,7 @@ void escribir_block(int ultimo_bloque, char *linea);
 
 void actualizar_bloque(char *mapped, int desplazamiento, char *bloque);
 
-void modificar_linea_en_archivo(new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada);
+void modificar_linea_en_archivo(char *mapped_file, new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada);
 
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
@@ -183,7 +183,7 @@ void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, 
 // Funciones Extras
 
 void cambiar_valor_metadata(char *ruta_directorio_pokemon, char *campo, char *valor); //  la ruta tiene que ser: [pto_de_montaje]/files/[nombre_del_pokemon]
-char* valor_campo_directorio_metadata(char *ruta_dir_pokemon);
+char* get_valor_campo_metadata(char *ruta_dir_pokemon, char *campo);
 int ultimo_bloque_array_blocks(char *path_directorio_pokemon);
 int valor_campo_size_metadata(char *ruta_dir_pokemon);
 char** get_array_blocks_metadata(char *path_directorio_pokemon);

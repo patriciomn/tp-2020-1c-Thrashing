@@ -47,8 +47,9 @@ void verificar_punto_de_montaje() {
 }
 
 void iniciar_logger_config() {
+
 	datos_config = malloc(sizeof(struct config_tallGrass));
-	 metadataTxt = malloc(sizeof(struct metadata_info));
+	metadataTxt = malloc(sizeof(struct metadata_info));
 
 	logger = log_create("Tall_Grass_Logger","TG",1,LOG_LEVEL_INFO);
 	config_tall_grass = config_create("/home/utnso/tp-2020-1c-Thrashing/gamecard/tall_grass.config");
@@ -58,11 +59,13 @@ void obtener_datos_archivo_config() {
 
 	datos_config->tiempo_reintento_conexion = config_get_int_value(config_tall_grass, "TIEMPO_DE_REINTENTO_CONEXION");
 	datos_config->tiempo_reintento_operacion = config_get_int_value(config_tall_grass,"TIEMPO_DE_REINTENTO_OPERACION");
-	//datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
+	datos_config->tiempo_retardo_operacion = config_get_int_value(config_tall_grass, "TIEMPO_RETARDO_OPERACION");
 
 	int size_ip = strlen(config_get_string_value(config_tall_grass, "IP_BROKER")) + 1;
 	datos_config->ip_broker = malloc(size_ip);
 	memcpy(datos_config->ip_broker, config_get_string_value(config_tall_grass, "IP_BROKER"), size_ip);
+
+	datos_config->puerto_broker = config_get_int_value(config_tall_grass, "PUERTO_BROKER");
 
 	int size_pto_montaje = strlen(config_get_string_value(config_tall_grass, "PUNTO_MONTAJE_TALLGRASS")) + 1;
 	datos_config->pto_de_montaje = malloc(size_pto_montaje);
@@ -306,15 +309,16 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	int nro_bloque_libre = obtener_bloque_libre();
     	//mutex_unlock (cuidado, si muere el hilo me temo que no se desbloquea)
 
-    	log_info(logger, "CREANDO EL DIRECTORIO <%s>", path_directorio_pokemon);
-    	mkdir(path_directorio_pokemon,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
     	//enviar_respuesta_a_broker
     } else {
 
-    	char *valor = valor_campo_directorio_metadata(path_directorio_pokemon);
-    	if(string_equals_ignore_case( valor, "Y")) {
-    		log_info(logger, "EL DIRECTORIO <%s> EXISTE", path_directorio_pokemon);
+    	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+    	//char *expected = "Y";
+
+    	if(string_equals_ignore_case(valor, "Y")) {
+
+    		log_info(logger, "EL DIRECTORIO <%s> EXISTE Y ES SOLO UN DIRECTORIO", path_directorio_pokemon);
 
     		//mutex_lock
     		int nro_bloque_libre = obtener_bloque_libre();
@@ -324,18 +328,24 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     		// enviar_respuesta_a_broker
     	} else {
 
-    		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
+    		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
     		// el archivo existe y hay que verificar si existe la linea
     		//mutex_lock
-    		char *valor_open = valor_campo_directorio_metadata(path_directorio_pokemon);
+    		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
     		if(string_equals_ignore_case(valor_open, "N")) {
 
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
     			// mutex_unlock
     			buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
-    			// mutex_unlock
+
     		} else {
     			// hacer reintento de operacion
+    			log_warning(logger, "HILO EN STANDBY DE OPERACION");
+    			sleep(10);
+    			pthread_cancel(thread_new_pokemon);
+    			pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
+    			pthread_join(atender_new_pokemon, NULL);
+    			//log_info(logger, "HILO RETOMANDO LA OPERACION");
     		}
     	}
     }
@@ -359,13 +369,14 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 	char *linea = string_new();
 	string_append_with_format(&linea, "%s%s%s", string_itoa(newPokemon->pos.posx), GUION, string_itoa(newPokemon->pos.posy));
 
-	if(string_contains(file_memory, linea)) {
+	if(string_contains(file_memory, linea)) { // buscar en el archivo y modificar
 		log_info(logger, "COORDENADA <%s> ENCONTRADO", linea);
 		log_info(logger, "LINEA <%s>", linea);
-		munmap(file_memory, tamanioArchivo); // revisar, se puede seguir usando!
-		modificar_linea_en_archivo(newPokemon, path_directorio_pokemon, linea);
-	} else {
-		log_info(logger, "COORDENADA <%s> NO ENCONTRADO!");
+		//munmap(file_memory, tamanioArchivo); // revisar, se puede seguir usando!
+		modificar_linea_en_archivo(file_memory, newPokemon, path_directorio_pokemon, linea);
+	} else { // se agrega al final del archivo
+
+		log_info(logger, "COORDENADA <%s> NO ENCONTRADO!", linea);
 		string_append_with_format(&linea, "%s%s%s", IGUAL, string_itoa(newPokemon->cantidad), "\n");
 		log_info(logger, "LINEA <%s>", linea);
 		munmap(file_memory, tamanioArchivo);
@@ -480,7 +491,7 @@ void escribir_block(int ultimo_bloque, char *linea) {
 }
 
 
-char* valor_campo_directorio_metadata(char *ruta_dir_pokemon) { // se puede generalizar
+char* get_valor_campo_metadata(char *ruta_dir_pokemon, char *campo) { // para todos los campos menos el array blocks
 
 	char *path_metadata_pokemon = string_new();
 	string_append(&path_metadata_pokemon, ruta_dir_pokemon);
@@ -488,8 +499,12 @@ char* valor_campo_directorio_metadata(char *ruta_dir_pokemon) { // se puede gene
 
 	t_config *metadata_pokemon = config_create(path_metadata_pokemon);
 
-	return config_get_string_value(metadata_pokemon, "DIRECTORY");
+	char *valor = config_get_string_value(metadata_pokemon, campo);
 
+	//config_destroy(metadata_pokemon);
+	//free(path_metadata_pokemon);
+
+	return valor;
 }
 
 
@@ -630,7 +645,8 @@ int ultimo_bloque_array_blocks(char *path_directorio_pokemon) { // nos devuelve 
 		i++;
 	}
 
-	//free(path_metadata_file);
+	config_destroy(metadata_pokemon);
+	free(path_metadata_file);
 
 	return atoi(array_blocks[i - 1]);
 }
@@ -657,7 +673,7 @@ void agregar_bloque_metadata_pokemon(char *ruta_directorio_pokemon, int nro_bloq
 	}
 
 	log_info(logger, "AGREGANDO BLOQUE <%d> A LA ESTRUCTURA BLOCKS", nro_bloque);
-	char *newBlocks = malloc(sizeBlocks);
+	char *newBlocks = malloc(sizeBlocks + 1);
 	int posicion = 0;
 
 	if(strlen(blocks) < 3) {
@@ -683,6 +699,8 @@ void agregar_bloque_metadata_pokemon(char *ruta_directorio_pokemon, int nro_bloq
 	config_set_value(metadata_pokemon, "BLOCKS", newBlocks);
 	config_save(metadata_pokemon);
 	config_destroy(metadata_pokemon);
+	free(newBlocks);
+	free(ruta_metadata_pokemon);
 }
 
 // No hay memleak (funciona bien)
@@ -721,26 +739,18 @@ void crear_metadata_pokemon(char *ruta_directorio_pokemon, char *pokemon) {
 }
 
 
-void modificar_linea_en_archivo(new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada) {
+void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada) {
 
 	char *ruta_archivo_pokemon = string_new();
 	string_append(&ruta_archivo_pokemon, ruta_directorio_pokemon);
 	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s", "/", newPokemon->name, ".txt");
 
-	int tamArchivo = fileSize(ruta_archivo_pokemon);
+	int posicionLinea = get_posicion_linea_en_archivo(coordenada, file_memory);
 
-	int fdPokemon = open(ruta_archivo_pokemon, O_RDWR);
-
-	char *fileMemory = mmap(0, tamArchivo, PROT_READ | PROT_WRITE, MAP_SHARED, fdPokemon, 0);
-
-	close(fdPokemon);
-
-	int posicionLinea = get_posicion_linea_en_archivo(coordenada, fileMemory);
-
-	int tamanioLineaVieja = get_tamanio_linea(fileMemory + posicionLinea);
+	int tamanioLineaVieja = get_tamanio_linea(file_memory + posicionLinea);
 	log_info(logger, "tamanio vieja linea: %d", tamanioLineaVieja);
 
-	char *viejaLinea = string_duplicate(string_substring(fileMemory, posicionLinea, tamanioLineaVieja));
+	char *viejaLinea = string_duplicate(string_substring(file_memory, posicionLinea, tamanioLineaVieja));
 	log_info(logger, "vieja linea: %s", viejaLinea);
 
 	char *lineaActualizada = get_linea_nueva_cantidad(viejaLinea, coordenada, newPokemon->cantidad); // devuelve la linea actualizada pero sin el \n
@@ -751,7 +761,7 @@ void modificar_linea_en_archivo(new_pokemon *newPokemon, char *ruta_directorio_p
 
 	if(hay_espacio_ultimo_bloque(ruta_directorio_pokemon, lineaActualizada)) {
 		// se escribe sin nuevo bloque
-		modificar_linea_pokemon(fileMemory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
+		modificar_linea_pokemon(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
 	} else {
 		// buscamos un bloque libre y si lo hay, se lo asignamos a la metadata
 		int nuevo_nro_bloque = obtener_bloque_libre();
@@ -1000,7 +1010,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 		log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 	    //enviar_respuesta_a_broker
 	} else {
-		char *valor = valor_campo_directorio_metadata(path_directorio_pokemon);
+		char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
 		if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
 	    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
 	    	// enviar_respuesta_a_broker
@@ -1125,13 +1135,13 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 			log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 		    //si no existe se devuelve el nombre y el id, los cuales ya estan cargados
 		} else {
-			char *valor = valor_campo_directorio_metadata(path_directorio_pokemon);
+			char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
 			if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
 		    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
 		    } else {
 		    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
 		    	//mutex_lock
-    		char *valor_open = valor_campo_directorio_metadata(path_directorio_pokemon);
+    		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
     		if(string_equals_ignore_case(valor_open, "N")) {
 
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
@@ -1225,6 +1235,7 @@ void suscripcion_colas_broker() {
 }
 
 void suscribirse_a_new_pokemon() {
+
 	socket_cliente_np = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_np != -1) {
 		//enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
@@ -1318,13 +1329,12 @@ void atender_peticion(int socket_cliente, int cod_op) {
 	switch(cod_op) {
 		case NEW_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON");
-			new_pokemon *newPokemon = malloc(sizeof(new_pokemon));
+
 			int id_mensaje_new;
 			memcpy(&(id_mensaje_new), stream, sizeof(int));
 			printf("ID MENSAJE: %d\n", id_mensaje_new);
 
-			//deserealizar_new_pokemon_gameboy(stream, newPokemon);
-			newPokemon = deserializar_new(stream + sizeof(int));
+			new_pokemon *newPokemon = deserializar_new(stream + sizeof(int));
 
 			printf("POKEMON: %s\n", newPokemon->name);
 			printf("PosX: %d\n", newPokemon->pos.posx);
@@ -1333,24 +1343,22 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 			pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 
-			free(newPokemon);
 			free(stream);
 		break;
 
 		case CATCH_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON");
-			catch_pokemon *catchPokemon = malloc(sizeof(catch_pokemon));
+
 			int id_mensaje_catch;
 			memcpy(&(id_mensaje_catch), stream, sizeof(int));
 			printf("ID MENSAJE: %d\n", id_mensaje_catch);
-			//deserealizar_catch_pokemon_gameboy(stream, catchPokemon);
-			catchPokemon = deserializar_catch(stream + sizeof(int));
+
+			catch_pokemon *catchPokemon = deserializar_catch(stream + sizeof(int));
 
 			printf("POKEMON: %s\n", catchPokemon->name);
 			printf("PosX: %d\n", catchPokemon->pos.posx);
 			printf("PosY: %d\n", catchPokemon->pos.posy);
 
-			free(catchPokemon);
 			free(stream);
 		break;
 
