@@ -116,6 +116,7 @@ pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servi
 pthread_t cliente_gamecard; // este hilo es para iniciar gamecard como cliente del broker
 
 pthread_t servidor_gamecard;
+
 pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_pokemon
 pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
@@ -164,6 +165,8 @@ void actualizar_bloque(char *mapped, int desplazamiento, char *bloque);
 
 void modificar_linea_en_archivo(char *mapped_file, new_pokemon *newPokemon, char *ruta_directorio_pokemon, char *coordenada);
 
+void actualizar_contenido_blocks(char *path_directorio_pokemon, char *mapped);
+
 void agregar_bloque_metadata_pokemon(char *path_pokemon_metadata_file, int nro_bloque);
 int obtener_bloque_libre();
 void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
@@ -191,6 +194,7 @@ char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agr
 int cantidad_de_bloques(char **arrayBlocks);
 int get_posicion_linea_en_archivo(char *linea, char *mmaped);
 int get_tamanio_linea(char *mapped);
+int fileSize(char* file);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
