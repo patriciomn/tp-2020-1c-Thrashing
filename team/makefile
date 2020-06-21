@@ -3,7 +3,7 @@
 # Como por ejemplo, bibliotecas, flags, el compilador (el "CC")
 
 TARGET = team # Definimos la tarea que va a ejecutar make por defecto Y el nombre del binario final
-LIBS = -lm -lcommons -lpthread -luuid # Incluimos las bibliotecas que necesitamos, las commons y readline
+LIBS = -lm -lcommons -lpthread# Incluimos las bibliotecas que necesitamos, las commons y readline
 CC = gcc # Vamos a usar gcc como compilador, porque nos encanta!
 CFLAGS = -g -Wall # Compilamos con los flags -g (con simbolos de debug) y -Wall (que nos muestre todos los warnings)
 

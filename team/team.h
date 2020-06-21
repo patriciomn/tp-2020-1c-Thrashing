@@ -28,7 +28,6 @@
 #define CICLOS_INTERCAMBIAR 5
 #define CANT_ENTRE 20
 
-
 enum ESTADO{
 	NEW,
 	BLOCKED,
@@ -36,6 +35,13 @@ enum ESTADO{
 	EXEC,
 	EXIT,
 };
+
+typedef struct{
+	char* name;
+	int posx;
+	int posy;
+	bool espera_caught;
+}pokemon;
 
 typedef struct{
 	int tid;
@@ -53,26 +59,23 @@ typedef struct{
 	int turnaround_time;
 	double estimacion_anterior;
 	int ciclos_totales;
+	int quantum;
+	pokemon* pok_atrapar;
 }entrenador;
 
 typedef struct{
 	pid_t pid;
 	entrenador* exec;
+	entrenador* blocked;
 	t_list* entrenadores;
 	t_list* objetivos;
 	t_list* exit;
 	int cant_ciclo;
 	t_list* poks_requeridos;
 	t_list* cola_ready;
+	t_list* cola_deadlock;
 	bool suscrito;
 }team;
-
-typedef struct{
-	char* name;
-	int posx;
-	int posy;
-	bool espera_caught;
-}pokemon;
 
 typedef struct{
 	char* log_file;
@@ -126,6 +129,9 @@ bool atrapar_pokemon(entrenador*,pokemon*);
 void intercambiar_pokemon(entrenador* entre1,entrenador* entre2);
 void actuar_intercambio(entrenador* entre1,entrenador* entre2,pokemon* pok1,pokemon* pok2);
 void agregar_eliminar_pokemon(entrenador* entre,pokemon* pok_agregar,pokemon* pok_eliminar);
+void actuar_entrenador_sin_desalojo(entrenador* entre);
+void actuar_entrenador_round_robin(entrenador* entre);
+void desalojar_entrenador(entrenador* entre);
 
 pokemon* crear_pokemon(char* name);
 void set_pokemon(pokemon* pok,int posx,int posy);
@@ -160,15 +166,15 @@ void sumar_ciclos(entrenador* entre,int ciclos);
 bool verificar_espera_caught(entrenador* entre);
 int cant_entrenadores(char** posiciones);
 int cant_requerida_pokemon(char* name);
+entrenador* algoritmo_deadlock(t_list* cola);
 
 double estimacion(entrenador* entre);
 void algoritmo_largo_plazo(pokemon* pok);
 entrenador* algoritmo_corto_plazo();
-void algoritmo_fifo(t_list* cola_ready);
-void algoritmo_round_robin(t_list* cola_ready);
-void fin_de_quantum();
-void algoritmo_sjf_sin_desalojo(t_list* cola_ready);
-void algoritmo_sjf_con_desalojo(t_list* cola_ready);
+entrenador* algoritmo_fifo(t_list* cola_ready);
+entrenador* algoritmo_round_robin(t_list* cola_ready);
+entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready);
+entrenador* algoritmo_sjf_con_desalojo(t_list* cola_ready);
 msg* crear_mensaje(int id,int tipo,pokemon*);
 
 void iniciar_servidor(void);
