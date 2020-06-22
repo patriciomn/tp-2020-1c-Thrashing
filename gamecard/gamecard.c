@@ -1121,16 +1121,19 @@ char *read_file_into_buf (char ** source,  FILE *fp){
 			 }
 
         /* Read the entire file into memory. */
-        size_t newLen = fread(source, sizeof(char), bufsize, fp);
-		log_info(logger, "yyyyyyyyyyyyyy");
-	//	log_info(logger, "Malloc tam archivo %s",source[0]);
+		int i = 0;
+        int c = fgetc(fp);
+		log_info(logger,"8888888888888888888888888");
+		while(!feof(fp)){
+			source[i] = c;
+			i++;
+
+		}
+		log_info(logger,"QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
+		log_info(logger, "el primer valor %s",source[0]);
         if ( ferror( fp ) != 0 ) {
             fputs("Error reading file", stderr);
-        } else {
-			log_info(logger, "opopopopo");
-            source[newLen++] = '\0'; /* Just to be safe. */
-			log_info(logger, "mafwmgakga");
-        }
+        } 
     }
 }
 
