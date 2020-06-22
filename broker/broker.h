@@ -113,7 +113,7 @@ particion* algoritmo_particion_libre(uint32_t size);
 particion* particiones_dinamicas(uint32_t size);
 uint32_t calcular_size_potencia_dos(uint32_t size);
 uint32_t log_dos(uint32_t size);
-particion* algoritmo_reemplazo();
+void algoritmo_reemplazo();
 particion* buddy_system(uint32_t size);
 void delete_particion(particion* borrar);
 void limpiar_cache();

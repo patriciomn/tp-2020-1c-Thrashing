@@ -87,7 +87,7 @@ mensaje* crear_mensaje(int tipo_msg,int socket,int nro_id,void* msg){
 	m->suscriptors_enviados = list_create();
 	m->suscriptors_ack = list_create();
 	m->msj = msg;
-	log_info(logger,"Nuevo Mensaje Tipo_Mensaje:%d ID_Mensaje:%d",m->tipo_msg,m->id);
+	log_info(logger,"Nuevo Mensaje Tipo_Mensaje:%s ID_Mensaje:%d",get_cola(m->tipo_msg),m->id);
 	return m;
 }
 
@@ -306,6 +306,7 @@ void atender_ack(int cliente_fd){
 		}
 		if(confirmado_todos_susciptors_mensaje(item) == 1){
 			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs De Todos Sus Suscriptors\033[0m\n");
+			//Durabilidad: Todo mensaje debe permanecer en la cola de mensajes hasta que todos los Suscribers lo reciban.
 			//borrar_mensaje(item);
 		}
 		free(msg);
@@ -342,6 +343,7 @@ void borrar_mensaje(mensaje* m){
 	list_remove_by_condition(cola->mensajes,(void*)by_id_tipo_mensaje);
 	list_destroy(m->suscriptors_ack);
 	list_destroy(m->suscriptors_enviados);
+	printf("\033[1;33mMensaje ID:%d De Cola:%s Eliminado\033[0m\n",m->id,get_cola(m->tipo_msg));
 	free(m);
 }
 
@@ -521,6 +523,7 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 
 //enviar mensajes===========================================================================================================================================================
 void enviar_mensajes(suscriber* sus,int tipo_cola){
+	//Notificación de recepción: Todo mensaje entregado debe ser confirmado por cada Suscriptor para marcarlo y no enviarse nuevamente al mismo.
 	mq* cola = cola_mensaje(tipo_cola);
 	bool no_enviado(mensaje* m){
 		bool by_id(suscriber* aux){
@@ -1057,7 +1060,7 @@ void consolidar_buddy_system(){
 	consolidar_buddy_system();
 }
 
-particion* algoritmo_reemplazo(){
+void algoritmo_reemplazo(){
 	particion* victima;
 	bool ocupada(particion* aux){
 		return aux->libre == 'X';
@@ -1096,10 +1099,16 @@ particion* algoritmo_reemplazo(){
 		delete_particion(victima);
 	}
 	list_destroy(ocupadas);
-	return victima;
 }
 
 void delete_particion(particion* borrar){
+	//Mantenibilidad: Cada cola de mensaje debe mantener su estado y borrar los mensajes que fueron eliminados de la caché por el algoritmo de reemplazo
+	mq* cola = cola_mensaje(borrar->tipo_cola);
+	bool by_id(mensaje* aux){
+		return aux->id == borrar->id_mensaje;
+	}
+	mensaje* m = list_find(cola->mensajes,(void*)by_id);
+
 	log_warning(logger,"Particion: %d Eliminada  Inicio: %d",borrar->id_particion,borrar->start);
 	borrar->libre = 'L';
 	borrar->tipo_cola = -1;
@@ -1112,6 +1121,11 @@ void delete_particion(particion* borrar){
 		mem_asignada -=	calcular_size_potencia_dos(borrar->size);
 		consolidar_buddy_system();
 	}
+	list_remove_by_condition(cola->mensajes,(void*)by_id);
+	list_destroy(m->suscriptors_ack);
+	list_destroy(m->suscriptors_enviados);
+	printf("\033[1;33mMensaje ID:%d De Cola:%s Eliminado\033[0m\n",m->id,get_cola(m->tipo_msg));
+	free(m);
 }
 
 void limpiar_cache(){
