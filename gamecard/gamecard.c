@@ -17,7 +17,7 @@ int main () {
     pthread_join(thread_get_pokemon, NULL);
 
 ///Area para probar cosas
-	
+
 //-----***------***-----
 
     munmap(bitmap_memoria, 2);
@@ -1104,26 +1104,34 @@ int fileSize(char* file) {
     return res; 
 } 
 
-char *read_file_into_buf (char **filebuf, long fplen, FILE *fp)
-{
-    fseek (fp, 0, SEEK_END);
-    if ((fplen = ftell (fp)) == -1) {  /* get file length */
-        fprintf (stderr, "error: unable to determine file length.\n");
-        return NULL;
-    }
-    fseek (fp, 0, SEEK_SET);  /* allocate memory for file */
-    if (!(*filebuf = calloc (fplen, sizeof *filebuf))) {
-        fprintf (stderr, "error: virtual memory exhausted.\n");
-        return NULL;
-    }
+char *read_file_into_buf (char ** source,  FILE *fp){
+   if (fseek(fp, 0L, SEEK_END) == 0) {
+        long bufsize = ftell(fp);
+        if (bufsize == -1) { 
+			log_error(logger, "EL archivo buscado NO EXISTE");
+		 }
 
-    /* read entire file into filebuf */
-    if (!fread (*filebuf, sizeof *filebuf, fplen, fp)) {
-        fprintf (stderr, "error: file read failed.\n");
-        return NULL;
-    }
+        /*Le da al buffer el mismo tamaño del archivo */
+        source = malloc(sizeof(bufsize + 1));
+		log_info(logger, "Malloc tam archivo %d",bufsize);
+        /* Go back to the start of the file. */
+		fseek (fp, 0, SEEK_SET);
+        if (fseek(fp, 0L, SEEK_SET) != 0) { /* Error */
+			log_error(logger, "entra en este feo");
+			 }
 
-    return *filebuf;
+        /* Read the entire file into memory. */
+        size_t newLen = fread(source, sizeof(char), bufsize, fp);
+		log_info(logger, "yyyyyyyyyyyyyy");
+	//	log_info(logger, "Malloc tam archivo %s",source[0]);
+        if ( ferror( fp ) != 0 ) {
+            fputs("Error reading file", stderr);
+        } else {
+			log_info(logger, "opopopopo");
+            source[newLen++] = '\0'; /* Just to be safe. */
+			log_info(logger, "mafwmgakga");
+        }
+    }
 }
 
 /*rtaGet* prueba = malloc(sizeof(rtaGet));
@@ -1146,10 +1154,10 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 		    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
 		    } else {
 		    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
+			
 		    	//mutex_lock
     		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
     		if(string_equals_ignore_case(valor_open, "N")) {
-
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
     			// mutex_unlock
 		
@@ -1157,22 +1165,30 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
             char* pathFILE = string_new();
             string_append(&pathFILE,path_directorio_pokemon);
             string_append_with_format(&pathFILE,"%s%s%s", "/",pokemon, POKEMON_FILE_EXT);
+			log_info(logger, "Path pokemon %s", pathFILE);
 			FILE *fp =fopen(pathFILE, "r");
+			int fplen = fileSize(pathFILE);
+			 log_info(logger, "%d es la longitud del scaneo", fplen);
             char* scaneo = NULL;
-            long fplen = (long) fileSize(pathFILE);
+			 log_info(logger, "eeeeeeeo");
 			//revisar como entran las cosas al buffer
-            read_file_into_buf (&scaneo, fplen, fp);
-            log_info(logger, "%d es la longitud del scaneo", string_length(scaneo));
-              printf("%d deberia saber el length\n", string_length(scaneo));
+            read_file_into_buf (&scaneo, fp);
+			log_info(logger, "yyyyyyyyyyyyyy");
+    //        log_info(logger, "%d es la longitud del scaneo", string_length(scaneo));
+          //    printf("%d deberia saber el length\n", string_length(scaneo));
             //settear OPEN = N
 			//mutex_lock
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+			log_info(logger, "yyyyyyyyyyyy2yy");
     		// mutex_unlock
+			printf("  path archivo = %s \n", pathFILE );
 			free(pathFILE);
 			free(fp);
             //falta separar uno a uno las lineas
 			respuesta->posiYcant = list_create();
-/*for (int i = 0; i < 5; ++i){
+			log_info(logger, "yyyyyyyyyyyyyy3");
+			/*
+for (int i = 0; i < 5; ++i){
 	printf("  scaneo[%d] = %d ,", i,    scaneo[i]);
 }*/
        
@@ -1183,6 +1199,8 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 	//desplazamiento += sizeof(int);
 			posYcant* posicionesCant = malloc(sizeof(posYcant));
 			memcpy(&(posicionesCant->posX), scaneo, sizeof(int));
+			log_info(logger, "Entrando a memcpy");
+			log_info(logger, "%d Posicione en x", posicionesCant->posX);
 			printf("%d deberia ser la posicion en x",posicionesCant->posX);
 			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del -
 			memcpy(&(posicionesCant->posY), scaneo, sizeof(int));
@@ -1197,6 +1215,14 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 			
 		    } else{// en caso de que este abierto
 				  //finalizar hilo y reintentar despues del tiempo que dice el config
+/*
+				log_warning(logger, "HILO EN STANDBY DE OPERACION");
+    			pthread_cancel(thread_get_pokemon);
+				sleep(datos_config->tiempo_retardo_operacion);
+COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) operacion_get_pokemon, PARAMETROS);
+    		//	pthread_join(atender_get_pokemon, NULL);
+    			log_info(logger, "HILO RETOMANDO LA OPERACION");
+				*/
 			}
 				
 		}
