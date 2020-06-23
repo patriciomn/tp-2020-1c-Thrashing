@@ -155,7 +155,7 @@ void esperar_cliente(int socket_servidor){
 
 void serve_client(int* socket){
 	int cod_op;
-
+	memset(&cod_op, 0 ,sizeof(int));
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
 		printf("\033[0;31mERROR: socket error\033[0m\n" );
 		pthread_exit(NULL);	
@@ -206,6 +206,7 @@ void process_request(int cod_op, int cliente_fd){
 				}
 			}
 			list_iterate(cola->suscriptors,(void*)enviar);
+			//Asincronismo: La recepción y notificación de mensajes pueden diferir en el tiempo. No deben notificarse inmediatamente a los componentes suscritos a dicha cola.
 			void ack(suscriber* sus){
 				if(check_socket(sus->cliente_fd) == 1){
 					atender_ack(sus->cliente_fd);
@@ -269,6 +270,7 @@ void atender_suscripcion(int cliente_fd){
 		if(check_socket(sus->cliente_fd) == 1){
 			enviar_mensajes(sus,queue_id);
 		}
+		//Asincronismo: La recepción y notificación de mensajes pueden diferir en el tiempo. No deben notificarse inmediatamente a los componentes suscritos a dicha cola.
 		while(!list_all_satisfy(cola->mensajes,(void*)confirmado_todos_susciptors_mensaje)){
 			atender_ack(sus->cliente_fd);
 		}
@@ -670,8 +672,8 @@ void iniciar_cache(){
 	header->tiempo_actual = time(NULL);
 	header->intervalo = 0;
 	list_add(cache,header);
-	signal(SIGINT,sig_handler);
-	//signal(SIGUSR1,handler_dump);
+	//en otra consola: kill -USR1 [pid del broker]
+	signal(SIGUSR1,handler_dump);
 }
 
 particion* malloc_cache(uint32_t size){
@@ -968,7 +970,7 @@ void consolidar_particiones_dinamicas(){
 		return (aux->end == libre->start || aux->start == libre->end) && aux->libre == 'L';
 	}
 	if(list_any_satisfy(cache,(void*)existe_hermano)){
-		printf("\033[1;33mConsolidando El Cache ...033[0m\n");
+		printf("\033[1;33mConsolidando El Cache ...\033[0m\n");
 		particion* libre = list_find(cache,(void*)existe_hermano);
 		void aplicar(particion* aux){
 			bool anterior(particion* aux){
@@ -984,7 +986,9 @@ void consolidar_particiones_dinamicas(){
 				bool by_start(particion* a){
 					return a->start == aux->start;
 				}
+				particion* borrar = list_find(cache,(void*)by_start);
 				list_remove_by_condition(cache,(void*)by_start);
+				free(borrar);
 				ant->size += size;
 				ant->fin = ant->inicio+ant->size;
 				ant->end = ant->start+ant->size;
@@ -994,7 +998,9 @@ void consolidar_particiones_dinamicas(){
 				bool by_start(particion* aux){
 					return aux->start == pos->start;
 				}
+				particion* borrar = list_find(cache,(void*)by_start);
 				list_remove_by_condition(cache,(void*)by_start);
+				free(borrar);
 				aux->size += size;
 				aux->fin = aux->inicio+aux->size;
 				aux->end = aux->start+aux->size;;
@@ -1034,7 +1040,9 @@ void consolidar_buddy_system(){
 					bool by_start(particion* a){
 						return a->start == aux->start;
 					}
+					particion* borrar = list_find(cache,(void*)by_start);
 					list_remove_by_condition(cache,(void*)by_start);
+					free(borrar);
 					ant->fin = ant->inicio+ant->buddy_size*2;
 					ant->end = end;
 					ant->buddy_size = ant->buddy_size*2;
@@ -1045,7 +1053,9 @@ void consolidar_buddy_system(){
 					bool by_start(particion* aux){
 						return aux->start == pos->start;
 					}
+					particion* borrar = list_find(cache,(void*)by_start);
 					list_remove_by_condition(cache,(void*)by_start);
+					free(borrar);
 					aux->fin = aux->inicio+aux->buddy_size*2;
 					aux->end = end;
 					aux->buddy_size =aux->buddy_size* 2;
@@ -1125,7 +1135,6 @@ void delete_particion(particion* borrar){
 	list_destroy(m->suscriptors_ack);
 	list_destroy(m->suscriptors_enviados);
 	printf("\033[1;33mMensaje ID:%d De Cola:%s Eliminado\033[0m\n",m->id,get_cola(m->tipo_msg));
-	free(m);
 }
 
 void limpiar_cache(){
@@ -1134,6 +1143,7 @@ void limpiar_cache(){
 		free(aux);
 	}
 	list_destroy_and_destroy_elements(cache,(void*)limpiar);
+	free(memoria);
 }
 
 uint32_t calcular_size_potencia_dos(uint32_t size){
@@ -1161,11 +1171,7 @@ uint32_t log_dos(uint32_t size){
 	return potencia;
 }
 
-//dum[=====================================================================================================================================================================
-void sig_handler(){
-	handler_dump(SIGUSR1);
-}
-
+//dump=====================================================================================================================================================================
 char* get_cola(uint32_t tipo){
 	char* c;
 	switch(tipo){

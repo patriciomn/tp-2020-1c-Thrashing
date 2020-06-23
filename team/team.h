@@ -130,8 +130,9 @@ void intercambiar_pokemon(entrenador* entre1,entrenador* entre2);
 void actuar_intercambio(entrenador* entre1,entrenador* entre2,pokemon* pok1,pokemon* pok2);
 void agregar_eliminar_pokemon(entrenador* entre,pokemon* pok_agregar,pokemon* pok_eliminar);
 void actuar_entrenador_sin_desalojo(entrenador* entre);
-void actuar_entrenador_round_robin(entrenador* entre);
+void actuar_entrenador_con_desalojo(entrenador* entre);
 void desalojar_entrenador(entrenador* entre);
+bool con_estimacion_menor(entrenador* entre);
 
 pokemon* crear_pokemon(char* name);
 void set_pokemon(pokemon* pok,int posx,int posy);

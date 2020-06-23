@@ -71,6 +71,19 @@ void iniciar_config(char* teamConfig){
 }
 
 //CREACION---------------------------------------------------------------------------------------------------------------------
+char* crear_string_vacios_con_coma(char* string,int cant){
+	char* corchete_i = "[ %s";
+	char* corchete_d = "]";
+	char* vacio = string_new();
+	for(int i=0;i<cant-1;i++){
+		string_append_with_format(&vacio, "%s ", ",");
+	}
+	string = string_from_format(corchete_i,vacio);
+	string_append(&string,corchete_d);
+	free(vacio);
+	return string;
+}
+
 void crear_team(){
 	equipo = malloc(sizeof(team));
 	equipo->pid = datos_config->id;
@@ -85,6 +98,9 @@ void crear_team(){
 	equipo->blocked = NULL;
 
 	char** pos = string_get_string_as_array(datos_config->posiciones);
+	if(string_equals_ignore_case(datos_config->pokemones,"[]")){
+		datos_config->pokemones = crear_string_vacios_con_coma(datos_config->pokemones,cant_entrenadores(pos));
+	}
 	char** poks = string_get_string_as_array(datos_config->pokemones);
 	char** objs = string_get_string_as_array(datos_config->objetivos);
 	char** posicion;
@@ -138,22 +154,20 @@ void crear_entrenador(int tid,int posx,int posy,char* pokemones,char* objetivos)
 	entre->quantum = datos_config->quantum;
 	entre->pok_atrapar = NULL;
 
-	if(pokemones){
-		char** poks = string_split(pokemones,"|");
-		for(int i=0;i<cant_pokemones(poks);i++){
-			pokemon* poke = crear_pokemon(poks[i]);
-			list_add(entre->pokemones,poke);
-		}
-		free(poks);
+	char** poks = string_split(pokemones,"|");
+	for(int i=0;i<cant_pokemones(poks);i++){
+		pokemon* poke = crear_pokemon(poks[i]);
+		list_add(entre->pokemones,poke);
 	}
-	if(objetivos){
-		char** objs = string_split(objetivos,"|");
-		for(int i=0;i<cant_pokemones(objs);i++){
-			list_add(entre->objetivos,crear_pokemon(objs[i]));
-			list_add(equipo->objetivos,crear_pokemon(objs[i]));
-		}
-		free(objs);
+	free(poks);
+
+	char** objs = string_split(objetivos,"|");
+	for(int i=0;i<cant_pokemones(objs);i++){
+		list_add(entre->objetivos,crear_pokemon(objs[i]));
+		list_add(equipo->objetivos,crear_pokemon(objs[i]));
 	}
+	free(objs);
+
 	list_add(equipo->entrenadores,entre);
 	printf("Entrenador%c En Posicion: [%d,%d]\n",entre->tid,entre->posx,entre->posy);
 }
@@ -165,6 +179,14 @@ void salir_equipo(){
 		log_info(logger,"Cantidad De Ciclos De CPU Del Entrenador%c: %d",aux->tid,aux->ciclos_totales);
 	}
 	list_iterate(equipo->exit,(void*)cant_ciclos);
+	free(datos_config->objetivos);
+	free(datos_config->pokemones);
+	log_destroy(logger);
+	//liberar_conexion(conexion_broker->appeared);
+	//liberar_conexion(conexion_broker->catch);
+	//liberar_conexion(conexion_broker->caught);
+	//liberar_conexion(conexion_broker->get);
+	//liberar_conexion(conexion_broker->localized);
 	exit(0);
 }
 
@@ -224,8 +246,8 @@ void ejecutar_equipo(){
 }
 
 void ejecutar_entrenador(entrenador* entre){
-	if(string_equals_ignore_case(datos_config->algoritmo,"RR")){
-		actuar_entrenador_round_robin(entre);
+	if(string_equals_ignore_case(datos_config->algoritmo,"RR") || string_equals_ignore_case(datos_config->algoritmo,"SJF-CD")){
+		actuar_entrenador_con_desalojo(entre);
 	}
 	else{
 		actuar_entrenador_sin_desalojo(entre);
@@ -291,7 +313,7 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 	}
 }
 
-void actuar_entrenador_round_robin(entrenador* entre){
+void actuar_entrenador_con_desalojo(entrenador* entre){
 	inicio:while(1){
 		bool by_id(entrenador* aux){
 			return aux->tid == entre->tid;
@@ -300,7 +322,8 @@ void actuar_entrenador_round_robin(entrenador* entre){
 		if(!verificar_deadlock_equipo()){
 			pokemon* pok = entre->pok_atrapar;
 			move_entrenador(entre,pok->posx,pok->posy);
-			if(entre->quantum <= 0){
+			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
+				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				desalojar_entrenador(entre);
 				goto inicio;
 			}
@@ -311,7 +334,8 @@ void actuar_entrenador_round_robin(entrenador* entre){
 				bloquear_entrenador(entre);
 				goto inicio;
 			}
-			if(entre->quantum <= 0){
+			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
+				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				desalojar_entrenador(entre);
 				goto inicio;
 			}
@@ -319,7 +343,8 @@ void actuar_entrenador_round_robin(entrenador* entre){
 		else{//DEADLOCK
 			list_remove_by_condition(equipo->cola_deadlock,(void*)by_id);
 			move_entrenador(entre,equipo->blocked->posx,equipo->blocked->posy);
-			if(entre->quantum <= 0){
+			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
+				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				list_add(equipo->cola_deadlock,entre);
 				desalojar_entrenador(entre);
 				goto inicio;
@@ -349,10 +374,12 @@ void actuar_entrenador_round_robin(entrenador* entre){
 				list_add(equipo->cola_deadlock,entre);
 			}
 			bloquear_entrenador(entre);
+			goto inicio;
 		}
 		else if(!cumplir_objetivo_entrenador(entre)){
 			log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
 			bloquear_entrenador(entre);
+			goto inicio;
 		}
 		else{
 			salir_entrenador(entre);
@@ -365,11 +392,14 @@ void desalojar_entrenador(entrenador* entre){
 	if(string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->estado == EXEC){
 		printf("\033[1;33m-----Fin De Quantum-----\033[0m\n");
 		printf("\033[1;35mEntrenado%c Desalojado\033[0m\n",entre->tid);
-		despertar_entrenador(entre);
-		sem_post(&semExecTeam);
-		if(list_size(equipo->poks_requeridos) > 0){
-			sem_post(&semPoks);
-		}
+	}
+	else{
+		printf("\033[1;35mEntrenado%c Desalojado Por Otro Entrenador Que Tiene Menor Estimacion\033[0m\n",entre->tid);
+	}
+	despertar_entrenador(entre);
+	sem_post(&semExecTeam);
+	if(list_size(equipo->poks_requeridos) > 0){
+		sem_post(&semPoks);
 	}
 }
 
@@ -423,30 +453,41 @@ void salir_entrenador(entrenador* entre){
 	pthread_rwlock_unlock(&lockEntrenadores);
 }
 
+bool con_estimacion_menor(entrenador* entre){
+	bool menor(entrenador* aux){
+		return estimacion(aux) < entre->estimacion_anterior;
+	}
+	return list_any_satisfy(equipo->cola_ready,(void*)menor);
+}
+
 void move_entrenador(entrenador* entre,int posx,int posy){
 	if(entre->posx != posx || entre->posy != posy){
 		log_info(logger,"Entrenador%c Moviendose A Posicion: [%d,%d]",entre->tid,posx,posy);
 		int ciclosx = abs(entre->posx-posx) * CICLOS_MOVER;
 		int ciclosy = abs(entre->posy-posy) * CICLOS_MOVER;
 		for(int i=0;i<ciclosx;i++){
-			if(string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum == 0){
+			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
+				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				return;
 			}
 			printf("\033[1;32mEntrenador%c Moviendose Por El Eje X ...\033[0m\n",entre->tid);
 			movimiento_ejex_entrenador(entre,posx);
 			entre->quantum--;
 			entre->service_time++;
+			entre->estimacion_anterior--;
 			sumar_ciclos(entre,1);
 			sleep(datos_config->retardo_cpu);
 		}
 		for(int i=0;i<ciclosy;i++){
-			if(string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum == 0){
+			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
+				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				return;
 			}
 			printf("\033[1;32mEntrenador%c Moviendose Por El Eje Y ...\033[0m\n",entre->tid);
 			movimiento_ejey_entrenador(entre,posy);
 			entre->quantum--;
 			entre->service_time++;
+			entre->estimacion_anterior--;
 			sumar_ciclos(entre,1);
 			sleep(datos_config->retardo_cpu);
 		}
@@ -485,6 +526,7 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 		for(int i=0;i<CICLOS_ENVIAR;i++){
 			printf("TEAM enviando mensaje a BROKER ...\n");
 			entre->quantum--;
+			entre->estimacion_anterior--;
 			entre->service_time++;
 			sumar_ciclos(entre,1);
 			sleep(datos_config->retardo_cpu);
@@ -543,6 +585,7 @@ void actuar_intercambio(entrenador* entre1,entrenador* entre2,pokemon* pok1,poke
 		printf("\033[1;32mEntrenador%c y Entrenador%c intercambiando pokemones %s Y %s...\033[0m\n",entre1->tid,entre2->tid,pok1->name,pok2->name);
 		entre1->quantum--;
 		entre1->service_time++;
+		entre1->estimacion_anterior--;
 		sumar_ciclos(entre1,1);
 		sleep(datos_config->retardo_cpu);
 	}
@@ -634,25 +677,31 @@ entrenador* algoritmo_sjf_sin_desalojo(t_list* cola){
 		}
 		return estimacion(aux1) < estimacion(aux2);
 	}
-	list_sort(cola,(void*)sjf_sin_desalojo);
-	return list_get(cola,0);
+
+	void i(entrenador* a){
+		printf("estimacion:%lf\n",estimacion(a));
+	}
+	list_iterate(cola,(void*)i);
+	entrenador* entre = list_get(cola,0);
+	entre->estimacion_anterior = estimacion(entre);
+	return entre;
 }
 
 entrenador* algoritmo_sjf_con_desalojo(t_list* cola){//implementar
 	printf("\033[1;37m==========SJF CON DESALOJO==========\033[0m\n");
-	entrenador* exec = equipo->exec;
-	entrenador* ready = list_get(cola,0);
-	bool sjf_sin_desalojo(entrenador* aux1,entrenador* aux2){
+	bool sjf_con_desalojo(entrenador* aux1,entrenador* aux2){
 		if(estimacion(aux1) == estimacion(aux2)){
 			return aux1->arrival_time < aux2->arrival_time;
 		}
 		return estimacion(aux1) < estimacion(aux2);
 	}
-	if(exec->estimacion_anterior > ready->estimacion_anterior){
-		list_add(cola,exec);
-		list_sort(cola,(void*)sjf_sin_desalojo);
+	void i(entrenador* a){
+		printf("estimacion:%lf\n",estimacion(a));
 	}
-	return list_get(cola,0);
+	list_iterate(cola,(void*)i);
+	entrenador* entre = list_get(cola,0);
+	entre->estimacion_anterior = estimacion(entre);
+	return entre;
 }
 
 entrenador* algoritmo_round_robin(t_list* cola){//implementar
@@ -1333,7 +1382,6 @@ void esperar_cliente(int socket_servidor){
 	recibir_appeared_pokemon_gameboy(socket_cliente);
 	free(cliente_fd);
 }
-
 
 msg* crear_mensaje(int id,int tipo,pokemon* pok){
 	msg* mensaje = malloc(sizeof(msg));
