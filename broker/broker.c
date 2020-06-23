@@ -264,6 +264,9 @@ void atender_suscripcion(int cliente_fd){
 	}
 	else{
 		log_warning(logger,"Proceso %d Ya Habia Suscrito A La Cola %s",pid,get_cola(queue_id));
+		suscriber* sus = list_find(cola->suscriptors,(void*)existe);
+		sus->cliente_fd = cliente_fd;
+		enviar_confirmacion_suscripcion(sus);
 	}
 
 	if(!list_is_empty(cola->mensajes)){

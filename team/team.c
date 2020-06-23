@@ -94,7 +94,6 @@ void crear_team(){
 	equipo->cola_ready = list_create();
 	equipo->cola_deadlock = list_create();
 	equipo->exit = list_create();
-	equipo->suscrito = 0;
 	equipo->blocked = NULL;
 
 	char** pos = string_get_string_as_array(datos_config->posiciones);
@@ -1095,7 +1094,7 @@ void recibir_localized_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->localized, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		if(cod_op <= 0){
+		if(cod_op <= 0 || check_socket(conexion_broker->localized) != 1){
 			conexion_broker->localized = -1;
 			reintento_conectar_broker();
 			return;
@@ -1147,7 +1146,7 @@ void recibir_caught_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->caught, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		if(cod_op <= 0){
+		if(cod_op <= 0 || check_socket(conexion_broker->caught) != 1){
 			conexion_broker->caught = -1;
 			reintento_conectar_broker();
 			return;
@@ -1208,7 +1207,7 @@ void recibir_appeared_pokemon(){
 		int cod_op;
 		if(recv(conexion_broker->appeared, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 			cod_op = -1;
-		if(cod_op <= 0){
+		if(cod_op <= 0 || check_socket(conexion_broker->appeared) != 1){
 			conexion_broker->appeared = -1;
 			reintento_conectar_broker();
 			return;
@@ -1246,22 +1245,16 @@ void recibir_appeared_pokemon(){
 
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
-	if(suscribirse_appeared() == 1 && suscribirse_localized() == 1 && suscribirse_caught() == 1){
-		recibir_mensajes();
-		equipo->suscrito = 1;
-		printf("TEAM Se Ha Suscrito\n");
-	}
-	else{
+	suscribirse_localized();
+	suscribirse_appeared();
+	suscribirse_caught();
+	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1 || conexion_broker->caught == -1){
 		log_error(logger,"No Se Puede Conectarse A Broker");
 		reintento_conectar_broker();
 	}
-}
-
-void conectar_broker(){
-	conexion_broker->localized = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	conexion_broker->caught = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	conexion_broker->appeared = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	recibir_mensajes();
+	else{
+		recibir_mensajes();
+	}
 }
 
 void recibir_mensajes(){
@@ -1273,43 +1266,31 @@ void recibir_mensajes(){
 	pthread_detach(suscripcion_localized);
 }
 
-int suscribirse_appeared(){
+void suscribirse_appeared(){
 	conexion_broker->appeared = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	int res = 0;
 	if(conexion_broker->appeared != -1){
 		log_warning(logger,"Conectado A Broker Suscribirse a APPEARED");
 		enviar_info_suscripcion(APPEARED_POKEMON,conexion_broker->appeared,equipo->pid);
-		if(recibir_confirmacion_suscripcion(conexion_broker->appeared,APPEARED_POKEMON) != -1){
-			res = 1;
-		}
+		recibir_confirmacion_suscripcion(conexion_broker->appeared,APPEARED_POKEMON);
 	}
-	return res;
 }
 
-int suscribirse_localized(){
+void suscribirse_localized(){
 	conexion_broker->localized = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	int res = 0;
 	if(conexion_broker->localized != -1){
 		log_warning(logger,"Conectado A Broker Suscribirse a LOCALIZED");
 		enviar_info_suscripcion(LOCALIZED_POKEMON,conexion_broker->localized,equipo->pid);
-		if(recibir_confirmacion_suscripcion(conexion_broker->localized,LOCALIZED_POKEMON) !=-1){
-			res = 1;
-		}
+		recibir_confirmacion_suscripcion(conexion_broker->localized,LOCALIZED_POKEMON);
 	}
-	return res;
 }
 
-int suscribirse_caught(){
+void suscribirse_caught(){
 	conexion_broker->caught = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
-	int res = 0;
 	if(conexion_broker->localized != -1){
 		log_warning(logger,"Conectado A Broker Suscribirse a CAUGHT");
 		enviar_info_suscripcion(CAUGHT_POKEMON,conexion_broker->caught,equipo->pid);
-		if(recibir_confirmacion_suscripcion(conexion_broker->caught,CAUGHT_POKEMON) != -1){
-			res = 1;
-		}
+		recibir_confirmacion_suscripcion(conexion_broker->caught,CAUGHT_POKEMON);
 	}
-	return res;
 }
 
 void reintento_conectar_broker(){
@@ -1324,13 +1305,7 @@ void reintento_conectar_broker(){
 void end_of_quantum_handler(){
 	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1 || conexion_broker->caught == -1){
 		log_warning(logger,"Reconectando A Broker...");
-		if(equipo->suscrito == 0){
-			suscribirse_broker(equipo->pid);
-		}
-		else{
-			log_error(logger,"No Se Puede Conectarse A Broker.");
-			conectar_broker();
-		}
+		suscribirse_broker(equipo->pid);
 		alarm(datos_config->tiempo_reconexion);
 	}
 }

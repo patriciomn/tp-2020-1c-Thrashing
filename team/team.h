@@ -74,7 +74,6 @@ typedef struct{
 	t_list* poks_requeridos;
 	t_list* cola_ready;
 	t_list* cola_deadlock;
-	bool suscrito;
 }team;
 
 typedef struct{
@@ -182,9 +181,9 @@ void iniciar_servidor(void);
 void esperar_cliente(int);
 void process_request(int cod_op, int cliente_fd);
 void serve_client(int *socket);
-int suscribirse_appeared();
-int suscribirse_localized();
-int suscribirse_caught();
+void suscribirse_appeared();
+void suscribirse_localized();
+void suscribirse_caught();
 void suscribirse_broker();
 void enviar_mensajes_get_pokemon();
 void enviar_mensajes_get_pokemon();
