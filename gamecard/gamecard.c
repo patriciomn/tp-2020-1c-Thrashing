@@ -1126,6 +1126,7 @@ char *read_file_into_buf (char ** source,  FILE *fp){
 		log_info(logger,"8888888888888888888888888");
 		while(!feof(fp)){
 			source[i] = c;
+			c=fgetc(fp);
 			i++;
 
 		}
@@ -1133,6 +1134,7 @@ char *read_file_into_buf (char ** source,  FILE *fp){
 		log_info(logger, "el primer valor %s",source[0]);
         if ( ferror( fp ) != 0 ) {
             fputs("Error reading file", stderr);
+
         } 
     }
 }
