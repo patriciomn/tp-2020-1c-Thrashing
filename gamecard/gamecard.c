@@ -1104,7 +1104,7 @@ int fileSize(char* file) {
     return res; 
 } 
 
-char *read_file_into_buf (char ** source,  FILE *fp){
+char *read_file_into_buf (char * source,  FILE *fp){
    if (fseek(fp, 0L, SEEK_END) == 0) {
         long bufsize = ftell(fp);
         if (bufsize == -1) { 
@@ -1113,25 +1113,17 @@ char *read_file_into_buf (char ** source,  FILE *fp){
 
         /*Le da al buffer el mismo tamaño del archivo */
         source = malloc(sizeof(bufsize + 1));
-		log_info(logger, "Malloc tam archivo %d",bufsize);
-        /* Go back to the start of the file. */
-		fseek (fp, 0, SEEK_SET);
+		//log_info(logger, "Malloc tam archivo %d",bufsize);
+		fseek (fp, 0, SEEK_SET); //vuelve al principio
         if (fseek(fp, 0L, SEEK_SET) != 0) { /* Error */
-			log_error(logger, "entra en este feo");
+			log_error(logger, "Error al volver al inicio del archivo");
 			 }
 
         /* Read the entire file into memory. */
-		int i = 0;
-        int c = fgetc(fp);
-		log_info(logger,"8888888888888888888888888");
-		while(!feof(fp)){
-			source[i] = c;
-			c=fgetc(fp);
-			i++;
-
-		}
-		log_info(logger,"QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
-		log_info(logger, "el primer valor %s",source[0]);
+		
+		fgets(source,bufsize,fp);
+		log_info(logger,"Lo que se escaneo :: %s",source);
+		return source;
         if ( ferror( fp ) != 0 ) {
             fputs("Error reading file", stderr);
 
@@ -1170,43 +1162,30 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
             char* pathFILE = string_new();
             string_append(&pathFILE,path_directorio_pokemon);
             string_append_with_format(&pathFILE,"%s%s%s", "/",pokemon, POKEMON_FILE_EXT);
-			log_info(logger, "Path pokemon %s", pathFILE);
+			//log_info(logger, "Path pokemon %s", pathFILE);
 			FILE *fp =fopen(pathFILE, "r");
 			int fplen = fileSize(pathFILE);
-			 log_info(logger, "%d es la longitud del scaneo", fplen);
             char* scaneo = NULL;
-			 log_info(logger, "eeeeeeeo");
 			//revisar como entran las cosas al buffer
-            read_file_into_buf (&scaneo, fp);
-			log_info(logger, "yyyyyyyyyyyyyy");
-    //        log_info(logger, "%d es la longitud del scaneo", string_length(scaneo));
-          //    printf("%d deberia saber el length\n", string_length(scaneo));
-            //settear OPEN = N
+            read_file_into_buf (scaneo, fp);
 			//mutex_lock
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
-			log_info(logger, "yyyyyyyyyyyy2yy");
+			log_info(logger, "Cerro archivo pokemon");
     		// mutex_unlock
-			printf("  path archivo = %s \n", pathFILE );
 			free(pathFILE);
 			free(fp);
             //falta separar uno a uno las lineas
 			respuesta->posiYcant = list_create();
-			log_info(logger, "yyyyyyyyyyyyyy3");
-			/*
-for (int i = 0; i < 5; ++i){
-	printf("  scaneo[%d] = %d ,", i,    scaneo[i]);
-}*/
+			log_info(logger, "Hizo los frees  y Crea lista");
        
 			int desplazamiento = 0;
 			while(desplazamiento < fplen){
-	//memcpy(destino, fuente, tamaño);
-	//memcpy(&(catch_pokemon->id_mensaje), valor + desplazamiento, sizeof(int));
-	//desplazamiento += sizeof(int);
 			posYcant* posicionesCant = malloc(sizeof(posYcant));
+			log_info(logger, "zona de memcpy");
+	//TENGO PROBLEMAS CON LOS MEMCPY REVISAR
 			memcpy(&(posicionesCant->posX), scaneo, sizeof(int));
 			log_info(logger, "Entrando a memcpy");
 			log_info(logger, "%d Posicione en x", posicionesCant->posX);
-			printf("%d deberia ser la posicion en x",posicionesCant->posX);
 			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del -
 			memcpy(&(posicionesCant->posY), scaneo, sizeof(int));
 			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del =

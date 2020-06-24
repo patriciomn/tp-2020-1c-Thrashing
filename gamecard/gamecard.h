@@ -173,7 +173,7 @@ void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 
-char *read_file_into_buf (char **source, FILE *fp);
+char *read_file_into_buf (char *source, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 
