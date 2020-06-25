@@ -493,11 +493,11 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	memcpy(&correlation_id, msg, sizeof(int));
 	localized_pokemon* localized = deserializar_localized(msg);
 	printf("\033[1;35mDatos Recibidos:LOCALIZED_POKEMON:Correlation_id:%d|Pokemon:%s|Size:%d|Cant_posiciones:%d\033[0m\n",correlation_id,localized->name,localized->name_size,localized->cantidad_posiciones);
-	void show(pos_cant* pos){
-		printf("Pos:[%d,%d]|Cantidad:%d\n",pos->posx,pos->posy,pos->cant);
+	void show(position* pos){
+		printf("Pos:[%d,%d]\n",pos->posx,pos->posy);
 		free(pos);
 	}
-	list_iterate(localized->pos_cant,(void*)show);
+	list_iterate(localized->posiciones,(void*)show);
 	mensaje* item = crear_mensaje(LOCALIZED_POKEMON,cliente_fd,cola_localized->id,localized);
 	item->id_correlacional = correlation_id;
 
@@ -510,7 +510,7 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	}
 
 	//almacena
-	size_t size = localized->name_size+sizeof(uint32_t)*2+sizeof(pos_cant)*localized->cantidad_posiciones;
+	size_t size = localized->name_size+sizeof(uint32_t)*2+sizeof(position)*localized->cantidad_posiciones;
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);

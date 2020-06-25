@@ -127,7 +127,7 @@ get_pokemon* deserializar_get(void* buffer) {
 
 localized_pokemon* deserializar_localized(void* buffer) {
     localized_pokemon* localized = malloc(sizeof(localized_pokemon));
-    localized->pos_cant = list_create();
+    localized->posiciones = list_create();
 
     void* stream = buffer+sizeof(int);
     memcpy(&(localized->name_size), stream, sizeof(int));
@@ -138,10 +138,10 @@ localized_pokemon* deserializar_localized(void* buffer) {
 	memcpy(&localized->cantidad_posiciones,stream,sizeof(int));
 	stream += sizeof(int);
 	for(int i=0;i<localized->cantidad_posiciones;i++){
-		pos_cant* pc = malloc(sizeof(pos_cant));
-		memcpy(pc,stream, sizeof(pos_cant));
-		list_add(localized->pos_cant,pc);
-		stream += sizeof(pos_cant);
+		position* pc = malloc(sizeof(position));
+		memcpy(pc,stream, sizeof(position));
+		list_add(localized->posiciones,pc);
+		stream += sizeof(position);
 	}
 	
     return localized;

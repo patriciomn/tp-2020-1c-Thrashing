@@ -604,15 +604,15 @@ void recibir_localized_pokemon(){
 		memcpy(&id_correlacional,valor+sizeof(int),sizeof(int));
 		localized_pokemon* localized = deserializar_localized(valor+sizeof(int));
 		log_info(logger,"Llega Un Mensaje Tipo: APPEARED_POKEMON: ID: %d ID_Correlacional: %d Pokemon: %s \n",id,id_correlacional,localized->name);
-		void show(pos_cant* pos){
-			log_info(logger,"Pos:[%d,%d]|Cantidad:%d",pos->posx,pos->posy,pos->cant);
+		void show(position* pos){
+			log_info(logger,"Pos:[%d,%d]",pos->posx,pos->posy);
 			free(pos);
 		}
-		list_iterate(localized->pos_cant,(void*)show);
+		list_iterate(localized->posiciones,(void*)show);
 		free(valor);
 		//conectar_proceso(BROKER);
 		enviar_ack(LOCALIZED_POKEMON,id,pid,conexion);
-		list_destroy(localized->pos_cant);
+		list_destroy(localized->posiciones);
 		free(localized->name);
 		free(localized);
 	}

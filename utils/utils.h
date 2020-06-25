@@ -108,16 +108,10 @@ typedef struct{
 }get_pokemon;
 
 typedef struct{
-	int posx;
-	int posy;
-	int cant;
-}pos_cant;
-
-typedef struct{
 	int name_size;
 	char* name;
 	int cantidad_posiciones;
-	t_list* pos_cant;
+	t_list* posiciones;
 }localized_pokemon;
 
 void* serializar_paquete(t_paquete* paquete, int bytes);
