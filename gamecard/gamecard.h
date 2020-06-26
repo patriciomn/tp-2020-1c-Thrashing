@@ -183,6 +183,10 @@ void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon,
 
 bool ultimo_bloque_queda_en_cero(int bytes_a_mover, char *path_directorio_pokemon);
 
+void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon);
+
+void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque);
+
 //void operacion_new_pokemon(new_pokemon *newPokemon);
 rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 

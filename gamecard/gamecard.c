@@ -352,6 +352,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     free(path_directorio_pokemon);
 }
 
+
 void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon) { // verificamos si existe o no la linea en el archivo existente
 
 	char *path_archivo_pokemon = string_new();
@@ -385,6 +386,7 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 	free(path_archivo_pokemon);
 	free(linea);
 }
+
 
 void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon, char *linea) { // si hay espacio en el ultimo bloque, se escribe en la ultima posicion del archivo. Caso contrario se busca un nuevo bloque
 
@@ -1006,6 +1008,7 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 	free(ruta_archivo_pokemon);
 }
 
+
 //-------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------
 // catch_pokemon
@@ -1097,44 +1100,41 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 	int cantidadLineaActualizada = atoi(string_duplicate(string_substring(lineaActualizada, sizeCoordenada, strlen(lineaActualizada) - sizeCoordenada - 1)));
 	log_info(logger, "cantidad actualizada:%d", cantidadLineaActualizada);
 
-	if(diferencia == 0 && cantidadLineaActualizada != 0) { // no cambia nada, es solo reemplazar la misma linea con la nueva cantidad
+	// diferencia == 0
+	if(cantidadLineaActualizada != 0) {
 
-		log_info(logger, "NO ES NECESARIO MOVER LAS LINEAS DE DATOS");
-		memcpy(file_memory + posicionLinea, lineaActualizada, strlen(lineaActualizada));
-		actualizar_contenido_blocks(ruta_directorio_pokemon, file_memory);
-		munmap(file_memory, tamArchivo);
-		cambiar_valor_metadata(ruta_directorio_pokemon, "OPEN", "N");
+		if(diferencia == 0) { // no cambia nada, es solo reemplazar la misma linea con la nueva cantidad
 
-	} else {
+			log_info(logger, "NO ES NECESARIO MOVER LAS LINEAS DE DATOS");
+			memcpy(file_memory + posicionLinea, lineaActualizada, strlen(lineaActualizada));
+			actualizar_contenido_blocks(ruta_directorio_pokemon, file_memory);
+			munmap(file_memory, tamArchivo);
+			cambiar_valor_metadata(ruta_directorio_pokemon, "OPEN", "N");
 
-		if(cantidadLineaActualizada == 0) { // verifico si tengo que borrar todo o solo tratar con el ultimo bloque
-
-			if(tamArchivo == strlen(lineaActualizada)) {
-				// se borra todo y envio la vieja linea con la cantidad que queda
-				cambiar_archivo_a_directorio(file_memory, ruta_archivo_pokemon, ruta_directorio_pokemon);
-				// enviar rta al broker
-
-			} else {
-
-				if(ultimo_bloque_queda_en_cero(diferencia, ruta_directorio_pokemon)) {
-					// borro el ultimo bloque de la lista y tambien el archivo en blocks
-					log_info(logger, "ES NECESARIO MOVER LOS BYTES PARA ATRAS Y BORRAR EL ULTIMO BLOQUE");
-
-					char *ultimoBloque = string_itoa(ultimo_bloque_array_blocks(ruta_directorio_pokemon));
-					borrar_archivo(ultimoBloque, 'B');
-
-					//seteo a 0 el bitmap[ultimoBloque]
-
-					modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
-
-				} else {
-					// no borro nada, solo actualizo el ultimo bloque
-				}
-
-			}
 		} else {
 
+			if(ultimo_bloque_queda_en_cero(diferencia, ruta_directorio_pokemon)) {
+				// borro el ultimo bloque de la lista y tambien el archivo en blocks
+				log_info(logger, "ES NECESARIO MOVER LOS BYTES PARA ATRAS Y BORRAR EL ULTIMO BLOQUE");
+
+				int ultimo_bloque = ultimo_bloque_array_blocks(ruta_directorio_pokemon);
+				borrar_ultimo_bloque_metadata_blocks(ruta_directorio_pokemon, ultimo_bloque);
+
+				char *ultimoBloque = string_itoa(ultimo_bloque);
+				borrar_archivo(ultimoBloque, 'B');
+
+				//seteo a 0 el bitmap[ultimoBloque]
+
+				modificar_archivo_pokemon_catch_con_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+
+			} else {
+				// solo modifico el ultimo bloque
+				log_info(logger, "SOLO MODIFICAMOS EL ULTIMO BLOQUE");
+				modificar_archivo_pokemon_catch_con_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+			}
 		}
+
+	} else {
 
 	}
 
@@ -1236,6 +1236,106 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 }
 
 
+// esta funcion es para cuando la linea se reduce 1 byte o mas. Se mantiene la coordenada
+void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon) {
+
+	char *ruta_archivo_pokemon = string_new();
+	string_append(&ruta_archivo_pokemon, path_directorio_pokemon);
+	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s", "/", pokemon, ".txt");
+
+	int tamArchivo = fileSize(ruta_archivo_pokemon);
+
+	int sizeViejaLinea = strlen(viejaLinea);
+
+	int sizeNuevaLinea = strlen(lineaActualizada);
+
+	int nuevoTamArchivo = tamArchivo - (sizeViejaLinea - sizeNuevaLinea);
+
+	int desplazamiento = 0;
+
+	// mover los bloques para atras
+	char *buffer = malloc(nuevoTamArchivo + 1); // + 1 por el \0
+
+	if(posicionLinea == 0) { // esta en la primera linea
+
+		memcpy(buffer, lineaActualizada, sizeNuevaLinea);
+		desplazamiento += sizeNuevaLinea;
+
+		memcpy(buffer + desplazamiento, fileMemory + sizeViejaLinea, tamArchivo - sizeViejaLinea);
+		desplazamiento += tamArchivo - sizeViejaLinea;
+
+		buffer[desplazamiento] = '\0';
+
+		munmap(fileMemory, tamArchivo);
+
+		log_info(logger, "contenido actualizado:");
+		log_info(logger, "%s", buffer);
+
+		escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+		cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
+
+		// actualizamos el valor de los bloques
+		actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+		// cambiamos el valor de OPEN a N
+		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+		free(buffer);
+
+	} else if(posicionLinea + sizeViejaLinea == tamArchivo) { // esta en la ultima linea
+
+			memcpy(buffer, fileMemory, posicionLinea);
+			desplazamiento += posicionLinea;
+
+			memcpy(buffer + desplazamiento, lineaActualizada, sizeNuevaLinea);
+			desplazamiento += sizeNuevaLinea;
+
+			buffer[desplazamiento] = '\0';
+
+			munmap(fileMemory, tamArchivo);
+
+			log_info(logger, "contenido actualizado:");
+			log_info(logger, "%s", buffer);
+
+			escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
+			// actualizamos el valod de los bloques
+			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+			// cambiamos el valor de OPEN a N
+			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+			free(buffer);
+
+		} else { // esta en el medio
+
+			memcpy(buffer, fileMemory, posicionLinea);
+			desplazamiento += posicionLinea;
+
+			memcpy(buffer + desplazamiento, lineaActualizada, sizeNuevaLinea);
+			desplazamiento += sizeNuevaLinea;
+
+			buffer[desplazamiento] = '\0';
+
+			munmap(fileMemory, tamArchivo);
+
+			log_info(logger, "contenido actualizado:");
+			log_info(logger, "%s", buffer);
+
+			escribir_archivo(ruta_archivo_pokemon, buffer, "w+");
+
+			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
+			// actualizamos el valod de los bloques
+			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
+			// cambiamos el valor de OPEN a N
+			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+		}
+
+	free(ruta_archivo_pokemon);
+}
+
+
 char* get_linea_nueva_cantidad_catch(char *linea, char *coordenada) { // nos devuelve un char* que tiene la cantidad modificada pero disminuido en 1 (x - 1)
 
 	int sizeCoordenada = strlen(coordenada) + 1; // 1 por el caracter '='
@@ -1263,13 +1363,14 @@ bool ultimo_bloque_queda_en_cero(int bytes_a_mover, char *path_directorio_pokemo
 	char **array_blocks = get_array_blocks_metadata(path_directorio_pokemon);
 
 	char *ultimoBloque = string_itoa(ultimo_bloque_array_blocks(path_directorio_pokemon));
+	//log_info(logger, "ultimo bloque: %s", ultimoBloque); tira bien
 
 	char *ruta_archivo_bloque = string_new();
-	string_append_with_format(&ruta_archivo_bloque, "%s%s%s%s%s", path_directorio_pokemon, BLOCKS_DIR, "/", ultimoBloque, ".txt");
+	string_append_with_format(&ruta_archivo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", ultimoBloque, ".txt");
 
 	int fileSizeLastBlock = fileSize(ruta_archivo_bloque);
 
-	if(fileSizeLastBlock - bytes_a_mover < 0) {
+	if(fileSizeLastBlock - bytes_a_mover == 0) {
 		// puedo asumir que el ultimo bloque queda vacio
 		return true;
 
@@ -1289,7 +1390,6 @@ void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon,
 	munmap(file_memory, tamArchivo);
 	remove(path_archivo_pokemon);
 	int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-	log_info(logger, "ultimo bloque: %d", ultimo_bloque);
 	// se actualiza el bitmap, se limpia el bit de la posicion ultimo_bloque
 	char *path_ultimo_bloque = string_new();
 	string_append_with_format(&path_ultimo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", string_itoa(ultimo_bloque), ".txt");
@@ -1308,11 +1408,9 @@ void borrar_archivo(char *nombre, char flag) {
 
 	if(flag == 'P') { // quiero borrar un archivo pokemon
 		string_append_with_format(&ruta_archivo, "%s%s%s", POKEMON_DIR, nombre, ".txt");
-		log_info(logger, "BORRANDO ARCHIVO CON RUTA <%s>", ruta_archivo);
 		remove(ruta_archivo);
 	} else {
 		string_append_with_format(&ruta_archivo, "%s%s%s%s", BLOCKS_DIR, "/", nombre, ".txt");
-		log_info(logger, "BORRANDO ARCHIVO CON RUTA <%s>", ruta_archivo);
 		remove(ruta_archivo);
 	}
 
@@ -1338,6 +1436,46 @@ void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon) {
 	config_destroy(metadataArchivo);
 }
 
+void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque) { // borra un nro de bloque en el campo blocks de la metadata
+
+	int size_nro_bloque = strlen(string_itoa(nro_bloque));
+
+	int size_new_string = strlen(ruta_directorio_pokemon) + strlen(METADATA_FILE) + 1;
+	char *ruta_metadata_pokemon = malloc(size_new_string);
+	strcpy(ruta_metadata_pokemon, ruta_directorio_pokemon);
+	string_append(&ruta_metadata_pokemon, METADATA_FILE);
+
+	t_config *metadata_pokemon = config_create(ruta_metadata_pokemon);
+
+	char *blocks = config_get_string_value(metadata_pokemon, "BLOCKS");
+	int sizeBlocks = strlen(blocks);
+
+	int newSizeBlocks = sizeBlocks - size_nro_bloque - 1; // -1 por la coma
+
+	char *newBlocks = malloc(newSizeBlocks + 1);
+
+	char *auxiliar = strdup(string_substring(blocks, 1, newSizeBlocks - 2)); // se resta 2 por los corchetes []
+	log_info(logger, "auxiliar: %s", auxiliar);
+
+	int posicion = 0;
+
+	strcpy(newBlocks, "[");
+	posicion++;
+
+	strcpy(newBlocks + posicion, auxiliar);
+	posicion += strlen(auxiliar);
+
+	strcpy(newBlocks + posicion, "]");
+	posicion++;
+
+	config_set_value(metadata_pokemon, "BLOCKS", newBlocks);
+	config_save(metadata_pokemon);
+	config_destroy(metadata_pokemon);
+	free(newBlocks);
+	free(ruta_metadata_pokemon);
+}
+
+
 //-------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------
 
@@ -1346,7 +1484,7 @@ int fileSize(char* file) {
 	FILE* fp = fopen(file, "r");
     if (fp == NULL) {
     	log_error(logger, "No existe el archivo");
-        return -1; 
+        exit(1);
     } 
 
     fseek(fp, 0L, SEEK_END);
