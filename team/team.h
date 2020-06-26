@@ -19,14 +19,12 @@
 #include<signal.h>
 #include<semaphore.h>
 #include<sys/time.h>
-#include <uuid/uuid.h>
 
 #define IP "127.0.0.2"
 #define PUERTO "4445"
-#define CICLOS_MOVER 1
-#define CICLOS_ENVIAR 1
+#define CICLO_ACCION 1
 #define CICLOS_INTERCAMBIAR 5
-#define CANT_ENTRE 20
+#define CANT_ENTRE 100
 
 enum ESTADO{
 	NEW,
@@ -59,6 +57,7 @@ typedef struct{
 	int turnaround_time;
 	double estimacion_anterior;
 	int ciclos_totales;
+	int cant_cambio_contexto;
 	int quantum;
 	pokemon* pok_atrapar;
 }entrenador;
@@ -74,6 +73,8 @@ typedef struct{
 	t_list* poks_requeridos;
 	t_list* cola_ready;
 	t_list* cola_deadlock;
+	int cant_deadlock;
+	int cant_deadlock_resuelto;
 }team;
 
 typedef struct{

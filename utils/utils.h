@@ -14,7 +14,6 @@
 #include<assert.h>
 #include<signal.h>
 #include<semaphore.h>
-#include <uuid/uuid.h>
 /*
 
 	FORMA DE ENVIO DE MENSAJES:
