@@ -122,9 +122,6 @@ pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_poke
 pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
-pthread_t atender_new_pokemon;      // hilo para hacer el new_pokemon
-pthread_t atender_catch_pokemon;    // hilo para hacer el catch_pokemon
-
 //FUNCIONES
 
 int main ();

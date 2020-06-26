@@ -342,9 +342,9 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     			// hacer reintento de operacion
     			log_warning(logger, "HILO EN STANDBY DE OPERACION");
     			sleep(10);
-    			pthread_cancel(thread_new_pokemon);
-    			pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
-    			pthread_join(atender_new_pokemon, NULL);
+    			//pthread_cancel(thread_new_pokemon);
+    			//pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
+    			//pthread_join(atender_new_pokemon, NULL);
     			//log_info(logger, "HILO RETOMANDO LA OPERACION");
     		}
     	}
@@ -1101,7 +1101,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 	log_info(logger, "cantidad actualizada:%d", cantidadLineaActualizada);
 
 	// diferencia == 0
-	if(cantidadLineaActualizada != 0) {
+	if(cantidadLineaActualizada != 0) { // no se tiene que borrar la linea entera, solo uno o mas bytes de la misma
 
 		if(diferencia == 0) { // no cambia nada, es solo reemplazar la misma linea con la nueva cantidad
 
@@ -1134,7 +1134,35 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 			}
 		}
 
-	} else {
+	} else { // se borra la linea entera
+
+		if(tamArchivo == strlen(lineaActualizada)) { // se borra todo: el archvio, los bloques y en la metadata queda solamente el DIRECTORY
+
+			cambiar_archivo_a_directorio(file_memory, ruta_archivo_pokemon, ruta_directorio_pokemon);
+
+		} else {
+
+			if(ultimo_bloque_queda_en_cero(strlen(lineaActualizada), ruta_directorio_pokemon)) {
+				// borro el ultimo bloque de la lista y tambien el archivo en blocks
+				log_info(logger, "SE BORRA LA LINEA ENTERA Y EL ULTIMO BLOQUE");
+
+				int ultimo_bloque = ultimo_bloque_array_blocks(ruta_directorio_pokemon);
+				borrar_ultimo_bloque_metadata_blocks(ruta_directorio_pokemon, ultimo_bloque);
+
+				char *ultimoBloque = string_itoa(ultimo_bloque);
+				borrar_archivo(ultimoBloque, 'B');
+
+				//seteo a 0 el bitmap[ultimoBloque]
+
+				modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+
+			} else {
+				// solo modifico el ultimo bloque
+				log_info(logger, "SOLO MODIFICAMOS EL ULTIMO BLOQUE");
+				modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+			}
+
+		}
 
 	}
 
@@ -1143,7 +1171,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 	free(ruta_archivo_pokemon);
 }
 
-
+// esta es para cuando se borra la linea entera
 void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon) {
 
 	char *ruta_archivo_pokemon = string_new();
@@ -1363,14 +1391,13 @@ bool ultimo_bloque_queda_en_cero(int bytes_a_mover, char *path_directorio_pokemo
 	char **array_blocks = get_array_blocks_metadata(path_directorio_pokemon);
 
 	char *ultimoBloque = string_itoa(ultimo_bloque_array_blocks(path_directorio_pokemon));
-	//log_info(logger, "ultimo bloque: %s", ultimoBloque); tira bien
 
 	char *ruta_archivo_bloque = string_new();
 	string_append_with_format(&ruta_archivo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", ultimoBloque, ".txt");
 
 	int fileSizeLastBlock = fileSize(ruta_archivo_bloque);
 
-	if(fileSizeLastBlock - bytes_a_mover == 0) {
+	if(bytes_a_mover >= fileSizeLastBlock) {
 		// puedo asumir que el ultimo bloque queda vacio
 		return true;
 
@@ -1436,7 +1463,8 @@ void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon) {
 	config_destroy(metadataArchivo);
 }
 
-void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque) { // borra un nro de bloque en el campo blocks de la metadata
+
+void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque) { // borra el ultimo bloque en el campo blocks de la metadata
 
 	int size_nro_bloque = strlen(string_itoa(nro_bloque));
 
@@ -1746,7 +1774,8 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("PosY: %d\n", newPokemon->pos.posy);
 			printf("Cantidad: %d\n", newPokemon->cantidad);
 
-			pthread_create(&atender_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
+			pthread_t hilo_new_pokemon;
+			pthread_create(&hilo_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 
 			free(stream);
 		break;
@@ -1764,7 +1793,8 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("PosX: %d\n", catchPokemon->pos.posx);
 			printf("PosY: %d\n", catchPokemon->pos.posy);
 
-			pthread_create(&atender_catch_pokemon, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
+			pthread_t hilo_catch_pokemon;
+			pthread_create(&hilo_catch_pokemon, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
 
 			free(stream);
 		break;
