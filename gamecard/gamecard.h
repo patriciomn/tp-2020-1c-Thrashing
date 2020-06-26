@@ -32,13 +32,14 @@
 #define METADATA_FILE "/metadata.txt"
 #define BLOCKS_DIR "/blocks"
 #define FILES_DIR "/files"
-#define POKEMON_DIR "/files/"
+#define POKEMON_DIR "/pokemon/"
 #define METADATA_TXT_PATH "/metadata/metadata.txt"
 #define BITMAP_PATH "/metadata/bitmap.bin"
 #define BITMAP_FILE "/bitmap.bin"
 #define BITS 8
 #define POKEMON_FILE_EXT ".txt"
 #define TXT_FILE_EXT ".txt"
+#define DIRECTORIO_POKEMON "pokemon"
 #define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 
 
@@ -122,6 +123,7 @@ pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
 pthread_t atender_new_pokemon;      // hilo para hacer el new_pokemon
+pthread_t atender_catch_pokemon;    // hilo para hacer el catch_pokemon
 
 //FUNCIONES
 
@@ -177,6 +179,10 @@ char *read_file_into_buf (char *source, FILE *fp);
 
 int tipo_mensaje(char* tipo_mensaje);
 
+void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon, char *path_directorio_pokemon);
+
+bool ultimo_bloque_queda_en_cero(int bytes_a_mover, char *path_directorio_pokemon);
+
 //void operacion_new_pokemon(new_pokemon *newPokemon);
 rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
@@ -195,6 +201,9 @@ int cantidad_de_bloques(char **arrayBlocks);
 int get_posicion_linea_en_archivo(char *linea, char *mmaped);
 int get_tamanio_linea(char *mapped);
 int fileSize(char* file);
+char* get_linea_nueva_cantidad_catch(char *linea, char *coordenada);
+void borrar_archivo(char *nombre, char flag);
+void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
