@@ -54,6 +54,9 @@ char *ruta_archivo_bitmap;
 
 void *bitmap_memoria;	// puntero para el mmap
 
+
+enum op_bitmap { SET = 1, CLEAN = 2};
+
 struct metadata_info {
     int block_size;
     int blocks;
@@ -205,6 +208,7 @@ int fileSize(char* file);
 char* get_linea_nueva_cantidad_catch(char *linea, char *coordenada);
 void borrar_archivo(char *nombre, char flag);
 void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
+void limpiar_bloque_bitmap(int nro_bloque);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------

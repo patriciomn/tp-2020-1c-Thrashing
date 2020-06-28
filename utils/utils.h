@@ -83,6 +83,7 @@ typedef struct{
 	char* name;
 	position pos;
 	int cantidad;
+	pthread_t hilo_new_pokemon;
 }new_pokemon;
 
 typedef struct{
