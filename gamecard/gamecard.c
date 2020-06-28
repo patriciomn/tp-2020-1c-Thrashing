@@ -1548,20 +1548,24 @@ char *read_file_into_buf (char * source,  FILE *fp){
     }
 }
 
-/*rtaGet* prueba = malloc(sizeof(rtaGet));
-	prueba = operacion_get_Pokemon(99, "pepa");*/
+/*
+	get_pokemon* pepa = malloc(sizeof(get_pokemon));
+	pepa->name_size = 6;
+	pepa->name= "pepa";
+	operacion_get_Pokemon(pepa);*/
 
-rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
+void operacion_get_Pokemon(get_pokemon *GETpokemon){
 	rtaGet* respuesta = malloc(sizeof(rtaGet));
-    respuesta->id_mensaje = idMensaje;
-    respuesta->name = pokemon;
+    respuesta->id_mensaje = 000; //Preguntar a Patricio como pasan el id @TODO
+    respuesta->name = GETpokemon->name;
 	char *path_directorio_pokemon = string_new();
-		string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", pokemon);
+		string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", GETpokemon->name);
 		log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
 
 		if(opendir(path_directorio_pokemon) == NULL) { // si existe o no el directorio (FAIL)
 			log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 		    //si no existe se devuelve el nombre y el id, los cuales ya estan cargados
+			//enviar_respuesta_a_broker(respuesta)
 		} else {
 			char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
 			if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
@@ -1578,7 +1582,7 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
             
             char* pathFILE = string_new();
             string_append(&pathFILE,path_directorio_pokemon);
-            string_append_with_format(&pathFILE,"%s%s%s", "/",pokemon, POKEMON_FILE_EXT);
+            string_append_with_format(&pathFILE,"%s%s%s", "/",GETpokemon->name, POKEMON_FILE_EXT);
 			//log_info(logger, "Path pokemon %s", pathFILE);
 			FILE *fp =fopen(pathFILE, "r");
 			int fplen = fileSize(pathFILE);
@@ -1597,6 +1601,7 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
        
 			int desplazamiento = 0;
 			while(desplazamiento < fplen){
+				//REPENSAR ESTO COMO ME DIJO PATRICIO
 			posYcant* posicionesCant = malloc(sizeof(posYcant));
 			log_info(logger, "zona de memcpy");
 	//TENGO PROBLEMAS CON LOS MEMCPY REVISAR
@@ -1613,14 +1618,14 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 			}
             
             free(scaneo);
-			
+			//enviar_respuesta_a_broker(respuesta)
 		    } else{// en caso de que este abierto
 				  //finalizar hilo y reintentar despues del tiempo que dice el config
 /*
 				log_warning(logger, "HILO EN STANDBY DE OPERACION");
     			pthread_cancel(thread_get_pokemon);
 				sleep(datos_config->tiempo_retardo_operacion);
-COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) operacion_get_pokemon, PARAMETROS);
+	//	pthread_create(&atender_get_pokemon, NULL, (void *) operacion_get_pokemon, (void *) GETpokemon);
     		//	pthread_join(atender_get_pokemon, NULL);
     			log_info(logger, "HILO RETOMANDO LA OPERACION");
 				*/
@@ -1632,7 +1637,7 @@ COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) op
 			
     }
 
-    return respuesta;
+    
 }
 
 
@@ -1809,7 +1814,10 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			getPokemon = deserializar_get(stream + sizeof(int));
 
 			printf("POKEMON: %s\n", getPokemon->name);
-
+			/*
+			pthread_t hilo_get_pokemon;
+			pthread_create(&hilo_get_pokemon, NULL, (void *) operacion_get_pokemon, (void *) getPokemon);
+*/
 			free(getPokemon);
 			free(stream);
 		break;
