@@ -1,5 +1,8 @@
 #include "gamecard.h"
 
+pthread_t hilo_new_pokemon;
+pthread_t hilo_catch_pokemon;
+
 int main () {
 
 	pid_gamecard = getpid();
@@ -313,6 +316,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
 
     if(opendir(path_directorio_pokemon) == NULL) {
+
     	log_warning(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 
     	//mutex_lock
@@ -324,6 +328,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
     	//enviar_respuesta_a_broker
+
     } else {
 
     	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
@@ -352,7 +357,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		} else {
 
-    			reintentar_operacion(newPokemon);
+    			reintentar_operacion(hilo_new_pokemon, newPokemon);
 
     		}
     	}
@@ -360,21 +365,25 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     free(path_directorio_pokemon);
 }
 
-void reintentar_operacion(new_pokemon *newPokemon) {
+void reintentar_operacion(pthread_t hilo_operacion, void *newPokemon) {
 
 	log_warning(logger, "HILO EN STANDBY DE OPERACION");
 	sleep(datos_config->tiempo_reintento_operacion);
-	pthread_cancel(newPokemon->hilo_new_pokemon);
+	pthread_cancel(hilo_operacion);
 
-	pthread_create(&(newPokemon->hilo_new_pokemon), NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
-	pthread_join(newPokemon->hilo_new_pokemon, NULL);
+	pthread_t hilo_reintento_new_pokemon;
+	pthread_create(&(hilo_reintento_new_pokemon), NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
+	pthread_join(hilo_reintento_new_pokemon, NULL);
 	log_info(logger, "HILO RETOMANDO LA OPERACION");
 
 }
 
+
 void retardo_operacion() {
 
+	log_info(logger, "Inicio retardo de operacion");
 	sleep(datos_config->tiempo_retardo_operacion);
+	log_info(logger, "fin retardo de operacion");
 
 }
 
@@ -1077,13 +1086,23 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	    	// enviar_respuesta_a_broker (FAIL)
 	    } else {
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
-	    	// el archivo existe y hay que verificar si existe la linea
+	    	// el archivo existe y hay que verificar si existe la linea sin antes preguntar si esta abierto
+
+	    	char *valorOpen = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
+
+	    	if(string_equals_ignore_case(valorOpen, "Y")) {
+
+	    		reintentar_operacion(hilo_catch_pokemon, catchPokemon);
+
+	    	}
+
 	    	buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
 	    }
 	}
 
 	free(path_directorio_pokemon);
 }
+
 
 void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_directorio_pokemon) { // verificamos si existe o no la linea en el archivo existente
 
@@ -1121,6 +1140,7 @@ void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_di
 	free(linea);
 }
 
+
 void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemon, char *ruta_directorio_pokemon, char *coordenada) {
 
 	char *ruta_archivo_pokemon = string_new();
@@ -1157,6 +1177,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 			memcpy(file_memory + posicionLinea, lineaActualizada, strlen(lineaActualizada));
 			actualizar_contenido_blocks(ruta_directorio_pokemon, file_memory);
 			munmap(file_memory, tamArchivo);
+			retardo_operacion();
 			cambiar_valor_metadata(ruta_directorio_pokemon, "OPEN", "N");
 
 		} else {
@@ -1258,7 +1279,9 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 
 		// actualizamos el valor de los bloques
 		actualizar_contenido_blocks(path_directorio_pokemon, buffer);
-		// cambiamos el valor de OPEN a N
+
+		retardo_operacion();
+
 		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 		free(buffer);
@@ -1280,7 +1303,9 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
 			// actualizamos el valod de los bloques
 			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
-			// cambiamos el valor de OPEN a N
+
+			retardo_operacion();
+
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 			free(buffer);
@@ -1305,7 +1330,9 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
 			// actualizamos el valod de los bloques
 			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
-			// cambiamos el valor de OPEN a N
+
+			retardo_operacion();
+
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 		}
@@ -1355,7 +1382,9 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 
 		// actualizamos el valor de los bloques
 		actualizar_contenido_blocks(path_directorio_pokemon, buffer);
-		// cambiamos el valor de OPEN a N
+
+		retardo_operacion();
+
 		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 		free(buffer);
@@ -1381,6 +1410,9 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 			// actualizamos el valod de los bloques
 			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
 			// cambiamos el valor de OPEN a N
+
+			retardo_operacion();
+
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 			free(buffer);
@@ -1405,7 +1437,9 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 			cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(nuevoTamArchivo));
 			// actualizamos el valod de los bloques
 			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
-			// cambiamos el valor de OPEN a N
+
+			retardo_operacion();
+
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
 		}
@@ -1473,6 +1507,9 @@ void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon,
 	remove(path_ultimo_bloque);
 
 	cambiar_metadata_archivo_a_directorio(path_directorio_pokemon);
+
+	retardo_operacion();
+
 	cambiar_valor_metadata(path_directorio_pokemon, "DIRECTORY", "Y");
 
 }
@@ -1829,10 +1866,9 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("PosY: %d\n", newPokemon->pos.posy);
 			printf("Cantidad: %d\n", newPokemon->cantidad);
 
-			pthread_t hilo_new_pokemon;
-			newPokemon->hilo_new_pokemon = hilo_new_pokemon;
+			//pthread_t hilo_new_pokemon;
 			pthread_create(&hilo_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
-			pthread_detach(hilo_new_pokemon);
+			pthread_join(hilo_new_pokemon, NULL);
 
 			free(stream);
 		break;
@@ -1850,8 +1886,9 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("PosX: %d\n", catchPokemon->pos.posx);
 			printf("PosY: %d\n", catchPokemon->pos.posy);
 
-			pthread_t hilo_catch_pokemon;
+			//pthread_t hilo_catch_pokemon;
 			pthread_create(&hilo_catch_pokemon, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
+			pthread_join(hilo_catch_pokemon, NULL);
 
 			free(stream);
 		break;
