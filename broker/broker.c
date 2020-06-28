@@ -13,7 +13,6 @@ mq* cola_new;
 mq* cola_appeared;
 
 pthread_t thread_servidor;
-pthread_t thread_suscripcion;
 
 int cant_liberadas;
 int inicio;
@@ -24,20 +23,15 @@ t_list* cache;
 void* memoria;
 
 pthread_rwlock_t lockCache = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockCola = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockMemAsignada = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockParticion = PTHREAD_RWLOCK_INITIALIZER;
-pthread_rwlock_t lockImprimir = PTHREAD_RWLOCK_INITIALIZER;
-pthread_mutex_t mutexMensaje = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t lockNew = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockGet = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockCatch = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockAppeared = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockLocalized = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockCaught = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t mutexMalloc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexBuddy = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexDump = PTHREAD_MUTEX_INITIALIZER;
-pthread_rwlock_t lockId = PTHREAD_RWLOCK_INITIALIZER;
-sem_t semHayEspacio;
-sem_t semACK;
-sem_t semNew;
-sem_t semGet;
-sem_t semCatch;
 
 int main(){	
     iniciar_broker();
@@ -52,14 +46,6 @@ void iniciar_broker(void){
 	printf("\033[1;33mBROKER START!\033[0m\n");
 	iniciar_cache();
 	iniciar_servidor();
-}
-
-void iniciar_semaforos(){
-	sem_init(&semHayEspacio,0,0);
-	sem_init(&semACK,0,0);
-	sem_init(&semCatch,0,0);
-	sem_init(&semGet,0,0);
-	sem_init(&semNew,0,0);
 }
 
 mq* crear_cola_mensaje(int tipo){
@@ -247,7 +233,7 @@ void atender_suscripcion(int cliente_fd){
 	pid_t pid;
 	memcpy(&queue_id,msg,sizeof(uint32_t));
 	memcpy(&pid,msg+sizeof(uint32_t),sizeof(pid_t));
-	printf("\033[1;35mSuscripcion:Pid:%d|Queue_id:%d|Socket:%d\033[0m\n",pid,queue_id,cliente_fd);
+	printf("\033[1;35mSuscripcion:Pid:%d|Cola:%s|Socket:%d\033[0m\n",pid,get_cola(queue_id),cliente_fd);
 
 	suscriber * sus = malloc(sizeof(suscriber));
 	sus->cliente_fd = cliente_fd;
@@ -365,8 +351,10 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockNew);
 		list_add(cola_new->mensajes,item);
 		cola_new->id++;
+		pthread_rwlock_unlock(&lockNew);
 		enviar_id(item,cliente_fd);
 	}
 	else{
@@ -399,8 +387,10 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,APPEARED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje APPEARED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockAppeared);
 		list_add(cola_appeared->mensajes,item);
 		cola_appeared->id++;
+		pthread_rwlock_unlock(&lockAppeared);
 		enviar_id(item,cliente_fd);
 	}
 	else{
@@ -421,8 +411,10 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockCatch);
 		list_add(cola_catch->mensajes,item);
 		cola_catch->id++;
+		pthread_rwlock_unlock(&lockCatch);
 		enviar_id(item,cliente_fd);
 	}
 	else{
@@ -454,8 +446,10 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),sizeof(uint32_t));
 		log_warning(logger,"MENSAJE_ID:%d CAUGHT_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockCaught);
 		list_add(cola_caught->mensajes,item);
 		cola_caught->id++;
+		pthread_rwlock_unlock(&lockCaught);
 		enviar_id(item,cliente_fd);
 	}
 	else{
@@ -477,8 +471,10 @@ void mensaje_get_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"MENSAJE_ID:%d GET_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockGet);
 		list_add(cola_get->mensajes,item);
 		cola_get->id++;
+		pthread_rwlock_unlock(&lockGet);
 		enviar_id(item,cliente_fd);
 	}
 	else{
@@ -515,8 +511,10 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje LOCALIZED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		pthread_rwlock_wrlock(&lockLocalized);
 		list_add(cola_localized->mensajes,item);
 		cola_localized->id++;
+		pthread_rwlock_unlock(&lockLocalized);
 		enviar_id(item,cliente_fd);
 	}
 	else{

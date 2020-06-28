@@ -54,9 +54,6 @@ char *ruta_archivo_bitmap;
 
 void *bitmap_memoria;	// puntero para el mmap
 
-
-enum op_bitmap { SET = 1, CLEAN = 2};
-
 struct metadata_info {
     int block_size;
     int blocks;
@@ -188,7 +185,7 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque);
 
 //void operacion_new_pokemon(new_pokemon *newPokemon);
-void operacion_get_Pokemon(get_pokemon *GETpokemon);
+rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
@@ -208,7 +205,6 @@ int fileSize(char* file);
 char* get_linea_nueva_cantidad_catch(char *linea, char *coordenada);
 void borrar_archivo(char *nombre, char flag);
 void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
-void limpiar_bloque_bitmap(int nro_bloque);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
