@@ -79,11 +79,11 @@ typedef struct{
 }position;
 
 typedef struct{
+	int id_mensaje;
 	int name_size;
 	char* name;
 	position pos;
 	int cantidad;
-	pthread_t hilo_new_pokemon;
 }new_pokemon;
 
 typedef struct{
@@ -93,6 +93,7 @@ typedef struct{
 }appeared_pokemon;
 
 typedef struct{
+	int id_mensaje;
 	int name_size;
 	char* name;
 	position pos;

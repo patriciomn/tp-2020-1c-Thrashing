@@ -126,6 +126,7 @@ pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_poke
 
 int main ();
 
+void iniciar_gamecard();
 void verificar_punto_de_montaje();
 void iniciar_logger_config();
 void obtener_datos_archivo_config();
@@ -218,9 +219,14 @@ void suscribirse_a_new_pokemon();
 void suscribirse_a_catch_pokemon();
 void suscribirse_a_get_pokemon();
 
+void recibir_mensajes_new_pokemon();
+void recibir_mensajes_catch_pokemon();
+
 void iniciar_servidor(void);
 void esperar_cliente(int socket_servidor);
 void atender_peticion(int socket_cliente, int cod_op);
+void reintento_conectar_broker();
+void reconexion_broker();
 
 // sockets para recibir los mensajes
 int socket_cliente_np;

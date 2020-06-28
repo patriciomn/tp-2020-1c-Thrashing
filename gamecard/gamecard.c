@@ -8,15 +8,17 @@ int main () {
 
 	pid_gamecard = getpid();
 
-    iniciar_logger_config();
+	iniciar_gamecard();
 
-    obtener_datos_archivo_config();
+    //iniciar_logger_config();
 
-    verificar_punto_de_montaje();
+    //obtener_datos_archivo_config();
 
-   suscripcion_colas_broker();
+    //verificar_punto_de_montaje();
 
-    pthread_join(thread_new_pokemon, NULL);
+    //suscripcion_colas_broker();
+
+    //pthread_join(thread_new_pokemon, NULL);
     pthread_join(thread_catch_pokemon, NULL);
     pthread_join(thread_get_pokemon, NULL);
 
@@ -34,6 +36,22 @@ int main () {
     free(datos_config);
 
     return 0;
+}
+
+void iniciar_gamecard() {
+
+	iniciar_logger_config();
+
+	obtener_datos_archivo_config();
+
+	//verificar_punto_de_montaje();
+
+	suscripcion_colas_broker();
+
+	// ver donde f#cking pongo esto para que no me salte que esta conectado como servidor pero en realidad esta como cliente con broker
+	//pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
+	//pthread_join(servidor_gamecard, NULL);
+
 }
 
 void verificar_punto_de_montaje() {
@@ -80,8 +98,7 @@ void obtener_datos_archivo_config() {
 	datos_config->size_block = config_get_int_value(config_tall_grass, "SIZE_BLOCK");
 }
 
-// Nota: Revisar memory leaks :-(
-// Nota2: Para un futuro lejano hacer un dump del bitmap
+// Nota: Revisar memory leaks
 
 void verificar_metadata_fs(char *path_pto_montaje) {
 
@@ -1111,6 +1128,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	pthread_mutex_unlock(&mutexCATCH);
 }
 
+
 void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_directorio_pokemon) { // verificamos si existe o no la linea en el archivo existente
 
 	char *path_archivo_pokemon = string_new();
@@ -1150,6 +1168,7 @@ void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_di
 	free(posx);
 	free(posy);
 }
+
 
 void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemon, char *ruta_directorio_pokemon, char *coordenada) {
 
@@ -1737,54 +1756,162 @@ void suscripcion_colas_broker() {
 	suscribirse_a_catch_pokemon();
 	suscribirse_a_get_pokemon();
 
-	if(socket_cliente_np == -1 && socket_cliente_cp == -1 && socket_cliente_gp == -1) {
-			log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
-			pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
-			pthread_join(servidor_gamecard, NULL);
+	if(socket_cliente_np == -1 || socket_cliente_cp == -1 || socket_cliente_gp == -1) {
+
+		log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
+		reintento_conectar_broker();
+		pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
+		pthread_join(servidor_gamecard, NULL);
+
 	} else {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
-		//pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
+		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
+		//pthread_join(thread_new_pokemon, NULL);
 		//pthread_detach(thread_new_pokemon);
 
-		//pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
+		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
 		//pthread_detach(thread_catch_pokemon);
 
 		//pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
 		//pthread_detach(thread_get_pokemon);
 	}
+
 }
 
 void suscribirse_a_new_pokemon() {
 
 	socket_cliente_np = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_np != -1) {
-		//enviar_mensaje_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
+
 		enviar_info_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
 		recv(socket_cliente_np, &(acks_gamecard.ack_new), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA NEW_POKEMON: %d", acks_gamecard.ack_new);
 	}
 }
 
+
 void suscribirse_a_catch_pokemon() {
 	socket_cliente_cp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_cp != -1) {
-		//enviar_mensaje_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
+
 		enviar_info_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
 		recv(socket_cliente_cp, &(acks_gamecard.ack_catch), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA CATCH_POKEMON: %d", acks_gamecard.ack_catch);
 	}
 }
 
+
 void suscribirse_a_get_pokemon() {
 	socket_cliente_gp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_gp != -1) {
-		//enviar_mensaje_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
+
 		enviar_info_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
 		recv(socket_cliente_gp, &(acks_gamecard.ack_get), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA GET_POKEMON: %d", acks_gamecard.ack_get);
 	}
 }
+
+// Funciones del Gamecard como Cliente del Broker
+
+void recibir_mensajes_new_pokemon(){
+
+	while(1) {
+
+		int codigo_operacion;
+		if(recv(socket_cliente_np, &(codigo_operacion), sizeof(int), MSG_WAITALL) == -1) {
+			log_warning(logger, "ERROR EN RECV DE CODIGO DE OPERACION EN LA FUNCION recibir_mensajes_new_pokemon");
+			codigo_operacion = -1;
+		}
+
+		if(codigo_operacion <= 0 || check_socket(socket_cliente_np) != 1) {
+			log_error(logger, "BROKER CAIDO");
+			socket_cliente_np = -1;
+			reintento_conectar_broker();
+			return;
+		}
+
+		t_list* paquete = recibir_paquete(socket_cliente_np);
+
+		void display(void* valor) {
+
+			int desplazamiento = 0;
+
+			int id_mensaje;
+			memcpy(&(id_mensaje), valor, sizeof(int));
+			desplazamiento += sizeof(int);
+
+			new_pokemon *newPokemon = deserializar_new(valor + desplazamiento);
+			newPokemon->id_mensaje = id_mensaje;
+
+			log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy, newPokemon->cantidad);
+			free(valor);
+			enviar_ack(NEW_POKEMON, newPokemon->id_mensaje, pid_gamecard, socket_cliente_np);
+
+			// ejecutar hilo new_pokemon
+			pthread_t hilo_new_pokemon_broker;
+			pthread_create(&hilo_new_pokemon_broker, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
+
+			//free(new_pokemon->name);
+			//free(new_pokemon);
+		}
+
+		list_iterate(paquete,(void*)display);
+		list_destroy(paquete);
+	}
+}
+
+void recibir_mensajes_catch_pokemon(){
+
+	while(1) {
+
+		int codigo_operacion;
+		if(recv(socket_cliente_cp, &(codigo_operacion), sizeof(int), MSG_WAITALL) == -1) {
+			log_warning(logger, "ERROR EN RECV DE CODIGO DE OPERACION EN LA FUNCION recibir_mensajes_new_pokemon");
+			codigo_operacion = -1;
+		}
+
+		if(codigo_operacion <= 0  || check_socket(socket_cliente_cp) != 1) {
+			log_error(logger, "BROKER CAIDO");
+			socket_cliente_cp = -1;
+			reintento_conectar_broker();
+			return;
+		}
+
+		t_list* paquete = recibir_paquete(socket_cliente_cp);
+
+		void display(void* valor){
+
+			int desplazamiento = 0;
+
+			int id_mensaje;
+			memcpy(&(id_mensaje), valor + desplazamiento, sizeof(int));
+			desplazamiento += sizeof(int);
+
+			catch_pokemon *catchPokemon = deserializar_catch(valor + desplazamiento);
+			catchPokemon->id_mensaje = id_mensaje;
+
+			log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
+			enviar_ack(CATCH_POKEMON, catchPokemon->id_mensaje, pid_gamecard, socket_cliente_cp);
+
+			pthread_t hilo_catch_pokemon_broker;
+			pthread_create(&hilo_catch_pokemon_broker, NULL , (void *) operacion_catch_pokemon, (void *) catchPokemon);
+
+
+			//free(catch_pokemon->nombre);
+			//free(catch_pokemon);
+			//free(valor);
+		}
+		list_iterate(paquete,(void*)display);
+		list_destroy(paquete);
+	}
+}
+
+
+
+
+
+// Funciones del Gamecard como Servidor
 
 void iniciar_servidor(void) {
 
@@ -1819,7 +1946,9 @@ void iniciar_servidor(void) {
     	esperar_cliente(socket_servidor);
 }
 
+
 void esperar_cliente(int socket_servidor) {
+
 	struct sockaddr_in dir_cliente;
 	int tam_direccion = sizeof(struct sockaddr_in);
 
@@ -1835,6 +1964,7 @@ void esperar_cliente(int socket_servidor) {
 	atender_peticion(socket_cliente, cod_op);
 }
 
+
 void atender_peticion(int socket_cliente, int cod_op) {
 
 	int sizeStream;
@@ -1845,6 +1975,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 	void *stream = malloc(sizeStream);
 	if(recv(socket_cliente, stream, sizeStream, MSG_WAITALL) == -1) {
+
 	}
 
 	switch(cod_op) {
@@ -1907,3 +2038,27 @@ void atender_peticion(int socket_cliente, int cod_op) {
 		break;
 	}
 }
+
+
+void reintento_conectar_broker() {
+
+	struct sigaction action;
+	action.sa_handler = (void*) reconexion_broker;
+	action.sa_flags = SA_RESTART|SA_NODEFER;
+	sigemptyset(&action.sa_mask);
+	sigaction(SIGALRM, &action, 0);
+	alarm(datos_config->tiempo_reintento_conexion);
+
+}
+
+
+void reconexion_broker() {
+
+	if(socket_cliente_np == -1 || socket_cliente_cp == -1 || socket_cliente_gp == -1) {
+		log_warning(logger,"Reconectando A Broker...");
+		suscripcion_colas_broker(100);
+		alarm(datos_config->tiempo_reintento_conexion);
+	}
+
+}
+
