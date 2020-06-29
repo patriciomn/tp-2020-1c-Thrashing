@@ -185,6 +185,16 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 
 void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro_bloque);
 
+
+// Funciones CATCH
+
+void operacion_catch_pokemon(catch_pokemon *catchPokemon);
+void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_directorio_pokemon);
+void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemon, char *ruta_directorio_pokemon, char *coordenada);
+void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon);
+
+
+
 //void operacion_new_pokemon(new_pokemon *newPokemon);
 rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
@@ -221,6 +231,9 @@ void suscribirse_a_get_pokemon();
 
 void recibir_mensajes_new_pokemon();
 void recibir_mensajes_catch_pokemon();
+
+void enviar_respuesta_new_pokemon(new_pokemon *newPokemon);
+void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor);
 
 void iniciar_servidor(void);
 void esperar_cliente(int socket_servidor);

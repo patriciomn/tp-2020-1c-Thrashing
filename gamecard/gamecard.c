@@ -10,15 +10,7 @@ int main () {
 
 	iniciar_gamecard();
 
-    //iniciar_logger_config();
-
-    //obtener_datos_archivo_config();
-
-    //verificar_punto_de_montaje();
-
-    //suscripcion_colas_broker();
-
-    //pthread_join(thread_new_pokemon, NULL);
+    pthread_join(thread_new_pokemon, NULL);
     pthread_join(thread_catch_pokemon, NULL);
     pthread_join(thread_get_pokemon, NULL);
 
@@ -44,7 +36,7 @@ void iniciar_gamecard() {
 
 	obtener_datos_archivo_config();
 
-	//verificar_punto_de_montaje();
+	verificar_punto_de_montaje();
 
 	suscripcion_colas_broker();
 
@@ -333,7 +325,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	//mutex_unlock (cuidado, si muere el hilo me temo que no se desbloquea)
 
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
-    	//enviar_respuesta_a_broker
+
     } else {
 
     	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
@@ -348,7 +340,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     		// mutex_unlock
 
     		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
-    		// enviar_respuesta_a_broker
+
     	} else {
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
@@ -409,6 +401,7 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 		log_info(logger, "LINEA <%s>", linea);
 		munmap(file_memory, tamanioArchivo);
 		insertar_linea_en_archivo(newPokemon, path_directorio_pokemon, linea);
+		enviar_respuesta_new_pokemon(newPokemon);
 		free(cant);
 	}
 
@@ -599,6 +592,8 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	cambiar_valor_metadata(path_directorio_pokemon, "SIZE", string_itoa(strlen(linea)));
 
 	cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+	enviar_respuesta_new_pokemon(newPokemon);
 
 	free(linea);
     free(ruta_archivo_pokemon);
@@ -837,16 +832,18 @@ void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char
 		actualizar_contenido_blocks(ruta_directorio_pokemon, file_memory);
 		munmap(file_memory, tamArchivo);
 		cambiar_valor_metadata(ruta_directorio_pokemon, "OPEN", "N");
+		enviar_respuesta_new_pokemon(newPokemon);
 
 	}
 
-	if(hay_espacio_ultimo_bloque(ruta_directorio_pokemon, lineaActualizada)) {
+	if(hay_espacio_ultimo_bloque(ruta_directorio_pokemon, lineaActualizada)) { // si hay espacio en el ultimo bloque, se reescribe en el mismo
 
-		// se escribe sin nuevo bloque
 		modificar_linea_pokemon(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
 
-	} else {
-		// buscamos un bloque libre y si lo hay, se lo asignamos a la metadata
+		enviar_respuesta_new_pokemon(newPokemon);
+
+	} else { // buscamos un bloque libre y si lo hay, se lo asignamos a la metadata
+
 		int nuevo_nro_bloque = obtener_bloque_libre();
 		// luego hacemos el resto
 		if(nuevo_nro_bloque == -1) {
@@ -857,6 +854,8 @@ void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char
 		agregar_bloque_metadata_pokemon(ruta_directorio_pokemon, nuevo_nro_bloque);
 
 		modificar_linea_pokemon(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
+
+		enviar_respuesta_new_pokemon(newPokemon);
 
 	}
 
@@ -1110,14 +1109,18 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
 	DIR* dir;
 	if((dir = opendir(path_directorio_pokemon)) == NULL) { // si esxiste o no el directorio (FAIL)
+
 		log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
-	    //enviar_respuesta_a_broker
+		enviar_respuesta_catch_pokemon(catchPokemon, false);
+
 	} else {
 		char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
 		if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
-	    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
-	    	// enviar_respuesta_a_broker (FAIL)
-	    } else {
+
+			log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
+			enviar_respuesta_catch_pokemon(catchPokemon, false);
+
+		} else {
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
 	    	// el archivo existe y hay que verificar si existe la linea
 	    	buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
@@ -1160,6 +1163,7 @@ void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_di
 
 		munmap(file_memory, tamanioArchivo);
 		log_info(logger, "COORDENADA <%s> NO ENCONTRADO!", linea);
+		enviar_respuesta_catch_pokemon(catchPokemon, false);
 
 	}
 
@@ -1207,6 +1211,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 			actualizar_contenido_blocks(ruta_directorio_pokemon, file_memory);
 			munmap(file_memory, tamArchivo);
 			cambiar_valor_metadata(ruta_directorio_pokemon, "OPEN", "N");
+			enviar_respuesta_catch_pokemon(catchPokemon, true);
 
 		} else {
 
@@ -1223,12 +1228,16 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 				//seteo a 0 el bitmap[ultimoBloque]
 
 				modificar_archivo_pokemon_catch_con_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+
+				enviar_respuesta_catch_pokemon(catchPokemon, true);
+
 				free(ultimoBloque);
 
 			} else {
 				// solo modifico el ultimo bloque
 				log_info(logger, "SOLO MODIFICAMOS EL ULTIMO BLOQUE");
 				modificar_archivo_pokemon_catch_con_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+				enviar_respuesta_catch_pokemon(catchPokemon, true);
 			}
 		}
 
@@ -1237,6 +1246,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 		if(tamArchivo == strlen(lineaActualizada)) { // se borra todo: el archvio, los bloques y en la metadata queda solamente el DIRECTORY
 
 			cambiar_archivo_a_directorio(file_memory, ruta_archivo_pokemon, ruta_directorio_pokemon);
+			enviar_respuesta_catch_pokemon(catchPokemon, true);
 
 		} else {
 
@@ -1253,11 +1263,15 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 				//seteo a 0 el bitmap[ultimoBloque]
 
 				modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+
+				enviar_respuesta_catch_pokemon(catchPokemon, true);
+
 				free(ultimoBloque);
 			} else {
 				// solo modifico el ultimo bloque
 				log_info(logger, "SOLO MODIFICAMOS EL ULTIMO BLOQUE");
 				modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
+				enviar_respuesta_catch_pokemon(catchPokemon, true);
 			}
 
 		}
@@ -1760,8 +1774,8 @@ void suscripcion_colas_broker() {
 
 		log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
 		reintento_conectar_broker();
-		pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
-		pthread_join(servidor_gamecard, NULL);
+		//pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
+		//pthread_join(servidor_gamecard, NULL);
 
 	} else {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
@@ -2062,3 +2076,62 @@ void reconexion_broker() {
 
 }
 
+
+void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
+
+	int socket_temporal_broker = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
+
+	int desplazamiento = 0;
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+
+	paquete->codigo_operacion = APPEARED_POKEMON;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int) * 2 + sizeof(position) + newPokemon->name_size;
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+
+	memcpy(paquete->buffer->stream, &(newPokemon->id_mensaje), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(paquete->buffer->stream + desplazamiento, &(newPokemon->name_size), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(paquete->buffer->stream + desplazamiento, newPokemon->name, newPokemon->name_size + 1);
+	desplazamiento += newPokemon->name_size + 1;
+
+	memcpy(paquete->buffer->stream + desplazamiento, &(newPokemon->pos), sizeof(position));
+	desplazamiento += sizeof(position);
+
+	enviar_paquete(paquete, socket_temporal_broker);
+
+
+	close(socket_temporal_broker);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
+
+void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
+
+	int socket_temporal_broker = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
+
+	int desplazamiento = 0;
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+
+	paquete->codigo_operacion = CAUGHT_POKEMON;
+	paquete->buffer = malloc(sizeof(t_buffer));
+	paquete->buffer->size = sizeof(int) + sizeof(bool);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+
+	memcpy(paquete->buffer->stream, &(catchPokemon->id_mensaje), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(paquete->buffer->stream + desplazamiento, &(valor), sizeof(bool));
+	desplazamiento += sizeof(bool);
+
+	enviar_paquete(paquete, socket_temporal_broker);
+
+	close(socket_temporal_broker);
+	free(paquete->buffer->stream);
+	free(paquete->buffer);
+	free(paquete);
+}
