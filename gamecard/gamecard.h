@@ -68,6 +68,7 @@ struct config_tallGrass {
     int puerto_broker;
     int size_block;
     int blocks;
+    int pid;
 };
 
 struct dataServer{

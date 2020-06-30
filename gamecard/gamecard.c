@@ -6,8 +6,6 @@ pthread_mutex_t mutexCATCH = PTHREAD_MUTEX_INITIALIZER;
 
 int main () {
 
-	pid_gamecard = getpid();
-
 	iniciar_gamecard();
 
     pthread_join(thread_new_pokemon, NULL);
@@ -18,7 +16,7 @@ int main () {
 
 //-----***------***-----
 
-    munmap(bitmap_memoria, 2);
+    //munmap(bitmap_memoria, 2);
     bitarray_destroy(bitarray);
     log_destroy(logger);
     config_destroy(config_tall_grass);
@@ -40,9 +38,8 @@ void iniciar_gamecard() {
 
 	suscripcion_colas_broker();
 
-	// ver donde f#cking pongo esto para que no me salte que esta conectado como servidor pero en realidad esta como cliente con broker
-	//pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
-	//pthread_join(servidor_gamecard, NULL);
+	pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
+	pthread_join(servidor_gamecard, NULL);
 
 }
 
@@ -88,6 +85,8 @@ void obtener_datos_archivo_config() {
 
 	datos_config->blocks = config_get_int_value(config_tall_grass, "BLOCKS");
 	datos_config->size_block = config_get_int_value(config_tall_grass, "SIZE_BLOCK");
+
+	datos_config->pid = config_get_int_value(config_tall_grass, "PID");
 }
 
 // Nota: Revisar memory leaks
@@ -1774,21 +1773,16 @@ void suscripcion_colas_broker() {
 
 		log_error(logger, "BROKER NO ESTA DISPONIBLE PARA LA CONEXION");
 		reintento_conectar_broker();
-		//pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
-		//pthread_join(servidor_gamecard, NULL);
 
 	} else {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
 		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
-		//pthread_join(thread_new_pokemon, NULL);
-		//pthread_detach(thread_new_pokemon);
 
 		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
-		//pthread_detach(thread_catch_pokemon);
 
 		//pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
-		//pthread_detach(thread_get_pokemon);
+		//pthread_join(thread_get_pokemon, NULL);
 	}
 
 }
@@ -1798,7 +1792,7 @@ void suscribirse_a_new_pokemon() {
 	socket_cliente_np = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_np != -1) {
 
-		enviar_info_suscripcion(NEW_POKEMON, socket_cliente_np, pid_gamecard);
+		enviar_info_suscripcion(NEW_POKEMON, socket_cliente_np, datos_config->pid);
 		recv(socket_cliente_np, &(acks_gamecard.ack_new), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA NEW_POKEMON: %d", acks_gamecard.ack_new);
 	}
@@ -1809,7 +1803,7 @@ void suscribirse_a_catch_pokemon() {
 	socket_cliente_cp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_cp != -1) {
 
-		enviar_info_suscripcion(CATCH_POKEMON, socket_cliente_cp, pid_gamecard);
+		enviar_info_suscripcion(CATCH_POKEMON, socket_cliente_cp, datos_config->pid);
 		recv(socket_cliente_cp, &(acks_gamecard.ack_catch), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA CATCH_POKEMON: %d", acks_gamecard.ack_catch);
 	}
@@ -1820,7 +1814,7 @@ void suscribirse_a_get_pokemon() {
 	socket_cliente_gp = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
 	if(socket_cliente_gp != -1) {
 
-		enviar_info_suscripcion(GET_POKEMON, socket_cliente_gp, pid_gamecard);
+		enviar_info_suscripcion(GET_POKEMON, socket_cliente_gp, datos_config->pid);
 		recv(socket_cliente_gp, &(acks_gamecard.ack_get), sizeof(int), MSG_WAITALL);
 		log_info(logger, "ACK RECIVIDO PARA COLA GET_POKEMON: %d", acks_gamecard.ack_get);
 	}
@@ -1860,7 +1854,7 @@ void recibir_mensajes_new_pokemon(){
 
 			log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy, newPokemon->cantidad);
 			free(valor);
-			enviar_ack(NEW_POKEMON, newPokemon->id_mensaje, pid_gamecard, socket_cliente_np);
+			enviar_ack(NEW_POKEMON, newPokemon->id_mensaje, datos_config->pid, socket_cliente_np);
 
 			// ejecutar hilo new_pokemon
 			pthread_t hilo_new_pokemon_broker;
@@ -1874,6 +1868,7 @@ void recibir_mensajes_new_pokemon(){
 		list_destroy(paquete);
 	}
 }
+
 
 void recibir_mensajes_catch_pokemon(){
 
@@ -1906,7 +1901,7 @@ void recibir_mensajes_catch_pokemon(){
 			catchPokemon->id_mensaje = id_mensaje;
 
 			log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
-			enviar_ack(CATCH_POKEMON, catchPokemon->id_mensaje, pid_gamecard, socket_cliente_cp);
+			enviar_ack(CATCH_POKEMON, catchPokemon->id_mensaje, datos_config->pid, socket_cliente_cp);
 
 			pthread_t hilo_catch_pokemon_broker;
 			pthread_create(&hilo_catch_pokemon_broker, NULL , (void *) operacion_catch_pokemon, (void *) catchPokemon);
@@ -2006,6 +2001,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("PosX: %d\n", newPokemon->pos.posx);
 			printf("PosY: %d\n", newPokemon->pos.posy);
 			printf("Cantidad: %d\n", newPokemon->cantidad);
+			newPokemon->id_mensaje = id_mensaje_new;
 
 			pthread_t hilo_new_pokemon;
 			pthread_create(&hilo_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
@@ -2025,6 +2021,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			printf("POKEMON: %s\n", catchPokemon->name);
 			printf("PosX: %d\n", catchPokemon->pos.posx);
 			printf("PosY: %d\n", catchPokemon->pos.posy);
+			catchPokemon->id_mensaje = id_mensaje_catch;
 
 			pthread_t hilo_catch_pokemon;
 			pthread_create(&hilo_catch_pokemon, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
@@ -2070,7 +2067,7 @@ void reconexion_broker() {
 
 	if(socket_cliente_np == -1 || socket_cliente_cp == -1 || socket_cliente_gp == -1) {
 		log_warning(logger,"Reconectando A Broker...");
-		suscripcion_colas_broker(100);
+		suscripcion_colas_broker();
 		alarm(datos_config->tiempo_reintento_conexion);
 	}
 
@@ -2109,6 +2106,7 @@ void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
 	free(paquete->buffer);
 	free(paquete);
 }
+
 
 void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
 
