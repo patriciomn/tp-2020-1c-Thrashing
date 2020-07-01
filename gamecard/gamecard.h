@@ -217,6 +217,8 @@ int fileSize(char* file);
 char* get_linea_nueva_cantidad_catch(char *linea, char *coordenada);
 void borrar_archivo(char *nombre, char flag);
 void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
+void liberar_bloque_bitmap(int nro_bloque_a_liberar);
+void retardo_operacion();
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
