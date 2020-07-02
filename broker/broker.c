@@ -272,7 +272,7 @@ void atender_ack(int cliente_fd){
 	pid_t pid;
 	if(recv(cliente_fd, &tipo, sizeof(int), MSG_WAITALL) == -1)
 		tipo = -1;
-	if(tipo > -1){
+	if(tipo > -1 ){
 		void* msg = recibir_mensaje(cliente_fd);
 		memcpy(&(id), msg, sizeof(int));
 		memcpy(&pid,msg+sizeof(int),sizeof(pid_t));
