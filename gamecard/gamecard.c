@@ -1159,7 +1159,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	pthread_mutex_unlock(&mutexCATCH);
 }
 
-
+// areglar esta funcion, se tiene que verificar que no este abierto el archivo por otro proceso
 void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_directorio_pokemon) { // verificamos si existe o no la linea en el archivo existente
 
 	char *path_archivo_pokemon = string_new();
@@ -1674,36 +1674,196 @@ int fileSize(char* file) {
     return res; 
 } 
 
-char *read_file_into_buf (char * source,  FILE *fp){
-   if (fseek(fp, 0L, SEEK_END) == 0) {
-        long bufsize = ftell(fp);
-        if (bufsize == -1) { 
-			log_error(logger, "EL archivo buscado NO EXISTE");
-		 }
 
-        /*Le da al buffer el mismo tamaño del archivo */
-        source = malloc(sizeof(bufsize + 1));
-		//log_info(logger, "Malloc tam archivo %d",bufsize);
-		fseek (fp, 0, SEEK_SET); //vuelve al principio
-        if (fseek(fp, 0L, SEEK_SET) != 0) { /* Error */
-			log_error(logger, "Error al volver al inicio del archivo");
-			 }
+// si no estoy mal, esta funcion trata de poner lo que hay en el archivo en un buffer
+char *read_file_into_buf (char * source /*,FILE *fp*/) {
 
-        /* Read the entire file into memory. */
-		
-		fgets(source,bufsize,fp);
-		log_info(logger,"Lo que se escaneo :: %s",source);
-		return source;
-        if ( ferror( fp ) != 0 ) {
-            fputs("Error reading file", stderr);
+	int size_file = fileSize(source);
+	if(size_file == 0) {
+		return NULL;
+	}
 
-        } 
-    }
+	char *buffer_file = malloc(size_file);
+
+	FILE *pointerFile = fopen(source, "r");
+
+	fread(buffer_file, size_file, 1, pointerFile);
+
+	fclose(pointerFile);
+
+	buffer_file[size_file] = '\0';
+
+	log_info(logger, "contenido buffer: %s", buffer_file);
+
+	return buffer_file;
+
+	//if (fseek(fp, 0L, SEEK_END) == 0) {
+	        //long bufsize = ftell(fp);
+	        //if (bufsize == -1) {
+				//log_error(logger, "EL archivo buscado NO EXISTE");
+			 //}
+
+	        /*Le da al buffer el mismo tamaño del archivo */
+	   //source = malloc(sizeof(bufSize + 1));
+	   //log_info(logger, "Malloc tam archivo %d",bufsize);
+			//fseek (fp, 0, SEEK_SET); //vuelve al principio
+	        //if (fseek(fp, 0L, SEEK_SET) != 0) { /* Error */
+				//log_error(logger, "Error al volver al inicio del archivo");
+				 //}
+
+	        /* Read the entire file into memory. */
+
+			//fgets(source,bufsize,fp);
+			//log_info(logger,"Lo que se escaneo :: %s",source);
+			//return source;
+	        //if ( ferror( fp ) != 0 ) {
+	            //fputs("Error reading file", stderr);
+
+	        //}
+	    //}
+
 }
+
 
 /*rtaGet* prueba = malloc(sizeof(rtaGet));
 	prueba = operacion_get_Pokemon(99, "pepa");*/
 
+
+void operacion_get_pokemon(get_pokemon *getPokemon) {
+
+	//pthread_mutex_lock(&mutexGET);
+
+	char *path_directorio_pokemon = string_new();
+	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", getPokemon->name);
+	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
+	DIR* dir;
+	if((dir = opendir(path_directorio_pokemon)) == NULL) { // si esxiste o no el directorio (FAIL)
+
+		log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
+
+		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICIONES: 0", getPokemon->id_mensaje, getPokemon->name);
+
+	} else {
+
+		char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+		if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
+
+			log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
+
+			log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICIONES: 0", getPokemon->id_mensaje, getPokemon->name);
+
+		} else {
+
+	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
+	    	//mutex_lock
+
+	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
+	    	log_info(logger, "valor open:%s", valor_open);
+
+	    	if(string_equals_ignore_case(valor_open, "N")) {
+
+	    		//cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
+	    	    // mutex_unlock
+	    		buscar_lineas_get_pokemon(getPokemon, path_directorio_pokemon);
+
+	    	} else {
+	    		// reintento de operacion
+	    		//reintentar_operacion(newPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
+	    	}
+	    }
+	}
+
+
+	//list_destroy(listaCoordenadas);
+	closedir(dir);
+	free(path_directorio_pokemon);
+	//pthread_mutex_unlock(&mutexCATCH);
+
+
+}
+
+
+
+void buscar_lineas_get_pokemon(get_pokemon *getPokemon, char *path_directorio_pokemon) {
+
+	char *ruta_archivo_pokemon = string_new();
+	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s%s", path_directorio_pokemon,"/", getPokemon->name, ".txt");
+
+	char *contenido_archivo = read_file_into_buf(ruta_archivo_pokemon);
+
+	char **lineas = string_split(contenido_archivo, "\n");
+
+	int i = 0;
+
+	t_list *listaElementosCoordenadas = list_create();
+
+	while(lineas[i] != NULL) {
+
+		char *linea = lineas[i];
+		log_info(logger, "linea: %s", linea);
+
+		position *elementos = obtener_elementos_coordenadas(linea);
+
+		//log_info(logger, "[%d][%d]",elementos.x, elementos.y);
+
+		list_add(listaElementosCoordenadas, elementos);
+
+		//void display(posicion *e) {
+
+			//log_info(logger, "pos X:%d,pos Y:%d", e->x, e->y);
+
+		//}
+
+		//list_iterate(listaElementosCoordenadas, (void*) display);
+
+		i++;
+	}
+
+	log_info(logger, "tamaño lista: %d", list_size(listaElementosCoordenadas));
+
+	void display(position *e) {
+
+		log_info(logger, "pos X:%d,pos Y:%d", e->posx, e->posy);
+
+	}
+
+	list_iterate(listaElementosCoordenadas, (void*) display);
+
+	enviar_respuesta_get_pokemon(getPokemon, 1, listaElementosCoordenadas);
+
+	cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+	list_destroy(listaElementosCoordenadas);
+
+}
+
+
+position* obtener_elementos_coordenadas(char *linea) {
+
+	int posSeparators[2] = {0 , 0}; // sabemos que solo tenemos dos separadores, el "-" y el "="
+
+	int j = 0;
+
+	for(int i = 0 ; i < strlen(linea) ; i++) {
+
+		if(!isdigit(linea[i])) {
+			posSeparators[j] = i;
+			j++;
+		}
+	}
+
+	position *coordenadas = malloc(sizeof(position));
+
+	coordenadas->posx = atoi(string_duplicate(string_substring(linea, 0, posSeparators[0])));
+	coordenadas->posy = atoi(string_duplicate(string_substring(linea, posSeparators[0] + 1, posSeparators[1] - posSeparators[0] - 1)));
+
+	//log_info(logger, "[%d][%d]",coordenadas.x, coordenadas.y);
+
+	return coordenadas;
+
+}
+
+/*
 rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 	pthread_mutex_lock(&mutexGET);
 	rtaGet* respuesta = malloc(sizeof(rtaGet));
@@ -1779,7 +1939,8 @@ COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) op
     		//	pthread_join(atender_get_pokemon, NULL);
     			log_info(logger, "HILO RETOMANDO LA OPERACION");
 				*/
-			}
+/*
+}
 				
 		}
 
@@ -1790,7 +1951,7 @@ COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) op
 	pthread_mutex_unlock(&mutexGET);
     return respuesta;
 }
-
+*/
 
 //-----------------------------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------------------------
@@ -1817,11 +1978,11 @@ void suscripcion_colas_broker() {
 
 		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
 
-		//pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
-		//pthread_join(thread_get_pokemon, NULL);
+		pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
 	}
 
 }
+
 
 void suscribirse_a_new_pokemon() {
 
@@ -1855,6 +2016,7 @@ void suscribirse_a_get_pokemon() {
 		log_info(logger, "ACK RECIVIDO PARA COLA GET_POKEMON: %d", acks_gamecard.ack_get);
 	}
 }
+
 
 // Funciones del Gamecard como Cliente del Broker
 
@@ -1896,6 +2058,7 @@ void recibir_mensajes_new_pokemon(){
 			pthread_t hilo_new_pokemon_broker;
 			pthread_create(&hilo_new_pokemon_broker, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 
+			free(valor);
 			//free(new_pokemon->name);
 			//free(new_pokemon);
 		}
@@ -1945,7 +2108,7 @@ void recibir_mensajes_catch_pokemon(){
 
 			//free(catch_pokemon->nombre);
 			//free(catch_pokemon);
-			//free(valor);
+			free(valor);
 		}
 		list_iterate(paquete,(void*)display);
 		list_destroy(paquete);
@@ -1953,8 +2116,52 @@ void recibir_mensajes_catch_pokemon(){
 }
 
 
+void recibir_mensajes_get_pokemon(){
 
+	while(1) {
 
+		int codigo_operacion;
+		if(recv(socket_cliente_gp, &(codigo_operacion), sizeof(int), MSG_WAITALL) == -1) {
+			log_warning(logger, "ERROR EN RECV DE CODIGO DE OPERACION EN LA FUNCION recibir_mensajes_new_pokemon");
+			codigo_operacion = -1;
+		}
+
+		if(codigo_operacion <= 0  || check_socket(socket_cliente_gp) != 1) {
+			log_error(logger, "BROKER CAIDO");
+			socket_cliente_gp = -1;
+			reintento_conectar_broker();
+			return;
+		}
+
+		t_list* paquete = recibir_paquete(socket_cliente_gp);
+
+		void display(void* valor){
+
+			int desplazamiento = 0;
+
+			int id_mensaje;
+			memcpy(&(id_mensaje), valor + desplazamiento, sizeof(int));
+			desplazamiento += sizeof(int);
+
+			get_pokemon *getPokemon = deserializar_get(valor + desplazamiento);
+
+			getPokemon->id_mensaje = id_mensaje;
+
+			log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n", getPokemon->id_mensaje, getPokemon->name);
+			enviar_ack(GET_POKEMON, getPokemon->id_mensaje, datos_config->pid, socket_cliente_gp);
+
+			pthread_t hilo_get_pokemon_broker;
+			pthread_create(&hilo_get_pokemon_broker, NULL , (void *) operacion_get_pokemon, (void *) getPokemon);
+
+			free(valor);
+			//free(get_pokemon->nombre);
+			//free(get_pokemon);
+		}
+
+		list_iterate(paquete,(void*)display);
+		list_destroy(paquete);
+	}
+}
 
 // Funciones del Gamecard como Servidor
 
@@ -2067,16 +2274,20 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 		case GET_POKEMON:
 			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON");
-			get_pokemon *getPokemon = malloc(sizeof(get_pokemon));
-			int id_mensaje;
-			memcpy(&(id_mensaje), stream, sizeof(int));
-			printf("ID MENSAJE: %d\n", id_mensaje);
-			//deserealizar_get_pokemon_gameboy(stream, getPokemon);
-			getPokemon = deserializar_get(stream + sizeof(int));
 
+			int id_mensaje_get;
+			memcpy(&(id_mensaje_get), stream, sizeof(int));
+
+			get_pokemon *getPokemon = deserializar_get(stream + sizeof(int));
+
+			printf("ID MENSAJE: %d\n", id_mensaje_get);
 			printf("POKEMON: %s\n", getPokemon->name);
+			getPokemon->id_mensaje = id_mensaje_get;
 
-			free(getPokemon);
+			pthread_t hilo_get_pokemon;
+			pthread_create(&hilo_get_pokemon, NULL, (void *) operacion_get_pokemon, (void *) getPokemon);
+
+			//free(getPokemon);
 			free(stream);
 		break;
 
@@ -2168,4 +2379,75 @@ void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
 	free(paquete);
+}
+
+
+void enviar_respuesta_get_pokemon(get_pokemon *getPokemon, int valor_rta, t_list *info_lineas) {
+
+	int desplazamiento = 0;
+	t_paquete* paquete = malloc(sizeof(t_paquete));
+
+	paquete->codigo_operacion = LOCALIZED_POKEMON;
+	paquete->buffer = malloc(sizeof(t_buffer));
+
+	if(valor_rta == 1) {
+
+		enviar_rta_con_exito_get(getPokemon, paquete, info_lineas);
+
+	} else {
+
+		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICIONES: 0", getPokemon->id_mensaje, getPokemon->name);
+
+	}
+
+	free(paquete->buffer);
+	free(paquete);
+}
+
+
+void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_list *info_lineas) {
+
+	int desplazamiento = 0;
+
+	paquete->buffer->size = sizeof(int) * 2 + getPokemon->name_size + sizeof(int) + list_size(info_lineas) * sizeof(position);
+	paquete->buffer->stream = malloc(paquete->buffer->size);
+
+	memcpy(paquete->buffer->stream, &(getPokemon->id_mensaje), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(paquete->buffer->stream + desplazamiento, &(getPokemon->name_size), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	memcpy(paquete->buffer->stream + desplazamiento, getPokemon->name, getPokemon->name_size + 1);
+	desplazamiento += getPokemon->name_size + 1;
+
+	int cantidad_posiciones = list_size(info_lineas);
+	memcpy(paquete->buffer->stream + desplazamiento, &(cantidad_posiciones), sizeof(int));
+	desplazamiento += sizeof(int);
+
+	for(int i = 0 ; i < cantidad_posiciones ; i++) {
+
+		memcpy(paquete->buffer->stream + desplazamiento, list_get(info_lineas, i), sizeof(position));
+		desplazamiento += sizeof(position);
+
+	}
+
+	int socket_temporal_broker = crear_conexion(datos_config->ip_broker, string_itoa(datos_config->puerto_broker));
+
+	if(socket_temporal_broker == -1) {
+
+		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | CANTIDAD POSICIONES: %d", getPokemon->id_mensaje, getPokemon->name, cantidad_posiciones);
+
+		void display(position *e) {
+			log_info(logger, "POS X: %d | POS Y: %d ", e->posx, e->posy);
+		}
+
+		list_iterate(info_lineas, (void *)display);
+
+	} else {
+		enviar_paquete(paquete, socket_temporal_broker);
+	}
+
+	close(socket_temporal_broker);
+	free(paquete->buffer->stream);
 }

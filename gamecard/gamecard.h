@@ -21,6 +21,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <ctype.h>
 //#include "sockets.c"
 
 #define IP_SERVIDOR		 "127.0.0.3"
@@ -174,7 +175,7 @@ void crear_bitmap_bin(char *path_bitmap, int size_bitmap);
 char *crear_nuevo_path(char* path_anterior, char *archivo);
 void escribir_datos_bloque(char *path_blocks_dir, char *datos_a_agregar, int nro_bloque);
 
-char *read_file_into_buf (char *source, FILE *fp);
+char *read_file_into_buf (char *source/*, FILE *fp*/);
 
 int tipo_mensaje(char* tipo_mensaje);
 
@@ -201,6 +202,12 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
 
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
+
+
+// Funciones GET
+position* obtener_elementos_coordenadas(char *linea);
+//t_list *recorrer_lineas(char **lineas);
+
 
 // Funciones Extras
 
@@ -234,6 +241,7 @@ void suscribirse_a_get_pokemon();
 
 void recibir_mensajes_new_pokemon();
 void recibir_mensajes_catch_pokemon();
+void recibir_mensajes_get_pokemon();
 
 void enviar_respuesta_new_pokemon(new_pokemon *newPokemon);
 void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor);
