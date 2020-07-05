@@ -47,8 +47,8 @@ void iniciar_team(char* teamConfig){
 	crear_team();
 	iniciar_semaforos();
 	suscribirse_broker();
-	enviar_mensajes_get_pokemon();
 	pthread_create(&servidor_gameboy,NULL,(void*)iniciar_servidor,NULL);
+	pthread_detach(servidor_gameboy);
 	list_iterate(equipo->entrenadores,(void*)crear_hilo_entrenador);
 }
 
@@ -193,6 +193,11 @@ void salir_equipo(){
 		liberar_conexion(conexion_broker->caught);
 		liberar_conexion(conexion_broker->localized);
 	}
+	pthread_cancel(suscripcion_appeared);
+	pthread_cancel(suscripcion_localized);
+	pthread_cancel(suscripcion_caught);
+	pthread_cancel(reintento);
+	pthread_cancel(servidor_gameboy);
 	exit(0);
 }
 
@@ -619,8 +624,8 @@ void algoritmo_largo_plazo(pokemon* pok){
 			}
 		}
 		list_iterate(entrenadores,(void*)pasar_ready);
-		list_destroy(entrenadores);
 	}
+	list_destroy(entrenadores);
 }
 
 bool verificar_espera_caught(entrenador* entre){
@@ -1006,6 +1011,7 @@ pokemon* find_pokemon(char* name){
 void enviar_mensajes_get_pokemon(){
 	void get(pokemon* pok){
 		enviar_get_pokemon_broker(pok->name);
+		sleep(1);
 	}
 	t_list* especies = especies_objetivo_team();
 	list_iterate(especies,(void*)get);
@@ -1063,6 +1069,7 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cli
 
 	log_info(logger,"CATCH_POKEMON:%s",pokemon);
 
+	free(pos);
 	free(a_enviar);
 	free(paquete->buffer->stream);
 	free(paquete->buffer);
@@ -1143,9 +1150,10 @@ void recibir_localized_pokemon(){
 				bool by_id(msg* m){
 					return m->id_recibido == id;
 				}
+				msg* m = list_find(mensajes,(void*)by_id);
 				t_list* poks_localized = list_create();
-				if(list_find(mensajes,(void*)by_id)){
-					for(int i=0;i<localized->cantidad_posiciones-1;i++){
+				if(m != NULL){
+					for(int i=0;i<localized->cantidad_posiciones;i++){
 						pokemon* pok = crear_pokemon(localized->name);
 						position* aux = list_get(localized->posiciones,i);
 						set_pokemon(pok,aux->posx,aux->posy);
@@ -1175,8 +1183,8 @@ void recibir_localized_pokemon(){
 						if(x>y) return x;
 						return y;
 					}
-					int cantidad = max(cant,localized->cantidad_posiciones);
-					for(int i=0;i<cantidad;i++){
+					//int cantidad = max(cant,localized->cantidad_posiciones);
+					for(int i=0;i<cant;i++){
 						entrenador* e = list_get(cercanos,i);
 						bool mas_cerca_pok(pokemon* aux1,pokemon* aux2){
 							return distancia_pokemon(e,aux1) < distancia_pokemon(e,aux2);
@@ -1198,11 +1206,18 @@ void recibir_localized_pokemon(){
 					}
 					list_destroy(cercanos);
 					list_destroy(entrenadores);
+					list_destroy(poks_localized);
 				}
 				else{
 					printf("\033[0;31m%s No Es Requerido\033[0m\n",localized->name);
 				}
 				free(valor);
+				void limpiar(position* pos){
+					free(pos);
+				}
+				list_iterate(localized->posiciones,(void*)limpiar);
+				list_destroy(localized->posiciones);
+				free(localized);
 			}
 			list_iterate(paquete,(void*)display);
 			list_destroy(paquete);
@@ -1304,6 +1319,7 @@ void recibir_caught_pokemon(){
 						sem_post(&semExecTeam);
 					}
 				}
+				free(mensaje);
 				free(valor);
 			}
 			list_iterate(paquete,(void*)display);
@@ -1346,6 +1362,7 @@ void recibir_appeared_pokemon(){
 					printf("\033[0;31m%s No Es Requerido\033[0m\n",appeared_pokemon->name);
 				}
 				free(valor);
+				free(appeared_pokemon);
 			}
 			list_iterate(paquete,(void*)display);
 			list_destroy(paquete);
@@ -1356,24 +1373,21 @@ void recibir_appeared_pokemon(){
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
 	suscribirse_localized();
-	suscribirse_appeared();
-	suscribirse_caught();
-	if(conexion_broker->appeared == -1 || conexion_broker->localized == -1 || conexion_broker->caught == -1){
+	enviar_mensajes_get_pokemon();
+	if(conexion_broker->localized == -1){
 		log_error(logger,"No Se Puede Conectarse A Broker");
 		reintento_conectar_broker();
 	}
 	else{
-		recibir_mensajes();
+		pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
+		pthread_detach(suscripcion_localized);
+		suscribirse_caught();
+		pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
+		pthread_detach(suscripcion_caught);
+		suscribirse_appeared();
+		pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
+		pthread_detach(suscripcion_appeared);
 	}
-}
-
-void recibir_mensajes(){
-	pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
-	pthread_detach(suscripcion_caught);
-	pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
-	pthread_detach(suscripcion_appeared);
-	pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
-	pthread_detach(suscripcion_localized);
 }
 
 void suscribirse_appeared(){
