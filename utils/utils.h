@@ -104,6 +104,7 @@ typedef struct{
 }caught_pokemon;
 
 typedef struct{
+	int id_mensaje;
 	int name_size;
 	char* name;
 }get_pokemon;
