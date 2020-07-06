@@ -703,7 +703,9 @@ entrenador* algoritmo_sjf_con_desalojo(t_list* cola){
 entrenador* algoritmo_round_robin(t_list* cola){
 	printf("\033[1;37m==========ROUND ROBIN==========\033[0m\n");
 	entrenador* entre = list_get(cola,0);
-	entre->quantum = datos_config->quantum;
+	if(entre != NULL){
+		entre->quantum = datos_config->quantum;
+	}
 	return entre;
 }
 
@@ -1150,9 +1152,9 @@ void recibir_localized_pokemon(){
 				bool by_id(msg* m){
 					return m->id_recibido == id;
 				}
-				msg* m = list_find(mensajes,(void*)by_id);
+				msg* mensaje = list_find(mensajes,(void*)by_id);
 				t_list* poks_localized = list_create();
-				if(m != NULL){
+				if(mensaje != NULL){
 					for(int i=0;i<localized->cantidad_posiciones;i++){
 						pokemon* pok = crear_pokemon(localized->name);
 						position* aux = list_get(localized->posiciones,i);
@@ -1204,6 +1206,9 @@ void recibir_localized_pokemon(){
 						}
 						list_iterate(poks_localized,(void*)agregar);
 					}
+					list_remove_by_condition(mensajes,(void*)by_id);
+					free(mensaje->buf_msg);
+					free(mensaje);
 					list_destroy(cercanos);
 					list_destroy(entrenadores);
 					list_destroy(poks_localized);
@@ -1276,15 +1281,16 @@ void recibir_caught_pokemon(){
 				bool by_tipo_id(msg* aux){
 					return aux->tipo_msg==CATCH_POKEMON && aux->id_recibido==id;
 				}
-				msg* mensaje = list_find(mensajes,(void*)by_tipo_id);
+				msg* mensaje = list_remove_by_condition(mensajes,(void*)by_tipo_id);
 				bool espera_caught(entrenador* aux){
 					bool by_pokemon(pokemon* pok){
-						return pok->espera_caught == 1 && pok->name == mensaje->pok->name;
+						return pok->espera_caught == 1 && string_equals_ignore_case(pok->name,mensaje->pok->name);
 					}
 					return list_any_satisfy(aux->espera_caught,(void*)by_pokemon);
 				}
-				entrenador* entre = list_find(equipo->entrenadores,(void*)espera_caught);
+
 				if(mensaje != NULL && res == 1){
+					entrenador* entre = list_find(equipo->entrenadores,(void*)espera_caught);
 					list_add(entre->pokemones,mensaje->pok);
 					printf("Entrenador%c Atrapa Pokemon %s\n",entre->tid,mensaje->pok->name);
 					sumar_ciclos(entre,CICLO_ACCION);
@@ -1304,10 +1310,13 @@ void recibir_caught_pokemon(){
 					else if(!cumplir_objetivo_entrenador(entre)){
 						log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
 					}
+					free(mensaje->buf_msg);
+					free(mensaje);
 					sem_post(&semPoks);
 					sem_post(&semExecTeam);
 				}
 				else if(mensaje != NULL && res == 0){
+					entrenador* entre = list_find(equipo->entrenadores,(void*)espera_caught);
 					printf("Entrenador%c No Pudo Atrapar El Pokemon %s\n",entre->tid,mensaje->pok->name);
 					bool by_name(pokemon* pok){
 						return strcmp(pok->name,mensaje->pok->name)==0;
@@ -1319,7 +1328,6 @@ void recibir_caught_pokemon(){
 						sem_post(&semExecTeam);
 					}
 				}
-				free(mensaje);
 				free(valor);
 			}
 			list_iterate(paquete,(void*)display);
