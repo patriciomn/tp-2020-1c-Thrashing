@@ -1151,7 +1151,20 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 		} else {
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
 	    	// el archivo existe y hay que verificar si existe la linea
-	    	buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
+
+			char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
+	    	log_info(logger, "valor open:%s", valor_open);
+
+	    	if(string_equals_ignore_case(valor_open, "N")) {
+
+	    		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
+	    	    // mutex_unlock
+	    		buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
+
+	    	} else {
+	    		// reintento de operacion
+	    		//reintentar_operacion(newPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
+	    	}
 	    }
 	}
 	closedir(dir);
@@ -1731,7 +1744,7 @@ char *read_file_into_buf (char * source /*,FILE *fp*/) {
 
 void operacion_get_pokemon(get_pokemon *getPokemon) {
 
-	//pthread_mutex_lock(&mutexGET);
+	pthread_mutex_lock(&mutexGET);
 
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", getPokemon->name);
@@ -1764,6 +1777,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 
 	    		//cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
 	    	    // mutex_unlock
+
 	    		buscar_lineas_get_pokemon(getPokemon, path_directorio_pokemon);
 
 	    	} else {
@@ -1777,7 +1791,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	//list_destroy(listaCoordenadas);
 	closedir(dir);
 	free(path_directorio_pokemon);
-	//pthread_mutex_unlock(&mutexCATCH);
+	pthread_mutex_unlock(&mutexCATCH);
 
 
 }
