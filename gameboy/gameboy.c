@@ -95,7 +95,9 @@ void iniciar_gameboy(int argc,char* argv[]){
 			//argv[3]:id_mensaje,argv[4]:ok/fail
 			if(argv[3]!=NULL &&argv[4]!=NULL){
 				conectar_proceso(process);
-				enviar_mensaje_caught_pokemon(atoi(argv[3]),atoi(argv[4]),conexion);
+				bool res = 0;
+				if(string_equals_ignore_case(argv[4],"OK")) res = 1;
+				enviar_mensaje_caught_pokemon(atoi(argv[3]),res,conexion);
 			}
 			else{
 				printf("\033[1;31mParametros Incompletos\033[0m\n");
