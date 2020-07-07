@@ -58,7 +58,7 @@ void iniciar_gamecard() {
 }
 
 void terminar_gamecard(int sig){
-    //munmap(bitmap_memoria, 2);
+    //munmap(bitmap_memoria, datos_config->);
     bitarray_destroy(bitarray);
     log_destroy(logger);
     config_destroy(config_tall_grass);
@@ -355,9 +355,11 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     if((dir = opendir(path_directorio_pokemon)) == NULL) {
     	log_warning(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 
-    	//mutex_lock_BITMAP
+    	pthread_mutex_lock(&mutexBITMAP);
     	int nro_bloque_libre = obtener_bloque_libre();
-    	//mutex_unlock_BITMAP (cuidado, si muere el hilo me temo que no se desbloquea)
+    	pthread_mutex_unlock(&mutexBITMAP);
+
+
 
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
@@ -371,9 +373,9 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE Y ES SOLO UN DIRECTORIO", path_directorio_pokemon);
 
-    		//mutex_lock_BITMAP
+    		pthread_mutex_lock(&mutexBITMAP);
     		int nro_bloque_libre = obtener_bloque_libre();
-    		// mutex_unlock_BITMAP
+    		pthread_mutex_unlock(&mutexBITMAP);
 
     		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
@@ -411,7 +413,7 @@ void reintentar_operacion(new_pokemon *newPokemon) {
 
 	// hacer reintento de operacion
 	log_warning(logger, "HILO EN STANDBY DE OPERACION");
-	sleep(10); //TODO no es el tiempo del config??
+	sleep(datos_config->tiempo_reintento_operacion);
 	pthread_cancel(thread_new_pokemon);
 
 	pthread_t hilo_reintentar_new;
@@ -432,9 +434,9 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 
 	log_info(logger, "ABRIENDO ARCHIVO CON RUTA <%s>", path_directorio_pokemon);
 
-	int fdPokemon = open(path_archivo_pokemon, O_RDONLY);
+	int fdPokemon = open(path_archivo_pokemon, O_RDWR);
 
-	char *file_memory = mmap(0, tamanioArchivo, PROT_READ, MAP_SHARED, fdPokemon, 0);
+	char *file_memory = mmap(0, tamanioArchivo, PROT_READ | PROT_WRITE, MAP_SHARED, fdPokemon, 0);
 
 	char *linea = string_new();
 	char* posx = string_itoa(newPokemon->pos.posx);
@@ -442,9 +444,11 @@ void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_p
 	string_append_with_format(&linea, "%s%s%s",posx , GUION,posy);
 
 	if(string_contains(file_memory, linea)) { // buscar en el archivo y modificar
+
 		log_info(logger, "COORDENADA <%s> ENCONTRADO", linea);
 		log_info(logger, "LINEA <%s>", linea);
 		modificar_linea_en_archivo(file_memory, newPokemon, path_directorio_pokemon, linea);
+
 	} else { // se agrega al final del archivo
 
 		log_info(logger, "COORDENADA <%s> NO ENCONTRADO!", linea);
@@ -489,9 +493,9 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 	} else {
 
 		// buscar un bloque para la nueva linea
-		// mutex_lock_BITMAP
+		pthread_mutex_lock(&mutexBITMAP);
 		int	nro_bloque_libre = obtener_bloque_libre();
-		// mutex_unlock_BITMAP
+		pthread_mutex_unlock(&mutexBITMAP);
 
 		if(nro_bloque_libre == -1) {
 			log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE PARA ESCRIBIR NUEVOS DATOS");
@@ -701,11 +705,6 @@ int obtener_bloque_libre() {
 		}
 	}
 
-	if(bloque == -1) {
-		log_error(logger, "NO HAY SUFICIENTE ESPACIO EN EL FILE SYSTEM");
-		// muere el hilo
-	}
-
 	return bloque;
 }
 
@@ -913,8 +912,10 @@ void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char
 
 		} else { // buscamos un bloque libre y si lo hay, se lo asignamos a la metadata
 
+			pthread_mutex_lock(&mutexBITMAP);
 			int nuevo_nro_bloque = obtener_bloque_libre();
-				// luego hacemos el resto
+			pthread_mutex_unlock(&mutexBITMAP);
+
 			if(nuevo_nro_bloque == -1) {
 				log_error(logger, "NO HAY SUFICIENTE ESPACIO PARA ALMACENAR NUEVOS DATOS");
 				pthread_cancel(thread_new_pokemon);
@@ -1299,7 +1300,7 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 	log_info(logger, "cantidad actualizada:%d", cantidadLineaActualizada);
 
 	// diferencia == 0
-	if(cantidadLineaActualizada != 0) { // no se tiene que borrar la linea entera, solo uno o mas bytes de la misma
+	if(cantidadLineaActualizada != 0) { // no se borra la linea entera, solo uno o mas bytes de la misma
 
 		if(diferencia == 0) { // no cambia nada, es solo reemplazar la misma linea con la nueva cantidad
 
@@ -1325,10 +1326,10 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 				char *ultimoBloque = string_itoa(ultimo_bloque);
 				borrar_archivo(ultimoBloque, 'B');
 
-				//seteo a 0 el bitmap[ultimoBloque]
-				// mutex_lock_mxBITMAP
+				pthread_mutex_lock(&mutexBITMAP);
 				liberar_bloque_bitmap(ultimo_bloque);
-				// mutex_unlock_mxBITMAP
+				pthread_mutex_unlock(&mutexBITMAP);
+
 				modificar_archivo_pokemon_catch_con_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
 
 				retardo_operacion(); // revisar, cuando se pasa de archivo a directorio, se hace retardo?
@@ -1364,10 +1365,10 @@ void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemo
 				char *ultimoBloque = string_itoa(ultimo_bloque);
 				borrar_archivo(ultimoBloque, 'B');
 
-				//seteo a 0 el bitmap[ultimoBloque]
-				// mutex_lock_mxBITMAP
+				pthread_mutex_lock(&mutexBITMAP);
 				liberar_bloque_bitmap(ultimo_bloque);
-				// mutex_unlock_mxBITMAP
+				pthread_mutex_unlock(&mutexBITMAP);
+
 				modificar_archivo_pokemon_catch_sin_linea(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, catchPokemon->name);
 
 				enviar_respuesta_catch_pokemon(catchPokemon, true);
@@ -1650,8 +1651,11 @@ void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon,
 	munmap(file_memory, tamArchivo);
 	remove(path_archivo_pokemon);
 	int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-	// se actualiza el bitmap, se limpia el bit de la posicion ultimo_bloque
+
+	pthread_mutex_lock(&mutexBITMAP);
 	liberar_bloque_bitmap(ultimo_bloque);
+	pthread_mutex_unlock(&mutexBITMAP);
+
 	char *path_ultimo_bloque = string_new();
 	string_append_with_format(&path_ultimo_bloque, "%s%s%s%s%s", datos_config->pto_de_montaje, BLOCKS_DIR, "/", string_itoa(ultimo_bloque), ".txt");
 	remove(path_ultimo_bloque);
