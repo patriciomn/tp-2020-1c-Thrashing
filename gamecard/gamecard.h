@@ -178,6 +178,9 @@ void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, 
 
 // Funciones GET
 position* obtener_elementos_coordenadas(char *linea);
+void buscar_lineas_get_pokemon(get_pokemon *getPokemon, char *path_directorio_pokemon);
+void enviar_respuesta_get_pokemon(get_pokemon *getPokemon, int valor_rta, t_list *info_lineas);
+void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_list *info_lineas);
 //t_list *recorrer_lineas(char **lineas);
 
 

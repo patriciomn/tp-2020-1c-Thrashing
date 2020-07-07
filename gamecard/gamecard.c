@@ -35,10 +35,6 @@ int main () {
 
 	iniciar_gamecard();
 
-    pthread_join(thread_new_pokemon, NULL);
-    pthread_join(thread_catch_pokemon, NULL);
-    pthread_join(thread_get_pokemon, NULL);
-
 	signal(SIGINT,terminar_gamecard);
     return 0;
 }
@@ -59,6 +55,10 @@ void iniciar_gamecard() {
 
 void terminar_gamecard(int sig){
     //munmap(bitmap_memoria, datos_config->);
+    pthread_cancel(thread_get_pokemon);
+    pthread_cancel(thread_catch_pokemon);
+    pthread_cancel(thread_new_pokemon);
+    pthread_cancel(servidor_gamecard);
     bitarray_destroy(bitarray);
     log_destroy(logger);
     config_destroy(config_tall_grass);
@@ -66,10 +66,6 @@ void terminar_gamecard(int sig){
     free(datos_config->ip_broker);
     free(datos_config->pto_de_montaje);
     free(datos_config);
-    pthread_cancel(thread_get_pokemon);
-    pthread_cancel(thread_catch_pokemon);
-    pthread_cancel(thread_new_pokemon);
-    pthread_cancel(servidor_gamecard);
 }
 
 void verificar_punto_de_montaje() {
@@ -117,8 +113,6 @@ void obtener_datos_archivo_config() {
 
 	datos_config->pid = config_get_int_value(config_tall_grass, "PID");
 }
-
-// Nota: Revisar memory leaks
 
 void verificar_metadata_fs(char *path_pto_montaje) {
 
@@ -358,8 +352,6 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	pthread_mutex_lock(&mutexBITMAP);
     	int nro_bloque_libre = obtener_bloque_libre();
     	pthread_mutex_unlock(&mutexBITMAP);
-
-
 
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
@@ -627,7 +619,6 @@ int valor_campo_size_metadata(char *ruta_dir_pokemon) { // se puede generalizar
 	config_destroy(metadata_pokemon);
 	free(path_metadata_pokemon);
 	return size;
-
 }
 
 //TODO esta funcion sirve solamente para cuando no existe el archivo pokemon (REVISAR!)
@@ -883,7 +874,8 @@ void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char
 	int tamanioLineaVieja = get_tamanio_linea(file_memory + posicionLinea);
 	log_info(logger, "tamanio vieja linea: %d", tamanioLineaVieja);
 
-	char *viejaLinea = string_duplicate(string_substring(file_memory, posicionLinea, tamanioLineaVieja));
+	char* sub = string_substring(file_memory, posicionLinea, tamanioLineaVieja);
+	char *viejaLinea = string_duplicate(sub);
 	log_info(logger, "vieja linea: %s", viejaLinea);
 
 	char *lineaActualizada = get_linea_nueva_cantidad(viejaLinea, coordenada, newPokemon->cantidad); // devuelve la linea actualizada pero con el \n
@@ -926,12 +918,10 @@ void modificar_linea_en_archivo(char* file_memory, new_pokemon *newPokemon, char
 			modificar_linea_pokemon(file_memory, viejaLinea, lineaActualizada, posicionLinea, ruta_directorio_pokemon, newPokemon->name);
 
 			enviar_respuesta_new_pokemon(newPokemon);
-
 		}
-
-
 	}
 
+	free(sub);
 	free(lineaActualizada);
 	free(viejaLinea);
 	free(ruta_archivo_pokemon);
@@ -982,7 +972,8 @@ char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agr
 
 	int sizeLinea = strlen(linea);
 
-	char *viejaCantidad = string_duplicate(string_substring(linea, sizeCoordenada, sizeLinea - sizeCoordenada));
+	char* sub = string_substring(linea, sizeCoordenada, sizeLinea - sizeCoordenada);
+	char *viejaCantidad = string_duplicate(sub);
 
 	int oldCantidad = atoi(viejaCantidad);
 
@@ -994,6 +985,8 @@ char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agr
 	string_append_with_format(&lineaModificada, "%s%s%s%s", coordenada, IGUAL, newCantidad, "\n");
 	printf("size nueva linea: %d\n", strlen(lineaModificada));
 
+	free(sub);
+	free(viejaCantidad);
 	free(newCantidad);
 	return lineaModificada;
 }
@@ -1060,7 +1053,6 @@ void actualizar_bloque(char *mapped, int desplazamiento, char *bloque) {
 	free(path_archivo_bloque);
 	free(contenido);
 	free(sub);
-
 }
 
 // modifica el archivo pokemon con la nueva cantidad (sin importar si se agrando o no el tamaño)
@@ -1433,7 +1425,6 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 		// mutex_unlock_mxMeTADATAPOKE
 
-		free(buffer);
 		free(tam);
 
 	} else if(posicionLinea + sizeViejaLinea == tamArchivo) { // esta en la ultima linea
@@ -1457,7 +1448,6 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 			// mutex_unlock_mxMeTADATAPOKE
 
-			free(buffer);
 			free(tam);
 
 		} else { // esta en el medio
@@ -1666,7 +1656,6 @@ void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon,
 
 }
 
-
 void borrar_archivo(char *nombre, char flag) {
 
 	char *ruta_archivo = string_new();
@@ -1744,7 +1733,6 @@ void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro
 	free(newBlocks);
 	free(ruta_metadata_pokemon);
 }
-
 
 void liberar_bloque_bitmap(int nro_bloque_a_liberar) {
 	bitarray_clean_bit(bitarray, nro_bloque_a_liberar);
@@ -2034,7 +2022,7 @@ rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
 			
 		    } else{// en caso de que este abierto
 				  //finalizar hilo y reintentar despues del tiempo que dice el config
-/*
+
 				log_warning(logger, "HILO EN STANDBY DE OPERACION");
     			pthread_cancel(thread_get_pokemon);
 				sleep(datos_config->tiempo_retardo_operacion);
@@ -2078,10 +2066,13 @@ void suscripcion_colas_broker() {
 		log_info(logger, "GAMECARD CONECTADO AL BROKER");
 
 		pthread_create(&thread_new_pokemon, NULL, (void *)recibir_mensajes_new_pokemon, NULL);
+		pthread_detach(thread_new_pokemon);
 
 		pthread_create(&thread_catch_pokemon, NULL, (void *)recibir_mensajes_catch_pokemon, NULL);
+		pthread_detach(thread_catch_pokemon);
 
 		pthread_create(&thread_get_pokemon, NULL, (void *)recibir_mensajes_get_pokemon, NULL);
+		pthread_detach(thread_get_pokemon);
 	}
 
 }
@@ -2433,7 +2424,7 @@ void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
 
 		paquete->codigo_operacion = APPEARED_POKEMON;
 		paquete->buffer = malloc(sizeof(t_buffer));
-		paquete->buffer->size = sizeof(int) * 2 + sizeof(position) + newPokemon->name_size;
+		paquete->buffer->size = sizeof(int) * 2 + sizeof(position) + newPokemon->name_size+1;
 		paquete->buffer->stream = malloc(paquete->buffer->size);
 
 		memcpy(paquete->buffer->stream, &(newPokemon->id_mensaje), sizeof(int));
@@ -2491,7 +2482,6 @@ void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
 
 void enviar_respuesta_get_pokemon(get_pokemon *getPokemon, int valor_rta, t_list *info_lineas) {
 
-	int desplazamiento = 0;
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 
 	paquete->codigo_operacion = LOCALIZED_POKEMON;
@@ -2530,7 +2520,7 @@ void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_lis
 	} else {
 		int desplazamiento = 0;
 
-		paquete->buffer->size = sizeof(int) * 2 + getPokemon->name_size + sizeof(int) + list_size(info_lineas) * sizeof(position);
+		paquete->buffer->size = sizeof(int) * 2 + getPokemon->name_size + 1 + sizeof(int) + list_size(info_lineas) * sizeof(position);
 		paquete->buffer->stream = malloc(paquete->buffer->size);
 
 		memcpy(paquete->buffer->stream, &(getPokemon->id_mensaje), sizeof(int));
