@@ -57,7 +57,6 @@ void suscribirse_a_get_pokemon() {
 	}
 }
 
-/*
 void recibir_mensajes_new_pokemon(){
 	while(1) {
 		int codigo_operacion;
@@ -307,9 +306,7 @@ void* serializar_paquete(t_paquete* paquete, int bytes) {
 
 	return magic;
 }
-*/
 
-/*
 void iniciar_servidor(void) {
 
 	int socket_servidor;
@@ -432,7 +429,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 }
 
 // Deserealizacion para Gameboy
-/*
+
 void deserealizar_new_pokemon_gameboy(void *stream, new_pokemon *newPokemon) {
 	int desplazamiento = 0;
 
@@ -455,7 +452,7 @@ void deserealizar_new_pokemon_gameboy(void *stream, new_pokemon *newPokemon) {
 	desplazamiento += sizeof(int);
 }
 
-/*
+
 void deserealizar_catch_pokemon_gameboy(void *stream, CPokemon *catchPokemon) {
 	int desplazamiento = 0;
 
@@ -490,12 +487,10 @@ void deserealizar_get_pokemon_gameboy(void *stream, GPokemon *getPokemon) {
 	memcpy(getPokemon->nombre, stream + desplazamiento, size_name);
 	desplazamiento += size_name;
 }
-*/
-
 
 //---------------------------------------------------------------------------
 //QUIZAS SIRVE ES EL MANEJO DE BLOQUES 
-/*
+
 void escribirRegistroEnArchivo(char* direccionArchivo, nodo_memtable* registro){
 	t_config* archivo = config_create(direccionArchivo);
 	char** bloques = config_get_array_value(archivo, "BLOCKS");

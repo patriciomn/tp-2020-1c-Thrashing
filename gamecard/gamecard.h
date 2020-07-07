@@ -47,13 +47,7 @@
 #define GUION "-"
 #define IGUAL "="
 
-t_log *logger;
-t_bitarray *bitarray;			// variable global bitmap, para manejar el bitmap siempre utilizamos esta variable
-t_config *config_tall_grass;
 
-char *ruta_archivo_bitmap;
-
-void *bitmap_memoria;	// puntero para el mmap
 
 struct metadata_info {
     int block_size;
@@ -101,34 +95,12 @@ typedef struct{
 	t_list* posiYcant;
 }rtaGet;
 
-ack_t acks_gamecard;
-
-FILE *bitmapFilePointer;
-
-// el pid del proceso
-
-pid_t pid_gamecard;
-
-// Los siguientes structs son para recibir mensajes del gameboy
-
-struct metadata_info *metadataTxt; // este puntero es para el metadata.txt que ya existe en el fs
-struct config_tallGrass *datos_config; // este struct es para almacenar los datos de las config. Tambien lo utilizamos para setear los valores de metadata.txt cuando se crea la primera vez
-
-// Hilos para gamecard
-pthread_t servidor_gamecard; // este hilo es para iniciar el gamecard como servidor e interacturar con gameboy si el broker cae
-pthread_t cliente_gamecard; // este hilo es para iniciar gamecard como cliente del broker
-
-pthread_t servidor_gamecard;
-
-pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_pokemon
-pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
-pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
-
 //FUNCIONES
 
 int main ();
 
 void iniciar_gamecard();
+void terminar_gamecard(int sig);
 void verificar_punto_de_montaje();
 void iniciar_logger_config();
 void obtener_datos_archivo_config();
