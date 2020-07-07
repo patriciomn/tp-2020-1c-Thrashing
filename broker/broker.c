@@ -973,6 +973,7 @@ void compactar_particiones_dinamicas(){
 			}
 		}
 		list_iterate(cache,(void*)compac);
+		free(borrar);
 	}
 }
 
@@ -1188,31 +1189,6 @@ uint32_t log_dos(uint32_t size){
 }
 
 //dump=====================================================================================================================================================================
-char* get_cola(uint32_t tipo){
-	char* c;
-	switch(tipo){
-		case NEW_POKEMON:
-			c = "NEW";
-			break;
-		case GET_POKEMON:
-			c = "GET";
-			break;
-		case CAUGHT_POKEMON:
-			c= "CAUGHT";
-			break;
-		case CATCH_POKEMON:
-			c= "CATCH";
-			break;
-		case APPEARED_POKEMON:
-			c= "APPEARED";
-			break;
-		case LOCALIZED_POKEMON:
-			c= "LOCALIZED";
-			break;
-	}
-	return c;
-}
-
 void display(){
 	printf("---------------------------------------------------------------------------------------------------------------------------------------------\n");
 	void imprimir(void* ele){

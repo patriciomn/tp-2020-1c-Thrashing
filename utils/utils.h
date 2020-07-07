@@ -132,3 +132,4 @@ int recibir_confirmacion_suscripcion(int cliente_fd,int);
 void liberar_conexion(int socket_cliente);
 bool check_socket(int sock);
 int recibir_id_mensaje(int cliente_fd);
+char* get_cola(uint32_t);

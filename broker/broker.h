@@ -117,6 +117,5 @@ void algoritmo_reemplazo();
 particion* buddy_system(uint32_t size);
 void delete_particion(particion* borrar);
 void limpiar_cache();
-char* get_cola(uint32_t);
 void consolidar_particiones_dinamicas();
 #endif /* CONEXIONES_H_ */

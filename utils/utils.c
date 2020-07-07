@@ -225,7 +225,7 @@ int recibir_confirmacion_suscripcion(int cliente_fd,int tipo){
 	if(recv(cliente_fd, &cod_op, sizeof(int), MSG_WAITALL) == -1)
 		cod_op = -1;
 	if(cod_op != -1){
-		printf("Se Ha Suscrito A La Cola %d\n",tipo);
+		printf("\033[1;33mSuscrito A La Cola %s\033[0m\n",get_cola(tipo));
 	}
 	return cod_op;
 }
@@ -269,4 +269,29 @@ int recibir_id_mensaje(int cliente_fd){
 	memcpy(&id,buffer,sizeof(int));
 	free(buffer);
 	return id;
+}
+
+char* get_cola(uint32_t tipo){
+	char* c;
+	switch(tipo){
+		case NEW_POKEMON:
+			c = "NEW";
+			break;
+		case GET_POKEMON:
+			c = "GET";
+			break;
+		case CAUGHT_POKEMON:
+			c= "CAUGHT";
+			break;
+		case CATCH_POKEMON:
+			c= "CATCH";
+			break;
+		case APPEARED_POKEMON:
+			c= "APPEARED";
+			break;
+		case LOCALIZED_POKEMON:
+			c= "LOCALIZED";
+			break;
+	}
+	return c;
 }
