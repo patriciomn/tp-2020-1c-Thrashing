@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <semaphore.h>
 //#include "sockets.c"
 
 #define IP_SERVIDOR		 "127.0.0.3"
@@ -84,16 +85,9 @@ typedef struct {
 
 
 typedef struct{
-	int posX;
-	int posY;
-	int cant;
-}posYcant;
-
-typedef struct{
-	int id_mensaje;
-	char* name;
-	t_list* posiYcant;
-}rtaGet;
+    char* nombrePokemon;
+    sem_t* semaforo;
+} semMetadataPoke;
 
 //FUNCIONES
 
@@ -170,7 +164,7 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 
 
 //void operacion_new_pokemon(new_pokemon *newPokemon);
-rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon);
+void operacion_get_Pokemon(get_pokemon *getPokemon);
 
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
@@ -201,6 +195,13 @@ void borrar_archivo(char *nombre, char flag);
 void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
 void liberar_bloque_bitmap(int nro_bloque_a_liberar);
 void retardo_operacion();
+//void reintentar_operacion(new_pokemon *newPokemon);
+//void reintentar_operacion(catch_pokemon *catchPokemon);
+//void reintentar_operacion(get_pokemon *getPokemon);
+void agregarSemaforo(char* pokemon);
+void waitSemaforo(char* pokemon);
+void signalSemaforo(char* pokemon);
+semMetadataPoke* buscarSemaforo(char* pokemon);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------

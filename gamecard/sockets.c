@@ -652,4 +652,99 @@ typedef struct {
 	uint16_t key;
 	char* value;
 } nodo_memtable;
+
+
+
+
+
+
+rtaGet* operacion_get_Pokemon(int idMensaje, char* pokemon){
+	pthread_mutex_lock(&mutexGET);
+	rtaGet* respuesta = malloc(sizeof(rtaGet));
+    respuesta->id_mensaje = idMensaje;
+    respuesta->name = pokemon;
+    DIR *dir;
+	char *path_directorio_pokemon = string_new();
+		string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", pokemon);
+		log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
+
+		if((dir = opendir(path_directorio_pokemon)) == NULL) { // si existe o no el directorio (FAIL)
+			log_error(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
+		    //si no existe se devuelve el nombre y el id, los cuales ya estan cargados
+		} else {
+			char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+			if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
+		    	log_info(logger, "LA RUTA <%s> ES SOLO UN DIRECTORIO ", path_directorio_pokemon);
+		    } else {
+		    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON");
+			
+		    	//mutex_lock
+    		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+    		if(string_equals_ignore_case(valor_open, "N")) {
+    			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
+    			// mutex_unlock
+		
+            
+            char* pathFILE = string_new();
+            string_append(&pathFILE,path_directorio_pokemon);
+            string_append_with_format(&pathFILE,"%s%s%s", "/",pokemon, POKEMON_FILE_EXT);
+			//log_info(logger, "Path pokemon %s", pathFILE);
+			FILE *fp =fopen(pathFILE, "r");
+			int fplen = fileSize(pathFILE);
+            char* scaneo = NULL;
+			//revisar como entran las cosas al buffer
+            read_file_into_buf (scaneo, fp);
+			//mutex_lock
+			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+			log_info(logger, "Cerro archivo pokemon");
+    		// mutex_unlock
+			free(pathFILE);
+			free(fp);
+            //falta separar uno a uno las lineas
+			respuesta->posiYcant = list_create();
+			log_info(logger, "Hizo los frees  y Crea lista");
+       
+			int desplazamiento = 0;
+			while(desplazamiento < fplen){
+			posYcant* posicionesCant = malloc(sizeof(posYcant));
+			log_info(logger, "zona de memcpy");
+	//TENGO PROBLEMAS CON LOS MEMCPY REVISAR
+			memcpy(&(posicionesCant->posX), scaneo, sizeof(int));
+			log_info(logger, "Entrando a memcpy");
+			log_info(logger, "%d Posicione en x", posicionesCant->posX);
+			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del -
+			memcpy(&(posicionesCant->posY), scaneo, sizeof(int));
+			desplazamiento = desplazamiento + sizeof(int) + sizeof(char);//el char del =
+			memcpy(&(posicionesCant->cant), scaneo, sizeof(int));
+			list_add(respuesta->posiYcant, posicionesCant);
+			desplazamiento = desplazamiento + sizeof(int) + 1; //por el /n
+			free(posicionesCant);
+			}
+            
+            free(scaneo);
+			
+		    } else{// en caso de que este abierto
+				  //finalizar hilo y reintentar despues del tiempo que dice el config
+
+				log_warning(logger, "HILO EN STANDBY DE OPERACION");
+    			pthread_cancel(thread_get_pokemon);
+				sleep(datos_config->tiempo_retardo_operacion);
+COSAS DEL NUEVO HILO 		//	pthread_create(&atender_get_pokemon, NULL, (void *) operacion_get_pokemon, PARAMETROS);
+    		//	pthread_join(atender_get_pokemon, NULL);
+    			log_info(logger, "HILO RETOMANDO LA OPERACION");
+				
+
+}
+				
+		}
+
+		    free(path_directorio_pokemon);
+			
+    }
+	closedir(dir);
+	pthread_mutex_unlock(&mutexGET);
+    return respuesta;
+}
+
+
 */
