@@ -1299,10 +1299,8 @@ void recibir_caught_pokemon(){
 			t_list* esperas = list_filter(equipo->entrenadores,(void*)verificar_espera_caught);
 			list_iterate(esperas,(void*)atrapar_default);
 			list_destroy(esperas);
-			if(equipo->exec == NULL){
-				sem_post(&semPoks);
-				sem_post(&semExecTeam);
-			}
+			sem_post(&semPoks);
+			sem_post(&semExecTeam);
 			return;
 		}
 		else{
