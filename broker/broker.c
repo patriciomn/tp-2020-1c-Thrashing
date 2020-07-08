@@ -36,7 +36,6 @@ pthread_mutex_t mutexDump = PTHREAD_MUTEX_INITIALIZER;
 
 int main(){	
     iniciar_broker();
-	terminar_broker( logger, config);
 }
 
 void iniciar_broker(void){
@@ -298,7 +297,7 @@ void atender_ack(int cliente_fd){
 		}
 		if(confirmado_todos_susciptors_mensaje(item) == 1){
 			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs De Todos Sus Suscriptors\033[0m\n");
-			//Durabilidad: Todo mensaje debe permanecer en la cola de mensajes hasta que todos los Suscribers lo reciban.
+			//Durabilidad: Todos los mensajes debe permanecer en la cola de mensajes hasta que todos los Suscribers lo reciban.
 			//borrar_mensaje(item);
 		}
 		free(msg);
@@ -352,7 +351,7 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
-		log_warning(logger,"MENSAJE_ID:%d NEW_POKEMON Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
+		log_warning(logger,"Mensaje NEW_POKEMON ID:%d Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
 		pthread_rwlock_wrlock(&lockNew);
 		list_add(cola_new->mensajes,item);
 		cola_new->id++;
@@ -415,7 +414,7 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
-		log_warning(logger,"MENSAJE_ID:%d CATCH_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		log_warning(logger,"Mensaje CATCH_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		pthread_rwlock_wrlock(&lockCatch);
 		list_add(cola_catch->mensajes,item);
 		cola_catch->id++;
@@ -450,8 +449,8 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	//almacena
 	particion* part_aux = malloc_cache(sizeof(uint32_t));
 	if(part_aux != NULL){
-		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),sizeof(uint32_t));
-		log_warning(logger,"MENSAJE_ID:%d CAUGHT_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,&(caught->caught),sizeof(bool));
+		log_warning(logger,"Mensaje CAUGHT_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		pthread_rwlock_wrlock(&lockCaught);
 		list_add(cola_caught->mensajes,item);
 		cola_caught->id++;
@@ -477,7 +476,7 @@ void mensaje_get_pokemon(void* msg,int cliente_fd){
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio,msg,size);
-		log_warning(logger,"MENSAJE_ID:%d GET_POKEMON Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		log_warning(logger,"Mensaje GET_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
 		pthread_rwlock_wrlock(&lockGet);
 		list_add(cola_get->mensajes,item);
 		cola_get->id++;
@@ -531,12 +530,13 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 		free(item);
 	}
 	free(localized->name);
+	list_destroy(localized->posiciones);
 	free(localized);
 }
 
 //enviar mensajes===========================================================================================================================================================
 void enviar_mensajes(suscriber* sus,int tipo_cola){
-	//Notificación de recepción: Todo mensaje entregado debe ser confirmado por cada Suscriptor para marcarlo y no enviarse nuevamente al mismo.
+	//Notificación de recepción: Todos los mensajes entregado debe ser confirmado por cada Suscriptor para marcarlo y no enviarse nuevamente al mismo.
 	mq* cola = cola_mensaje(tipo_cola);
 	bool no_enviado(mensaje* m){
 		bool by_id(suscriber* aux){
@@ -573,7 +573,6 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 
 	list_iterate(particiones_filtradas,(void*)agregar);
 	enviar_paquete(enviar,sus->cliente_fd);
-	log_info(logger,"Mensajes Enviado A Proceso %d",sus->pid);
 	list_destroy(mensajes);
 	list_destroy(particiones_tipo);
 	list_destroy(particiones_filtradas);
@@ -642,6 +641,7 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 			break;
 		}
 	}
+	log_info(logger,"Mensaje %s ID:%d Enviado A Proceso %d",get_cola(tipo),id,sus->pid);
 	agregar_a_paquete(enviar,buffer,size);
 	bool by_id(mensaje* m){
 		return m->id == aux->id_mensaje;
@@ -681,12 +681,14 @@ void iniciar_cache(){
 	header->start = inicio;
 	header->inicio = memoria;
 	header->fin = header->inicio + mem_total;
+	header->end = header->start + mem_total;
 	header->tiempo_inicial = time(NULL);
 	header->tiempo_actual = time(NULL);
 	header->intervalo = 0;
 	list_add(cache,header);
 	//en otra consola: kill -USR1 [pid del broker]
 	signal(SIGUSR1,handler_dump);
+	signal(SIGINT,handler_dump);
 }
 
 particion* malloc_cache(uint32_t size){
@@ -1220,7 +1222,7 @@ void display(){
 }
 
 void handler_dump(int signo){
-	if(signo == SIGUSR1){
+	if(signo == SIGUSR1 || signo == SIGINT){
 		log_info(logger,"Dump De Cache ...");
 		pthread_mutex_lock(&mutexDump);
 		time_t tiempo;
@@ -1260,6 +1262,7 @@ void handler_dump(int signo){
 
 		printf("\033[1;33mSIGUSR1 RUNNING...\033[0m\n");
 		limpiar_cache();
+		terminar_broker(logger, config);
 		exit(0);
 	}
 }
