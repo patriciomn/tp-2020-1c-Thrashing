@@ -123,11 +123,11 @@ void verificar_metadata_fs(char *path_pto_montaje) {
     string_append(&path_metadata_txt, METADATA_TXT_PATH);
 
     log_info(logger, "ABRIENDO METADATA FS CON RUTA <%s>", path_metadata_txt);
-	//sem_lock_mxMETDATAPOKE
+	//signalSemaforo(pokemon)
     FILE *filePointer = fopen(path_metadata_txt,"r");
     if(filePointer == NULL) {
         log_error(logger,"ERROR AL ABRIR EL ARCHIVO metadata.txt");
-		//sem_unlock_mxMETDATAPOKE
+		//waitSemaforo(pokemon)
         exit(1);
     }
 
@@ -184,9 +184,9 @@ void crear_pto_de_montaje(char *path_pto_montaje) {
     int rta_mkdir = mkdir(path_pto_montaje,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if(rta_mkdir == 0) {
         log_info(logger,"DIRECTORIO %s CREADO", path_pto_montaje);
-		//sem_lock_mxMETDATAPOKE
+		//signalSemaforo(pokemon)
         crear_metadata_tall_grass(path_pto_montaje);
-		//sem_unlock_mxMETDATAPOKE
+		//waitSemaforo(pokemon)
         crear_directorio_files(path_pto_montaje);
         crear_directorio_blocks(path_pto_montaje);
     } else {
@@ -358,10 +358,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
     } else {
-		//sem_lock_mxMETDATAPOKE
+		//signalSemaforo(newPokemon->name);
     	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
     	//char *expected = "Y";
-		//sem_unlock_mxMETDATAPOKE
+		//waitSemaforo(newPokemon->name);
 
     	if(string_equals_ignore_case(valor, "Y")) {
 
@@ -370,24 +370,25 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     		pthread_mutex_lock(&mutexBITMAP);
     		int nro_bloque_libre = obtener_bloque_libre();
     		pthread_mutex_unlock(&mutexBITMAP);
-
+			
     		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+		
 
     	} else {
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
     		// el archivo existe y hay que verificar si existe la linea
-    		//sem_lock_mxMETDATAPOKE
+    		//signalSemaforo(newPokemon->name);
     		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
     		log_info(logger, "valor open:%s", valor_open);
     		if(string_equals_ignore_case(valor_open, "N")) {
 
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-    			//sem_unlock_mxMETDATAPOKE
+    			//waitSemaforo(newPokemon->name);
     			buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
 
     		} else {
-				//sem_unlock_mxMETDATAPOKE
+				//waitSemaforo(newPokemon->name);
 				//porque si no queda trabado
     			// reintento de operacion
     			//reintentar_operacion(newPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
@@ -523,9 +524,9 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 		}
 
 		escribir_archivo(path_archivo_pokemon, linea, "a");
-		//sem_lock_mxMETDATAPOKE
+		//signalSemaforo(pokemon)
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-		//sem_unlock_mxMETDATAPOKE
+		//waitSemaforo(pokemon)
 		escribir_blocks(ultimo_bloque, nro_bloque_libre, linea);
 
 		agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
@@ -650,7 +651,6 @@ int valor_campo_size_metadata(char *ruta_dir_pokemon) { // se puede generalizar
 }
 
 //TODO esta funcion sirve solamente para cuando no existe el archivo pokemon (REVISAR!)
-
 void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int nro_bloque_libre) {
 
 	log_info(logger, "CREANDO EL DIRECTORIO <%s>", path_directorio_pokemon);
@@ -669,11 +669,11 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	string_append_with_format(&ruta_archivo_pokemon, "%s%s%s", "/", newPokemon->name, POKEMON_FILE_EXT);
 
 	crear_metadata_pokemon(path_directorio_pokemon, newPokemon->name);
-
+	
 	escribir_archivo(ruta_archivo_pokemon, linea, "a");
 
 	escribir_block(nro_bloque_libre, linea);
-
+	//signalSemaforo(newPokemon->name);
 	agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
 
 	char* size = string_itoa(strlen(linea));
@@ -682,6 +682,7 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	retardo_operacion();
 
 	cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+	//waitSemaforo(newPokemon->name);
 
 	enviar_respuesta_new_pokemon(newPokemon);
 
@@ -867,7 +868,7 @@ void crear_metadata_pokemon(char *ruta_directorio_pokemon, char *pokemon) {
     	log_error(logger, "ERROR AL CREAR EL ARCHIVO CON RUTA <%s>", ruta_metadata_pokemon);
     	exit(1);
     }
-
+	//agregarSemaforo(pokemon);
     char *campos_metadataTxt = string_new();
     string_append(&campos_metadataTxt, "DIRECTORY=N");
     string_append(&campos_metadataTxt, "\n");
@@ -1211,6 +1212,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 		enviar_respuesta_catch_pokemon(catchPokemon, false);
 
 	} else {
+	
 		char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
 		if(string_equals_ignore_case( valor, "Y")) { // si es un directorio, se envia al broker la respuesta (FAIL)
 
@@ -1220,18 +1222,18 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 		} else {
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
 	    	// el archivo existe y hay que verificar si existe la linea
-			//sem_lock_mxMETDATAPOKE
+			//signalSemaforo(catchPokemon->name);
 			char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
 	    	log_info(logger, "valor open:%s", valor_open);
 
 	    	if(string_equals_ignore_case(valor_open, "N")) {
 
 	    		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-	    	    //sem_unlock_mxMETDATAPOKE
+	    	   
 	    		buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
-
+				 //waitSemaforo(catchPokemon->name);
 	    	} else {
-				//sem_unlock_mxMETDATAPOKE
+				//waitSemaforo(catchPokemon->name);
 	    		// reintento de operacion
 	    		//reintentar_operacion(catchPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
 	    	}
@@ -1288,7 +1290,7 @@ void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_di
 	free(posy);
 }
 
-
+//TODO revisar que cierre el archivo metadata o sacar en el if que lo hace y ponerlo por fuera
 void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemon, char *ruta_directorio_pokemon, char *coordenada) {
 
 	char *ruta_archivo_pokemon = string_new();
@@ -1852,7 +1854,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 		} else {
 
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
-	    	//sem_lock_mxMETDATAPOKE
+	    	//signalSemaforo(getPokemon->name);
 
 	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
 			
@@ -1861,12 +1863,12 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	    	if(string_equals_ignore_case(valor_open, "N")) {
 
 	    		//cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-	    	    //sem_unlock_mxMETDATAPOKE
+	    	    //waitSemaforo(getPokemon->name);
 
 	    		buscar_lineas_get_pokemon(getPokemon, path_directorio_pokemon);
 
 	    	} else {
-				//sem_unlock_mxMETDATAPOKE
+				//waitSemaforo(getPokemon->name);
 	    		// reintento de operacion
 	    		//reintentar_operacion(getPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
 	    	}
@@ -2493,11 +2495,16 @@ void waitSemaforo(char* pokemon){
 
 void signalSemaforo(char* pokemon){
 	semMetadataPoke* semAux = buscarSemaforo(pokemon);
-	sem_signal(&semAux->semaforo);
+	sem_post(&semAux->semaforo);
 }
 
-semMetadataPoke* buscarSemaforo(char* pokemon){//sin probar
+semMetadataPoke* buscarSemaforo(char* pokemon){
 	semMetadataPoke* semaforo = malloc(sizeof(semMetadataPoke));
-	//semaforo = (semMetadataPoke*)list_find(sem_MetadataPoke,string_equals_ignore_case(pokemon, semaforo->nombrePokemon));
+	
+	bool esDeEstePokemon(semMetadataPoke* semAux){
+		string_equals_ignore_case(pokemon, semAux->nombrePokemon);
+	}
+	semaforo = (semMetadataPoke*)list_find(sem_MetadataPoke,(void*) esDeEstePokemon);
+	
 	return semaforo;
 }
