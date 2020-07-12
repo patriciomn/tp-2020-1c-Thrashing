@@ -63,6 +63,7 @@ void terminar_gamecard(int sig){
 	//pthread_mutex_unlock(&mutexBITMAP);	
     log_destroy(logger);
     config_destroy(config_tall_grass);
+	//vaciarListaSemaforos();
     free(metadataTxt);
     free(datos_config->ip_broker);
     free(datos_config->pto_de_montaje);
@@ -123,11 +124,11 @@ void verificar_metadata_fs(char *path_pto_montaje) {
     string_append(&path_metadata_txt, METADATA_TXT_PATH);
 
     log_info(logger, "ABRIENDO METADATA FS CON RUTA <%s>", path_metadata_txt);
-	//signalSemaforo(pokemon)
+	//waitSemaforo(pokemon)
     FILE *filePointer = fopen(path_metadata_txt,"r");
     if(filePointer == NULL) {
         log_error(logger,"ERROR AL ABRIR EL ARCHIVO metadata.txt");
-		//waitSemaforo(pokemon)
+		//signalSemaforo(pokemon)
         exit(1);
     }
 
@@ -184,9 +185,9 @@ void crear_pto_de_montaje(char *path_pto_montaje) {
     int rta_mkdir = mkdir(path_pto_montaje,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if(rta_mkdir == 0) {
         log_info(logger,"DIRECTORIO %s CREADO", path_pto_montaje);
-		//signalSemaforo(pokemon)
-        crear_metadata_tall_grass(path_pto_montaje);
 		//waitSemaforo(pokemon)
+        crear_metadata_tall_grass(path_pto_montaje);
+		//signalSemaforo(pokemon)
         crear_directorio_files(path_pto_montaje);
         crear_directorio_blocks(path_pto_montaje);
     } else {
@@ -358,10 +359,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
     } else {
-		//signalSemaforo(newPokemon->name);
+		//waitSemaforo(newPokemon->name);
     	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
     	//char *expected = "Y";
-		//waitSemaforo(newPokemon->name);
+		//signalSemaforo(newPokemon->name);
 
     	if(string_equals_ignore_case(valor, "Y")) {
 
@@ -378,17 +379,17 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
     		// el archivo existe y hay que verificar si existe la linea
-    		//signalSemaforo(newPokemon->name);
+    		//waitSemaforo(newPokemon->name);
     		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
     		log_info(logger, "valor open:%s", valor_open);
     		if(string_equals_ignore_case(valor_open, "N")) {
 
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-    			//waitSemaforo(newPokemon->name);
+    			//signalSemaforo(newPokemon->name);
     			buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
 
     		} else {
-				//waitSemaforo(newPokemon->name);
+				//signalSemaforo(newPokemon->name);
 				//porque si no queda trabado
     			// reintento de operacion
     			//reintentar_operacion(newPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
@@ -524,9 +525,9 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 		}
 
 		escribir_archivo(path_archivo_pokemon, linea, "a");
-		//signalSemaforo(pokemon)
+		//waitSemaforo(pokemon) SEGUN PATO ESTOS NO VAN
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-		//waitSemaforo(pokemon)
+		//signalSemaforo(pokemon)A LA ESPERA DE RESPUESTAS
 		escribir_blocks(ultimo_bloque, nro_bloque_libre, linea);
 
 		agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
@@ -673,7 +674,7 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	escribir_archivo(ruta_archivo_pokemon, linea, "a");
 
 	escribir_block(nro_bloque_libre, linea);
-	//signalSemaforo(newPokemon->name);
+	//waitSemaforo(newPokemon->name);
 	agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
 
 	char* size = string_itoa(strlen(linea));
@@ -682,7 +683,7 @@ void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int n
 	retardo_operacion();
 
 	cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
-	//waitSemaforo(newPokemon->name);
+	//signalSemaforo(newPokemon->name);
 
 	enviar_respuesta_new_pokemon(newPokemon);
 
@@ -1222,18 +1223,18 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 		} else {
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
 	    	// el archivo existe y hay que verificar si existe la linea
-			//signalSemaforo(catchPokemon->name);
+			//waitSemaforo(catchPokemon->name);
 			char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
 	    	log_info(logger, "valor open:%s", valor_open);
 
 	    	if(string_equals_ignore_case(valor_open, "N")) {
 
 	    		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-	    	   
+	    	   	 //signalSemaforo(catchPokemon->name);
 	    		buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
-				 //waitSemaforo(catchPokemon->name);
+			
 	    	} else {
-				//waitSemaforo(catchPokemon->name);
+				//signalSemaforo(catchPokemon->name);
 	    		// reintento de operacion
 	    		//reintentar_operacion(catchPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
 	    	}
@@ -1854,7 +1855,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 		} else {
 
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
-	    	//signalSemaforo(getPokemon->name);
+	    	//waitSemaforo(getPokemon->name);
 
 	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
 			
@@ -1863,12 +1864,12 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	    	if(string_equals_ignore_case(valor_open, "N")) {
 
 	    		//cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-	    	    //waitSemaforo(getPokemon->name);
+	    	    //signalSemaforo(getPokemon->name);
 
 	    		buscar_lineas_get_pokemon(getPokemon, path_directorio_pokemon);
 
 	    	} else {
-				//waitSemaforo(getPokemon->name);
+				//signalSemaforo(getPokemon->name);
 	    		// reintento de operacion
 	    		//reintentar_operacion(getPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
 	    	}
@@ -2484,18 +2485,20 @@ void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_lis
 void agregarSemaforo(char* pokemon){
 	semMetadataPoke* semaforo = malloc(sizeof(semMetadataPoke));
 	string_append(pokemon,semaforo->nombrePokemon);
-	sem_init(&semaforo->semaforo, 1,0); // el 1 se supone que es para que se comparta entre procesos y el 0 es la inicializacion
+	sem_init(&semaforo->semaforo, 1,1); // el 1 se supone que es para que se comparta entre procesos y el 1 es la inicializacion
 	list_add(sem_MetadataPoke, semaforo);
 	}
 
 void waitSemaforo(char* pokemon){
 	semMetadataPoke* semAux = buscarSemaforo(pokemon);
 	sem_wait(&semAux->semaforo);
+	//HAY QUE HACER FREE DE ESTE SEMAFORO AUXILIAR??
 }
 
 void signalSemaforo(char* pokemon){
 	semMetadataPoke* semAux = buscarSemaforo(pokemon);
 	sem_post(&semAux->semaforo);
+	//HAY QUE HACER FREE DE ESTE SEMAFORO AUXILIAR??
 }
 
 semMetadataPoke* buscarSemaforo(char* pokemon){
@@ -2507,4 +2510,13 @@ semMetadataPoke* buscarSemaforo(char* pokemon){
 	semaforo = (semMetadataPoke*)list_find(sem_MetadataPoke,(void*) esDeEstePokemon);
 	
 	return semaforo;
+}
+
+void vaciarListaSemaforos(){
+	list_clean_and_destroy_elements(sem_MetadataPoke,(void*) eliminarSemaforo);
+}
+
+void eliminarSemaforo(semMetadataPoke* semAux){
+	free(semAux->nombrePokemon);
+	free(semAux);
 }

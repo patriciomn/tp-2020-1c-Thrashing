@@ -198,10 +198,14 @@ void retardo_operacion();
 //void reintentar_operacion(new_pokemon *newPokemon);
 //void reintentar_operacion(catch_pokemon *catchPokemon);
 //void reintentar_operacion(get_pokemon *getPokemon);
+
+//SEMAFOROS PARA METADATA
 void agregarSemaforo(char* pokemon);
 void waitSemaforo(char* pokemon);
 void signalSemaforo(char* pokemon);
 semMetadataPoke* buscarSemaforo(char* pokemon);
+void vaciarListaSemaforos();
+void eliminarSemaforo(semMetadataPoke* semAux);
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
