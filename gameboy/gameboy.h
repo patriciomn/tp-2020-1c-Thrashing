@@ -1,7 +1,7 @@
 #ifndef GAMEBOY_H_
 #define GAMEBOY_H_
 
-#include"../utils/utils.c"
+#include"utils.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<commons/log.h>

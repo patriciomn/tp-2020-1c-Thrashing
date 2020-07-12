@@ -185,7 +185,7 @@ void process_request(int cod_op, int cliente_fd){
 		free(msg);
 
 		mq* cola = cola_mensaje(cod_op);
-		if(!list_is_empty(cola->suscriptors)){
+		if(cola != NULL && !list_is_empty(cola->suscriptors)){
 			void enviar(suscriber* sus){
 				if(check_socket(sus->cliente_fd) == 1){
 					enviar_mensajes(sus,cod_op);
@@ -272,12 +272,12 @@ void atender_ack(int cliente_fd){
 	pid_t pid;
 	if(recv(cliente_fd, &tipo, sizeof(int), MSG_WAITALL) == -1)
 		tipo = -1;
-	if(tipo > -1 || check_socket(cliente_fd) == 1){
+	if(tipo > -1 && check_socket(cliente_fd) == 1){
 		void* msg = recibir_mensaje(cliente_fd);
 		memcpy(&(id), msg, sizeof(int));
 		memcpy(&pid,msg+sizeof(int),sizeof(pid_t));
 
-		log_info(logger,"\033[1;35mACK Recibido:Proceso:%d,Tipo:%s,ID:%d\033[0m",pid,get_cola(tipo),id);
+		log_info(logger,"ACK Recibido:Proceso:%d,Tipo:%s,ID:%d",pid,get_cola(tipo),id);
 
 		bool by_id(mensaje* aux){
 			return aux->id == id;
@@ -290,13 +290,14 @@ void atender_ack(int cliente_fd){
 		mq* cola = cola_mensaje(tipo);
 		suscriber* sus = list_find(cola->suscriptors,(void*)by_pid);
 		mensaje* item = list_find(cola->mensajes,(void*)by_id);
+
 		list_add(item->suscriptors_ack,sus);
 
 		bool estar_ack(suscriber* sus){
 			return list_any_satisfy(item->suscriptors_ack,(void*)by_pid);
 		}
 		if(confirmado_todos_susciptors_mensaje(item) == 1){
-			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs De Todos Sus Suscriptors\033[0m\n");
+			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n");
 			//Durabilidad: Todos los mensajes debe permanecer en la cola de mensajes hasta que todos los Suscribers lo reciban.
 			//borrar_mensaje(item);
 		}
@@ -327,15 +328,6 @@ void borrar_mensaje(mensaje* m){
 	particion* borrar = list_find(cache,(void*)by_id_tipo);
 	delete_particion(borrar);
 
-	mq* cola = cola_mensaje(m->tipo_msg);
-	bool by_id_tipo_mensaje(mensaje* aux){
-		return aux->id == m->id && aux->tipo_msg == m->tipo_msg;
-	}
-	list_remove_by_condition(cola->mensajes,(void*)by_id_tipo_mensaje);
-	list_destroy(m->suscriptors_ack);
-	list_destroy(m->suscriptors_enviados);
-	printf("\033[1;33mMensaje ID:%d De Cola:%s Eliminado\033[0m\n",m->id,get_cola(m->tipo_msg));
-	free(m);
 }
 
 //recibir mensajes==================================================================================================================================================================
@@ -793,7 +785,7 @@ particion* particiones_dinamicas(uint32_t size){
 			list_add(cache,next);
 		}
 	}
-	else if(elegida != NULL && elegida->id_particion != ultima->id_particion){
+	else if(elegida != NULL && elegida->start != ultima->start){
 		uint32_t size_original = elegida->size;
 		elegida->size = part_size;
 		elegida->fin = elegida->inicio+elegida->size;
@@ -916,7 +908,7 @@ particion* algoritmo_particion_libre(uint32_t size){
 	else{
 		printf("\33[1;37m==========ALGORITEMO DE PARTICION LIBRE:BEST FIT==========\033[0m\n");
 		bool espacio_min(particion* aux1,particion* aux2){
-			return aux1->size < aux2->size;
+			return aux1->size <= aux2->size;
 		}
 		t_list* aux = list_filter(cache,(void*)libre_suficiente);
 		list_sort(aux,(void*)espacio_min);

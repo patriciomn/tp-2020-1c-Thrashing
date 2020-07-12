@@ -1,7 +1,7 @@
 #ifndef BROKER_H_
 #define BROKER_H_
 
-#include"../utils/utils.c"
+#include"utils.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>

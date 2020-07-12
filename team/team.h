@@ -1,7 +1,7 @@
 #ifndef TEAM_H_
 #define TEAM_H_
 
-#include"../utils/utils.c"
+#include"utils.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -39,6 +39,7 @@ typedef struct{
 	int posx;
 	int posy;
 	bool espera_caught;
+	bool requerido;
 }pokemon;
 
 typedef struct{
@@ -176,8 +177,7 @@ void algoritmo_largo_plazo(pokemon* pok);
 entrenador* algoritmo_corto_plazo();
 entrenador* algoritmo_fifo(t_list* cola_ready);
 entrenador* algoritmo_round_robin(t_list* cola_ready);
-entrenador* algoritmo_sjf_sin_desalojo(t_list* cola_ready);
-entrenador* algoritmo_sjf_con_desalojo(t_list* cola_ready);
+entrenador* algoritmo_sjf(t_list* cola_ready);
 msg* crear_mensaje(int id,int tipo,pokemon*);
 
 void iniciar_servidor(void);
