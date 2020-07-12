@@ -282,12 +282,6 @@ void crear_archivos_metadata(char *path_metadata) {
     strcpy(ruta_archivo_bitmap, path_metadata);
     string_append(&ruta_archivo_bitmap, BITMAP_FILE);
 
-    // creamos el archivo bitmap.bin
-    //bitmapFilePointer = fopen(ruta_archivo_bitmap, "wb+");
-    //if(bitmapFilePointer == NULL) {
-    	//log_error(logger, "ERROR AL CREAR EL ARCHIVO bitmap.bin");
-    //}
-
     int size_bytes_bitmap = (datos_config->blocks / BITS);
 	//pthread_mutex_lock(&mutexBITMAP)
     int fd = open (ruta_archivo_bitmap, O_RDWR | O_CREAT | O_APPEND,  S_IRUSR | S_IWUSR);
@@ -305,13 +299,6 @@ void crear_archivos_metadata(char *path_metadata) {
     	bitarray_clean_bit(bitarray,i);
     }
 
-    //escribimos el bitarray en el archivo
-    //if(fwrite(bitarray->bitarray, sizeof(char), size_bytes_bitmap, bitmapFilePointer) == 0) {
-    	//log_error(logger, "NO SE PUDO ESCRIBIR EL BITARRAY EN EL ARCHIVO bitmap.bin");
-    	//exit(1);
-    //}
-
-    //fclose(bitmapFilePointer);
 	//pthread_mutex_unlock(&mutexBITMAP)
     free(size_block);
     free(blocks);
@@ -359,6 +346,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
     } else {
+
 		//waitSemaforo(newPokemon->name);
     	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
     	//char *expected = "Y";
@@ -379,9 +367,14 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
     		// el archivo existe y hay que verificar si existe la linea
-    		//waitSemaforo(newPokemon->name);
+
+    		REINTENTO:
+			printf("");
+
+			//waitSemaforo(newPokemon->name);
+
     		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
-    		log_info(logger, "valor open:%s", valor_open);
+    		//log_info(logger, "valor open:%s", valor_open);
     		if(string_equals_ignore_case(valor_open, "N")) {
 
     			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
@@ -390,11 +383,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		} else {
 				//signalSemaforo(newPokemon->name);
-				//porque si no queda trabado
-    			// reintento de operacion
-    			//reintentar_operacion(newPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
+    			reintentar_operacion();
+    			goto REINTENTO;
     		}
-    		free(valor_open);
+    		//free(valor_open);
     	}
     	free(valor);
     }
@@ -405,47 +397,13 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     pthread_mutex_unlock(&mutexNEW);
 }
 
-void reintentar_operacion(new_pokemon *newPokemon) {
+void reintentar_operacion() {
 
-	// hacer reintento de operacion
 	log_warning(logger, "HILO EN STANDBY DE OPERACION");
 	sleep(datos_config->tiempo_reintento_operacion);
-	pthread_cancel(thread_new_pokemon);
-
-	pthread_t hilo_reintentar_new;
-	pthread_create(&hilo_reintentar_new, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
-	pthread_join(hilo_reintentar_new, NULL);
 	log_info(logger, "HILO RETOMANDO LA OPERACION");
 
 }
-/*
-void reintentar_operacion(catch_pokemon *catchPokemon) {
-
-	// hacer reintento de operacion
-	log_warning(logger, "HILO EN STANDBY DE OPERACION");
-	sleep(datos_config->tiempo_reintento_operacion);
-	pthread_cancel(thread_new_pokemon);
-
-	pthread_t hilo_reintentar_new;
-	pthread_create(&hilo_reintentar_new, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
-	pthread_join(hilo_reintentar_new, NULL);
-	log_info(logger, "HILO RETOMANDO LA OPERACION");
-
-}
-void reintentar_operacion(get_pokemon *getPokemon) {
-
-	// hacer reintento de operacion
-	log_warning(logger, "HILO EN STANDBY DE OPERACION");
-	sleep(datos_config->tiempo_reintento_operacion);
-	pthread_cancel(thread_new_pokemon);
-
-	pthread_t hilo_reintentar_new;
-	pthread_create(&hilo_reintentar_new, NULL, (void *) operacion_get_pokemon, (void *) getPokemon);
-	pthread_join(hilo_reintentar_new, NULL);
-	log_info(logger, "HILO RETOMANDO LA OPERACION");
-
-}*/
-
 
 void buscar_linea_en_el_archivo(new_pokemon *newPokemon, char *path_directorio_pokemon) { // verificamos si existe o no la linea en el archivo existente
 
@@ -724,6 +682,11 @@ int obtener_bloque_libre() {
 			bloque = i;
 			break;
 		}
+	}
+
+	if(msync(bitmap_memoria, datos_config->blocks / BITS, MS_ASYNC) == -1) {
+		log_error(logger, "ERROR EN LA SINCRONIZACION DEL BITMAP");
+		exit(1);
 	}
 
 	return bloque;
@@ -1221,11 +1184,16 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 			enviar_respuesta_catch_pokemon(catchPokemon, false);
 
 		} else {
+
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
+
+	    	REINTENTO:
+			printf("");
 	    	// el archivo existe y hay que verificar si existe la linea
 			//waitSemaforo(catchPokemon->name);
-			char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
-	    	log_info(logger, "valor open:%s", valor_open);
+
+	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
+	    	//log_info(logger, "valor open:%s", valor_open);
 
 	    	if(string_equals_ignore_case(valor_open, "N")) {
 
@@ -1235,9 +1203,10 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 			
 	    	} else {
 				//signalSemaforo(catchPokemon->name);
-	    		// reintento de operacion
-	    		//reintentar_operacion(catchPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
+	    		reintentar_operacion();
+	    		goto REINTENTO;
 	    	}
+
 	    	free(valor_open);
 	    }
 		free(valor);
@@ -1756,7 +1725,13 @@ void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro
 }
 
 void liberar_bloque_bitmap(int nro_bloque_a_liberar) {
+
 	bitarray_clean_bit(bitarray, nro_bloque_a_liberar);
+
+	if(msync(bitmap_memoria, datos_config->blocks / BITS, MS_ASYNC) == -1) {
+		log_error(logger, "ERROR EN LA SINCRONIZACION DEL BITMAP");
+		exit(1);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------------
@@ -1800,31 +1775,6 @@ char *read_file_into_buf (char * source /*,FILE *fp*/) {
 
 	return buffer_file;
 
-	//if (fseek(fp, 0L, SEEK_END) == 0) {
-	        //long bufsize = ftell(fp);
-	        //if (bufsize == -1) {
-				//log_error(logger, "EL archivo buscado NO EXISTE");
-			 //}
-
-	        /*Le da al buffer el mismo tamaño del archivo */
-	   //source = malloc(sizeof(bufSize + 1));
-	   //log_info(logger, "Malloc tam archivo %d",bufsize);
-			//fseek (fp, 0, SEEK_SET); //vuelve al principio
-	        //if (fseek(fp, 0L, SEEK_SET) != 0) { /* Error */
-				//log_error(logger, "Error al volver al inicio del archivo");
-				 //}
-
-	        /* Read the entire file into memory. */
-
-			//fgets(source,bufsize,fp);
-			//log_info(logger,"Lo que se escaneo :: %s",source);
-			//return source;
-	        //if ( ferror( fp ) != 0 ) {
-	            //fputs("Error reading file", stderr);
-
-	        //}
-	    //}
-
 }
 
 
@@ -1855,6 +1805,10 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 		} else {
 
 	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
+
+	    	REINTENTO:
+			printf("");
+
 	    	//waitSemaforo(getPokemon->name);
 
 	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
@@ -1870,8 +1824,8 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 
 	    	} else {
 				//signalSemaforo(getPokemon->name);
-	    		// reintento de operacion
-	    		//reintentar_operacion(getPokemon); tratar de encajar esto con el mutex, si cancelo y vuelvo a reiniciar el hilo tengo que hacer un signal del mutex
+	    		reintentar_operacion();
+	    		goto REINTENTO;
 	    	}
 	    	free(valor_open);
 	    }
@@ -2349,6 +2303,7 @@ void reconexion_broker() {
 
 
 void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
+
 	char* puerto = string_itoa(datos_config->puerto_broker);
 	int socket_temporal_broker = crear_conexion(datos_config->ip_broker, puerto);
 
@@ -2379,7 +2334,11 @@ void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
 		free(paquete->buffer->stream);
 		free(paquete->buffer);
 		free(paquete);
+	} else {
+		log_error(logger, "PROCESO BROKER DESCONECTADO");
+		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICION: [%d,%d]", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy);
 	}
+
 	free(puerto);
 }
 
@@ -2409,7 +2368,12 @@ void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
 		free(paquete->buffer->stream);
 		free(paquete->buffer);
 		free(paquete);
+	} else {
+		log_error(logger, "PROCESO BROKER DESCONECTADO");
+		log_info(logger, "ID MENSAJE: %d | VALOR: %d", catchPokemon->id_mensaje, valor);
 	}
+
+
 	free(puerto);
 }
 
@@ -2483,11 +2447,13 @@ void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_lis
 
 //SEMAFOROS DEL METADATA POKEMON
 void agregarSemaforo(char* pokemon){
+
 	semMetadataPoke* semaforo = malloc(sizeof(semMetadataPoke));
 	string_append(pokemon,semaforo->nombrePokemon);
 	sem_init(&semaforo->semaforo, 1,1); // el 1 se supone que es para que se comparta entre procesos y el 1 es la inicializacion
 	list_add(sem_MetadataPoke, semaforo);
-	}
+
+}
 
 void waitSemaforo(char* pokemon){
 	semMetadataPoke* semAux = buscarSemaforo(pokemon);

@@ -195,7 +195,7 @@ void borrar_archivo(char *nombre, char flag);
 void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
 void liberar_bloque_bitmap(int nro_bloque_a_liberar);
 void retardo_operacion();
-//void reintentar_operacion(new_pokemon *newPokemon);
+void reintentar_operacion();
 //void reintentar_operacion(catch_pokemon *catchPokemon);
 //void reintentar_operacion(get_pokemon *getPokemon);
 
