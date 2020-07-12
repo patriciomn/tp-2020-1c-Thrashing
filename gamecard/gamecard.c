@@ -124,11 +124,11 @@ void verificar_metadata_fs(char *path_pto_montaje) {
     string_append(&path_metadata_txt, METADATA_TXT_PATH);
 
     log_info(logger, "ABRIENDO METADATA FS CON RUTA <%s>", path_metadata_txt);
-	//waitSemaforo(pokemon)
+	//pthread_mutex_lock(&mxTallgrassMeta);
     FILE *filePointer = fopen(path_metadata_txt,"r");
     if(filePointer == NULL) {
         log_error(logger,"ERROR AL ABRIR EL ARCHIVO metadata.txt");
-		//signalSemaforo(pokemon)
+		//pthread_mutex_unlock(&mxTallgrassMeta);
         exit(1);
     }
 
@@ -142,7 +142,7 @@ void verificar_metadata_fs(char *path_pto_montaje) {
     config_destroy(metadata_txt_datos);
     fclose(filePointer);
     free(path_metadata_txt);
-	//MUTEX_UNLOCK_mxTallgrassMeta
+	//pthread_mutex_unlock(&mxTallgrassMeta);
 
     // creamos un nuevo string para armar el path del bitmap
     size_new_string = strlen(path_pto_montaje) + strlen(BITMAP_PATH) + 1;
@@ -185,9 +185,9 @@ void crear_pto_de_montaje(char *path_pto_montaje) {
     int rta_mkdir = mkdir(path_pto_montaje,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if(rta_mkdir == 0) {
         log_info(logger,"DIRECTORIO %s CREADO", path_pto_montaje);
-		//waitSemaforo(pokemon)
+		//pthread_mutex_lock(&mxTallgrassMeta);
         crear_metadata_tall_grass(path_pto_montaje);
-		//signalSemaforo(pokemon)
+		//pthread_mutex_unlock(&mxTallgrassMeta);
         crear_directorio_files(path_pto_montaje);
         crear_directorio_blocks(path_pto_montaje);
     } else {
@@ -525,9 +525,9 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 		}
 
 		escribir_archivo(path_archivo_pokemon, linea, "a");
-		//waitSemaforo(pokemon) SEGUN PATO ESTOS NO VAN
+		//waitSemaforo(newPokemon->name); SEGUN PATO ESTOS NO VAN
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-		//signalSemaforo(pokemon)A LA ESPERA DE RESPUESTAS
+		//signalSemaforo(ewPokemon->name);A LA ESPERA DE RESPUESTAS
 		escribir_blocks(ultimo_bloque, nro_bloque_libre, linea);
 
 		agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
