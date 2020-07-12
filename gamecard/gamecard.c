@@ -21,13 +21,16 @@ pthread_t thread_new_pokemon;		// hilo para recibir mensajes de la cola new_poke
 pthread_t thread_catch_pokemon;		// hilo para recibir mensajes de la cola catch_pokemon
 pthread_t thread_get_pokemon;		// hilo para recibir mensajes de la cola get_pokemon
 
+//semaforos
 pthread_mutex_t mutexNEW = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexGET = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexCATCH = PTHREAD_MUTEX_INITIALIZER;
 
+pthread_mutex_t mutexSemaforo = PTHREAD_MUTEX_INITIALIZER; // mutex para acceder a los semaforos
 pthread_mutex_t mxTallgrassMeta = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexBITMAP = PTHREAD_MUTEX_INITIALIZER;
-t_list* sem_MetadataPoke; // esto seria para los metadata de los pokemon. opera con semaphore.h
+
+t_dictionary *diccionario_semaforos;
 
 int main () {
 
@@ -46,7 +49,7 @@ void iniciar_gamecard() {
 	verificar_punto_de_montaje();
 
 	suscripcion_colas_broker();
-	//t_list* sem_MetadataPoke  = list_create();
+	
 
 	pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
 	pthread_join(servidor_gamecard, NULL);
@@ -63,7 +66,7 @@ void terminar_gamecard(int sig){
 	//pthread_mutex_unlock(&mutexBITMAP);	
     log_destroy(logger);
     config_destroy(config_tall_grass);
-	//vaciarListaSemaforos();
+	//vaciarDiccionarioSemaforos();
     free(metadataTxt);
     free(datos_config->ip_broker);
     free(datos_config->pto_de_montaje);
@@ -331,6 +334,10 @@ char* crear_directorio_pokemon(char *path_pto_montaje, char* pokemon) {
 // Operacion NEW POKEMON
 
 void operacion_new_pokemon(new_pokemon *newPokemon) {
+	pthread_mutex_lock(&mutexSemaforo);
+	key_semaforo_presente(newPokemon->name);
+	pthread_mutex_unlock(&mutexSemaforo);
+
 	pthread_mutex_lock(&mutexNEW);
     char *path_directorio_pokemon = string_new();
     string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", newPokemon->name);
@@ -483,9 +490,8 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 		}
 
 		escribir_archivo(path_archivo_pokemon, linea, "a");
-		//waitSemaforo(newPokemon->name); SEGUN PATO ESTOS NO VAN
 		int ultimo_bloque = ultimo_bloque_array_blocks(path_directorio_pokemon);
-		//signalSemaforo(ewPokemon->name);A LA ESPERA DE RESPUESTAS
+		
 		escribir_blocks(ultimo_bloque, nro_bloque_libre, linea);
 
 		agregar_bloque_metadata_pokemon(path_directorio_pokemon, nro_bloque_libre);
@@ -495,7 +501,9 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 		char* aux = string_itoa(nuevoSize);
 		cambiar_valor_metadata(path_directorio_pokemon, "SIZE",aux);
 		retardo_operacion();
+		//waitSemaforo(newPokemon->name);
 		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+		//signalSemaforo(ewPokemon->name);
 		free(aux);
 	}
 	free(path_archivo_pokemon);
@@ -832,8 +840,7 @@ void crear_metadata_pokemon(char *ruta_directorio_pokemon, char *pokemon) {
     	log_error(logger, "ERROR AL CREAR EL ARCHIVO CON RUTA <%s>", ruta_metadata_pokemon);
     	exit(1);
     }
-	//agregarSemaforo(pokemon);
-    char *campos_metadataTxt = string_new();
+	char *campos_metadataTxt = string_new();
     string_append(&campos_metadataTxt, "DIRECTORY=N");
     string_append(&campos_metadataTxt, "\n");
     string_append(&campos_metadataTxt, "SIZE=0");
@@ -1165,6 +1172,10 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 // catch_pokemon
 
 void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
+	pthread_mutex_lock(&mutexSemaforo);
+	key_semaforo_presente(catchPokemon->name);
+	pthread_mutex_unlock(&mutexSemaforo);
+
 	pthread_mutex_lock(&mutexCATCH);
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", catchPokemon->name);
@@ -1780,6 +1791,10 @@ char *read_file_into_buf (char * source /*,FILE *fp*/) {
 
 
 void operacion_get_pokemon(get_pokemon *getPokemon) {
+	pthread_mutex_lock(&mutexSemaforo);
+	key_semaforo_presente(getPokemon->name);
+	pthread_mutex_unlock(&mutexSemaforo);
+
 
 	pthread_mutex_lock(&mutexGET);
 
@@ -2446,43 +2461,54 @@ void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_lis
 }
 
 //SEMAFOROS DEL METADATA POKEMON
-void agregarSemaforo(char* pokemon){
+void key_semaforo_presente(char *pokemon) { // si la key no esta presente, se crea el semaforo y luego se lo agrega a la coleccion con la key
 
-	semMetadataPoke* semaforo = malloc(sizeof(semMetadataPoke));
-	string_append(pokemon,semaforo->nombrePokemon);
-	sem_init(&semaforo->semaforo, 1,1); // el 1 se supone que es para que se comparta entre procesos y el 1 es la inicializacion
-	list_add(sem_MetadataPoke, semaforo);
+	if(!dictionary_has_key(diccionario_semaforos, pokemon)) {
+
+		sem_t *sem_pokemon = malloc(sizeof(sem_t));
+		sem_init(sem_pokemon, 0, 1);
+
+		dictionary_put(diccionario_semaforos, pokemon, sem_pokemon);
+		//agregarSemaforo(pokemon);
+	}
+
+}
+
+
+sem_t *get_semaforo(char *pokemon) {
+
+	return dictionary_get(diccionario_semaforos, pokemon);
 
 }
 
 void waitSemaforo(char* pokemon){
-	semMetadataPoke* semAux = buscarSemaforo(pokemon);
-	sem_wait(&semAux->semaforo);
+	pthread_mutex_lock(&mutexSemaforo);
+	sem_t *semAux = get_semaforo(pokemon);
+	sem_wait(&semAux);
+	pthread_mutex_unlock(&mutexSemaforo);
 	//HAY QUE HACER FREE DE ESTE SEMAFORO AUXILIAR??
 }
 
 void signalSemaforo(char* pokemon){
-	semMetadataPoke* semAux = buscarSemaforo(pokemon);
-	sem_post(&semAux->semaforo);
+	pthread_mutex_lock(&mutexSemaforo);
+	sem_t *semAux = get_semaforo(pokemon);
+	sem_post(&semAux);
+	pthread_mutex_unlock(&mutexSemaforo);
 	//HAY QUE HACER FREE DE ESTE SEMAFORO AUXILIAR??
 }
 
-semMetadataPoke* buscarSemaforo(char* pokemon){
-	semMetadataPoke* semaforo = malloc(sizeof(semMetadataPoke));
-	
-	bool esDeEstePokemon(semMetadataPoke* semAux){
-		string_equals_ignore_case(pokemon, semAux->nombrePokemon);
-	}
-	semaforo = (semMetadataPoke*)list_find(sem_MetadataPoke,(void*) esDeEstePokemon);
-	
-	return semaforo;
-}
+void agregarSemaforo(char* pokemon){
+	sem_t *sem_pokemon = malloc(sizeof(sem_t));
+		sem_init(sem_pokemon, 0, 1);
 
-void vaciarListaSemaforos(){
-	list_clean_and_destroy_elements(sem_MetadataPoke,(void*) eliminarSemaforo);
+		dictionary_put(diccionario_semaforos, pokemon, sem_pokemon);
 }
-
-void eliminarSemaforo(semMetadataPoke* semAux){
-	free(semAux->nombrePokemon);
+void vaciarDiccionarioSemaforos(){
+	pthread_mutex_lock(&mutexSemaforo);
+	dictionary_clean_and_destroy_elements(diccionario_semaforos, (void*)eliminarSemaforo);
+	pthread_mutex_unlock(&mutexSemaforo);
+}
+void eliminarSemaforo(sem_t* semAux){
 	free(semAux);
 }
+

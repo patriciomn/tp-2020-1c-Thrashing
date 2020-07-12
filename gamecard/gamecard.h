@@ -200,12 +200,15 @@ void reintentar_operacion();
 //void reintentar_operacion(get_pokemon *getPokemon);
 
 //SEMAFOROS PARA METADATA
-void agregarSemaforo(char* pokemon);
+sem_t *get_semaforo(char *pokemon);
+void key_semaforo_presente(char *pokemon);
 void waitSemaforo(char* pokemon);
 void signalSemaforo(char* pokemon);
-semMetadataPoke* buscarSemaforo(char* pokemon);
-void vaciarListaSemaforos();
-void eliminarSemaforo(semMetadataPoke* semAux);
+void agregarSemaforo(char* pokemon);
+void vaciarDiccionarioSemaforos();
+void eliminarSemaforo(sem_t* semAux);
+
+
 
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
