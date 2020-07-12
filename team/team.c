@@ -1377,12 +1377,29 @@ void recibir_caught_pokemon(){
 					remove_pokemon_requeridos(mensaje->pok);
 					free(mensaje->pok->name);
 					free(mensaje->pok);
-					bool by_name(pokemon* pok){
-						return strcmp(pok->name,mensaje->pok->name)==0;
+					entre->pok_atrapar = NULL;
+
+					if(cumplir_objetivo_entrenador(entre)){
+						salir_entrenador(entre);
 					}
-					pokemon* pok = list_find(equipo->poks_requeridos,(void*)by_name);
-					if(pok != NULL){
-						algoritmo_largo_plazo(pok);
+					else if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
+						log_warning(logger,"Entrenador%c BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
+						list_add(equipo->cola_deadlock,entre);
+					}
+					else if(!cumplir_objetivo_entrenador(entre)){
+						log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
+						if(!list_is_empty(equipo->poks_requeridos)){
+							bool mas_cerca(pokemon* aux1,pokemon* aux2){
+								return distancia_pokemon(entre,aux1) <= distancia_pokemon(entre,aux2);
+							}
+							t_list* cercas = list_sorted(equipo->poks_requeridos,(void*)mas_cerca);
+							bool no_requerido(pokemon* pok){
+								return !pok->requerido;
+							}
+							pokemon* pok = list_remove_by_condition(cercas,(void*)no_requerido);
+							algoritmo_largo_plazo(pok);
+							list_destroy(cercas);
+						}
 					}
 					if(equipo->exec == NULL){
 						sem_post(&semPoks);
