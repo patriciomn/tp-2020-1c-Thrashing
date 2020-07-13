@@ -548,12 +548,12 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 	if(conexion_broker->catch != -1){
 		for(int i=0;i<CICLO_ACCION;i++){
 			printf("Entrenador%c Enviando mensaje CATCH_POKEMON:%s a BROKER ...\n",entre->tid,pok->name);
+			remove_pokemon_requeridos(pok);
 			entre->quantum--;
 			entre->service_time++;
 			sumar_ciclos(entre,CICLO_ACCION);
 			sleep(datos_config->retardo_cpu);
 		}
-		remove_pokemon_requeridos(pok);
 		enviar_mensaje_catch_pokemon(pok->name,pok->posx,pok->posy,conexion_broker->catch);
 		int id = recibir_id_mensaje(conexion_broker->catch);
 		msg* mensaje = crear_mensaje(id,CATCH_POKEMON,pok);
@@ -997,7 +997,7 @@ void remove_pokemon_requeridos(pokemon* pok){
 	pthread_rwlock_wrlock(&lockPoksRequeridos);
 	list_remove_by_condition(equipo->poks_requeridos,(void*)by_name_pos);
 	pthread_rwlock_unlock(&lockPoksRequeridos);
-	printf("\033[0;31mPOKEMON %s Eliminado De Los Requeridos\033[0m\n",pok->name);
+	printf("\033[0;31mPOKEMON %s En Posicion:[%d,%d] Eliminado De Los Requeridos\033[0m\n",pok->name,pok->posx,pok->posy);
 }
 
 pokemon* crear_pokemon(char* name){
@@ -1335,12 +1335,12 @@ void recibir_caught_pokemon(){
 
 					if(res == 1){
 						list_add(entre->pokemones,mensaje->pok);
-						printf("Entrenador%c Atrapa Pokemon %s\n",entre->tid,mensaje->pok->name);
+						printf("Entrenador%c Atrapa Pokemon %s En Posicion:[%d,%d]\n",entre->tid,mensaje->pok->name,mensaje->pok->posx,mensaje->pok->posy);
 						entre->pok_atrapar = NULL;
 						sumar_ciclos(entre,CICLO_ACCION);
 					}
 					else{
-						printf("Entrenador%c No Pudo Atrapar El Pokemon %s\n",entre->tid,mensaje->pok->name);
+						printf("Entrenador%c No Pudo Atrapar El Pokemon %s En Posicion:[%d,%d]\n",entre->tid,mensaje->pok->name,mensaje->pok->posx,mensaje->pok->posy);
 						entre->pok_atrapar = NULL;
 
 						free(mensaje->pok->name);
