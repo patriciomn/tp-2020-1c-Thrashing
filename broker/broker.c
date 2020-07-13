@@ -29,6 +29,7 @@ pthread_rwlock_t lockCatch = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockAppeared = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockLocalized = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockCaught = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockEnviados = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t mutexMalloc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexMemcpy = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexBuddy = PTHREAD_MUTEX_INITIALIZER;
@@ -534,10 +535,14 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 		bool by_id(suscriber* aux){
 			return aux->pid == sus->pid;
 		}
-		return !list_any_satisfy(m->suscriptors_enviados,(void*)by_id);
+		pthread_rwlock_rdlock(&lockEnviados);
+		bool res = !list_any_satisfy(m->suscriptors_enviados,(void*)by_id);
+		pthread_rwlock_unlock(&lockEnviados);
+		return res;
 	}
 
 	t_list* mensajes = list_filter(cola->mensajes,(void*)no_enviado);
+
 
 	bool es_tipo(particion* aux){
 		return aux->tipo_cola == tipo_cola;
@@ -553,12 +558,12 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 			return p->id_mensaje == m->id;
 		}
 		particion* aux = list_find(particiones_tipo,(void*)by_id);
+
 		list_add(particiones_filtradas,aux);
 	}
 
 	t_paquete* enviar = crear_paquete(tipo_cola);
 	void agregar(particion* aux){
-		sleep(1);
 		agregar_paquete(enviar,aux,sus,tipo_cola);
 		aux->tiempo_actual = time(NULL);
 	}
@@ -633,15 +638,16 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 			break;
 		}
 	}
-	log_info(logger,"Mensaje %s ID:%d Enviado A Proceso %d",get_cola(tipo),id,sus->pid);
 	agregar_a_paquete(enviar,buffer,size);
 	bool by_id(mensaje* m){
 		return m->id == aux->id_mensaje;
 	}
 	mq* cola = cola_mensaje(tipo);
 	mensaje* m = list_find(cola->mensajes,(void*)by_id);
+	pthread_rwlock_wrlock(&lockEnviados);
 	list_add(m->suscriptors_enviados,sus);
-
+	pthread_rwlock_unlock(&lockEnviados);
+	log_info(logger,"Mensaje %s ID:%d Enviado A Proceso %d",get_cola(tipo),id,sus->pid);
 	free(buffer);
 }
 
