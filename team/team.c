@@ -1368,6 +1368,15 @@ void recibir_caught_pokemon(){
 							}
 						}
 					}
+					sem_post(&semPoks);
+
+					if(verificar_deadlock_equipo()){
+						log_warning(logger,"EN DEADLOCK");
+						equipo->cant_deadlock++;
+					}
+					if(equipo->exec == NULL){
+						sem_post(&semExecTeam);
+					}
 				}
 				free(valor);
 			}
@@ -1375,17 +1384,6 @@ void recibir_caught_pokemon(){
 				list_iterate(paquete,(void*)display);
 			}
 			list_destroy(paquete);
-			sem_post(&semPoks);
-			if(verificar_deadlock_equipo()){
-				log_warning(logger,"EN DEADLOCK");
-				equipo->cant_deadlock++;
-				sem_post(&semExecTeam);
-			}
-			else{
-				if(equipo->exec == NULL){
-					sem_post(&semExecTeam);
-				}
-			}
 		}
 	}
 }
