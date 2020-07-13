@@ -31,11 +31,15 @@ typedef struct{
 	char* log_file;
 }config_broker;
 
-
 typedef struct{
 	int cliente_fd;
 	pid_t pid;
 }suscriber;
+
+typedef struct{
+	suscriber* sus;
+	int cod_op;
+}parametros;
 
 typedef struct _cache{
 	uint32_t libre;
@@ -80,7 +84,7 @@ void serve_client(int* socket);
 void process_request(int cod_op, int cliente_fd);
 void * recibir_mensaje(int socket_cliente);
 void atender_suscripcion(int cliente_fd );
-void atender_ack(int cliente_fd);
+void atender_ack(suscriber* sus);
 void enviar_id(mensaje *item,int socket_cliente);
 void mensaje_new_pokemon(void* msg,int cliente_fd);
 void mensaje_appeared_pokemon(void* msg,int cliente_fd);

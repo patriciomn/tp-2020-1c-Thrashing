@@ -13,6 +13,8 @@ mq* cola_new;
 mq* cola_appeared;
 
 pthread_t thread_servidor;
+pthread_t thread_ack;
+pthread_t thread_enviar;
 
 int cant_liberadas;
 int inicio;
@@ -34,6 +36,7 @@ pthread_mutex_t mutexMalloc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexMemcpy = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexBuddy = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexDump = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexACK = PTHREAD_MUTEX_INITIALIZER;
 
 int main(){	
     iniciar_broker();
@@ -193,13 +196,6 @@ void process_request(int cod_op, int cliente_fd){
 				}
 			}
 			list_iterate(cola->suscriptors,(void*)enviar);
-			//Asincronismo: La recepción y notificación de mensajes pueden diferir en el tiempo. No deben notificarse inmediatamente a los componentes suscritos a dicha cola.
-			void ack(suscriber* sus){
-				if(check_socket(sus->cliente_fd) == 1){
-					atender_ack(sus->cliente_fd);
-				}
-			}
-			list_iterate(cola->suscriptors,(void*)ack);
 		}
 	}
 }
@@ -247,34 +243,30 @@ void atender_suscripcion(int cliente_fd){
 	if (!list_any_satisfy(cola->suscriptors,(void*)existe) ){
 		list_add(cola->suscriptors, sus);
 		log_info(logger,"Proceso %d Suscrito A La Cola %s",pid,get_cola(queue_id));
-		enviar_confirmacion_suscripcion(sus);
 	}
 	else{
 		log_warning(logger,"Proceso %d Ya Habia Suscrito A La Cola %s",pid,get_cola(queue_id));
 		suscriber* sus = list_find(cola->suscriptors,(void*)existe);
 		sus->cliente_fd = cliente_fd;
-		enviar_confirmacion_suscripcion(sus);
 	}
+	enviar_confirmacion_suscripcion(sus);
 
 	if(!list_is_empty(cola->mensajes)){
 		if(check_socket(sus->cliente_fd) == 1){
 			enviar_mensajes(sus,queue_id);
 		}
-		//Asincronismo: La recepción y notificación de mensajes pueden diferir en el tiempo. No deben notificarse inmediatamente a los componentes suscritos a dicha cola.
-		while(!list_all_satisfy(cola->mensajes,(void*)confirmado_todos_susciptors_mensaje)){
-			atender_ack(sus->cliente_fd);
-		}
 	}
 	free(msg);
 }
 
-void atender_ack(int cliente_fd){
+void atender_ack(suscriber* sus){
+	sleep(3);
 	int tipo,id;
 	pid_t pid;
-	if(recv(cliente_fd, &tipo, sizeof(int), MSG_WAITALL) == -1)
+	if(recv(sus->cliente_fd, &tipo, sizeof(int),MSG_WAITALL) == -1)
 		tipo = -1;
-	if(tipo > -1 && check_socket(cliente_fd) == 1){
-		void* msg = recibir_mensaje(cliente_fd);
+	if(tipo > -1 && check_socket(sus->cliente_fd) == 1){
+		void* msg = recibir_mensaje(sus->cliente_fd);
 		memcpy(&(id), msg, sizeof(int));
 		memcpy(&pid,msg+sizeof(int),sizeof(pid_t));
 
@@ -284,39 +276,32 @@ void atender_ack(int cliente_fd){
 			return aux->id == id;
 		}
 
-		bool by_pid(suscriber* aux){
-			return aux->pid == pid;
-		}
-
 		mq* cola = cola_mensaje(tipo);
-		suscriber* sus = list_find(cola->suscriptors,(void*)by_pid);
 		mensaje* item = list_find(cola->mensajes,(void*)by_id);
 
 		list_add(item->suscriptors_ack,sus);
 
-		bool estar_ack(suscriber* sus){
-			return list_any_satisfy(item->suscriptors_ack,(void*)by_pid);
-		}
 		if(confirmado_todos_susciptors_mensaje(item) == 1){
-			printf("\033[1;35mMensaje Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n");
-			//Durabilidad: Todos los mensajes debe permanecer en la cola de mensajes hasta que todos los Suscribers lo reciban.
+			printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
 			//borrar_mensaje(item);
 		}
 		free(msg);
 	}
-	return;
 }
 
 bool confirmado_todos_susciptors_mensaje(mensaje* m){
 	bool res = 0;
 	suscriber* sus;
 
-	bool by_id(suscriber* aux){
+	bool by_pid(suscriber* aux){
 		return aux->pid == sus->pid;
 	}
 	for(int i=0;i<list_size(m->suscriptors_enviados);i++){
 		sus = list_get(m->suscriptors_enviados,i);
-		res = list_any_satisfy(m->suscriptors_ack,(void*)by_id);
+		res = list_any_satisfy(m->suscriptors_ack,(void*)by_pid);
+		if(res == 0){
+			return 0;
+		}
 	}
 	return res;
 }
@@ -529,7 +514,6 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 
 //enviar mensajes===========================================================================================================================================================
 void enviar_mensajes(suscriber* sus,int tipo_cola){
-	//Notificación de recepción: Todos los mensajes entregado debe ser confirmado por cada Suscriptor para marcarlo y no enviarse nuevamente al mismo.
 	mq* cola = cola_mensaje(tipo_cola);
 	bool no_enviado(mensaje* m){
 		bool by_id(suscriber* aux){
@@ -566,6 +550,8 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 	void agregar(particion* aux){
 		agregar_paquete(enviar,aux,sus,tipo_cola);
 		aux->tiempo_actual = time(NULL);
+		pthread_create(&thread_ack,NULL,(void*)atender_ack,sus);
+		pthread_detach(thread_ack);
 	}
 
 	list_iterate(particiones_filtradas,(void*)agregar);
@@ -1129,7 +1115,6 @@ void algoritmo_reemplazo(){
 }
 
 void delete_particion(particion* borrar){
-	//Mantenibilidad: Cada cola de mensaje debe mantener su estado y borrar los mensajes que fueron eliminados de la caché por el algoritmo de reemplazo
 	mq* cola = cola_mensaje(borrar->tipo_cola);
 	bool by_id(mensaje* aux){
 		return aux->id == borrar->id_mensaje;
