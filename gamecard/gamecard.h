@@ -1,7 +1,6 @@
 #ifndef GAMECARD_H_
 #define GAMECARD_H_
 
-//#include "../utils/utils.c"
 #include <commons/bitarray.h>
 #include <commons/string.h>
 #include <commons/config.h>
@@ -24,13 +23,11 @@
 #include <ctype.h>
 #include <semaphore.h>
 #include "utils.h"
-//#include "sockets.c"
 
 #define IP_SERVIDOR		 "127.0.0.3"
 #define PUERTO_SERVIDOR  "4446"
 
 #define MAGIC_NUMBER "TALL_GRASS"
-//#define RUTA_BITMAP  "/home/utnso/Escritorio/tall_grass/fs/metadata/bitmap.bin"
 #define METADATA_DIR "/metadata"
 #define METADATA_FILE "/metadata.txt"
 #define BLOCKS_DIR "/blocks"
@@ -43,7 +40,7 @@
 #define POKEMON_FILE_EXT ".txt"
 #define TXT_FILE_EXT ".txt"
 #define DIRECTORIO_POKEMON "pokemon"
-#define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
+//#define BITMAP_FS "/home/utnso/desktop/tall-grass/Metadata/bitmap.bin"
 
 
 #define GUION "-"
@@ -83,12 +80,6 @@ typedef struct {
 	int ack_catch;
 	int ack_get;
 }ack_t;
-
-
-typedef struct{
-    char* nombrePokemon;
-    sem_t* semaforo;
-} semMetadataPoke;
 
 //FUNCIONES
 
@@ -162,21 +153,16 @@ void buscar_linea_en_el_archivo_catch(catch_pokemon *catchPokemon, char *path_di
 void modificar_linea_pokemon_catch(char* file_memory, catch_pokemon *catchPokemon, char *ruta_directorio_pokemon, char *coordenada);
 void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLinea, char *lineaActualizada, int posicionLinea, char *path_directorio_pokemon, char *pokemon);
 
-
-
-//void operacion_new_pokemon(new_pokemon *newPokemon);
-void operacion_get_Pokemon(get_pokemon *getPokemon);
-
 void modificar_bitmap_crear_blocks(int cantidad_bloques_necesarios, char *ruta_directorio_pokemon, char *linea);
 void escribir_bitmap_metadata_block(char *ruta_directorio_pokemon, char *linea, int desplazamiento);
 
 
 // Funciones GET
+void operacion_get_Pokemon(get_pokemon *getPokemon);
 position* obtener_elementos_coordenadas(char *linea);
 void buscar_lineas_get_pokemon(get_pokemon *getPokemon, char *path_directorio_pokemon);
 void enviar_respuesta_get_pokemon(get_pokemon *getPokemon, int valor_rta, t_list *info_lineas);
 void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_list *info_lineas);
-//t_list *recorrer_lineas(char **lineas);
 
 
 // Funciones Extras
@@ -197,8 +183,6 @@ void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon);
 void liberar_bloque_bitmap(int nro_bloque_a_liberar);
 void retardo_operacion();
 void reintentar_operacion();
-//void reintentar_operacion(catch_pokemon *catchPokemon);
-//void reintentar_operacion(get_pokemon *getPokemon);
 
 //SEMAFOROS PARA METADATA
 sem_t *get_semaforo(char *pokemon);

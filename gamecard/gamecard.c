@@ -50,15 +50,13 @@ void iniciar_gamecard() {
 	verificar_punto_de_montaje();
 
 	suscripcion_colas_broker();
-	//t_list* sem_MetadataPoke  = list_create();
-	diccionario_semaforos = dictionary_create();
 
 	pthread_create(&servidor_gamecard, NULL, (void *)iniciar_servidor, NULL);
 	pthread_join(servidor_gamecard, NULL);
 }
 
 void terminar_gamecard(int sig){
-    //munmap(bitmap_memoria, datos_config->);
+    munmap(bitmap_memoria, datos_config->blocks / BITS);
 	//pthread_mutex_lock(&mutexBITMAP);
     pthread_cancel(thread_get_pokemon);
     pthread_cancel(thread_catch_pokemon);
@@ -74,6 +72,22 @@ void terminar_gamecard(int sig){
     free(datos_config);
 }
 
+/*
+void mostrar_bitmap() {
+
+	int j = 1;
+
+	for(int i = 1 ; i <= bitarray_get_max_bit(bitarray) ; i+=7) {
+
+		if(i % 8 == 0) {
+			j++;
+		}
+
+		printf("%d) %d %d %d %d %d %d %d %d \n", j, bitarray_test_bit(bitarray, i), bitarray_test_bit(bitarray, i + 1), bitarray_test_bit(bitarray, i + 2), bitarray_test_bit(bitarray, i + 3) ,bitarray_test_bit(bitarray, i + 4), bitarray_test_bit(bitarray, i + 5), bitarray_test_bit(bitarray, i + 6), bitarray_test_bit(bitarray, i + 7));
+	}
+}
+
+*/
 
 void verificar_punto_de_montaje() {
 	DIR *rta = opendir(datos_config->pto_de_montaje);
@@ -92,6 +106,8 @@ void verificar_punto_de_montaje() {
 
 
 void iniciar_logger_config() {
+
+	diccionario_semaforos = dictionary_create();
 
 	datos_config = malloc(sizeof(struct config_tallGrass));
 	metadataTxt = malloc(sizeof(struct metadata_info));
@@ -178,10 +194,11 @@ void verificar_metadata_fs(char *path_pto_montaje) {
 
     }
 
-    for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++) {
-        printf("%d",bitarray_test_bit(bitarray,i));
-    }
-    printf("\n");
+    //for(int i = 0 ; i < bitarray_get_max_bit(bitarray) ; i++) {
+        //printf("%d",bitarray_test_bit(bitarray,i));
+    //}
+    //printf("\n");
+    //mostrar_bitmap();
 	 //pthread_mutex_unlock(&mutexBITMAP);
     //config_destroy(metadata_txt_datos);
     free(path_bitmap_bin);
@@ -368,16 +385,27 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     waitSemaforo(newPokemon->name);
     DIR* dir = opendir(path_directorio_pokemon);
+
     if(dir == NULL) {
+
     	log_warning(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 
     	pthread_mutex_lock(&mutexBITMAP);
     	int nro_bloque_libre = obtener_bloque_libre();
     	pthread_mutex_unlock(&mutexBITMAP);
 
-    	crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+    	if(nro_bloque_libre == -1) {
+    		signalSemaforo(newPokemon->name);
+    		log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
+    		pthread_exit(NULL);
 
-    	signalSemaforo(newPokemon->name);
+    	} else {
+
+    		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+
+    		signalSemaforo(newPokemon->name);
+
+    	}
 
     } else {
     	signalSemaforo(newPokemon->name);
@@ -393,15 +421,25 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     		int nro_bloque_libre = obtener_bloque_libre();
     		pthread_mutex_unlock(&mutexBITMAP);
 
-    		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+    		if(nro_bloque_libre == -1) {
 
-    		signalSemaforo(newPokemon->name);
+    			signalSemaforo(newPokemon->name);
+    		    log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
+    		    pthread_exit(NULL);
+
+    		} else {
+
+    		    crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+
+    		    signalSemaforo(newPokemon->name);
+
+    		}
 
     	} else {
+
     		signalSemaforo(newPokemon->name);
 
     		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
-    		// el archivo existe y hay que verificar si existe la linea
 
     		LOOP:
 
@@ -491,6 +529,7 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 	string_append_with_format(&path_archivo_pokemon, "%s%s%s", "/", newPokemon->name, ".txt");
 
 	if(hay_espacio_ultimo_bloque(path_directorio_pokemon, linea)) {
+
 		log_info(logger, "HAY ESPACIO EN EL ULTIMO BLOQUE");
 		escribir_archivo(path_archivo_pokemon, linea, "a");
 
@@ -515,7 +554,7 @@ void insertar_linea_en_archivo(new_pokemon *newPokemon, char *path_directorio_po
 
 		if(nro_bloque_libre == -1) {
 			log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE PARA ESCRIBIR NUEVOS DATOS");
-			pthread_cancel(thread_new_pokemon);
+			pthread_exit(NULL);
 		}
 
 		escribir_archivo(path_archivo_pokemon, linea, "a");
@@ -646,7 +685,6 @@ int valor_campo_size_metadata(char *ruta_dir_pokemon) { // se puede generalizar
 	return size;
 }
 
-//TODO esta funcion sirve solamente para cuando no existe el archivo pokemon (REVISAR!)
 
 void crear_pokemon(new_pokemon *newPokemon, char *path_directorio_pokemon, int nro_bloque_libre) {
 
@@ -721,13 +759,17 @@ int obtener_bloque_libre() {
 		}
 	}
 
+	if(msync(bitmap_memoria, datos_config->blocks / BITS, MS_SYNC) == -1) {
+		log_error(logger, "ERROR MSYNC BITMAP BITARRAY SET");
+		exit(1);
+	}
+
 	return bloque;
 }
 
 
 bool hay_espacio_ultimo_bloque(char *path_dir_pokemon, char *datos_a_agregar) { // chequea si se puede agregar los datos en el ultimo bloque
 
-	// chequea que haya espacio en el ultimo bloque
 	char *path_metadata_file = string_new();
 	string_append(&path_metadata_file, path_dir_pokemon);
 	string_append(&path_metadata_file, METADATA_FILE);
@@ -750,6 +792,7 @@ bool hay_espacio_ultimo_bloque(char *path_dir_pokemon, char *datos_a_agregar) { 
 	free(path_metadata_file);
 	free(path_block);
 	free(aux);
+
 	if(datos_config->size_block >= nuevoTamanio) {
 		log_info(logger, "SE PUEDE AGREGAR LA LINEA EN EL ULTIMO BLOQUE");
 		return true;
@@ -793,6 +836,7 @@ int ultimo_bloque_array_blocks(char *path_directorio_pokemon) { // nos devuelve 
 
 
 void agregar_bloque_metadata_pokemon(char *ruta_directorio_pokemon, int nro_bloque) { // agregar un nro de bloque al campo blocks de la metadata
+
 	char* size = string_itoa(nro_bloque);
 	int size_nro_bloque = strlen(size);
 
@@ -1047,6 +1091,7 @@ char** get_array_blocks_metadata(char *path_directorio_pokemon) {
 
 	free(path_metadata_pokemon);
 	config_destroy(metadata_pokemon);
+
 	return value;
 }
 
@@ -1256,6 +1301,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	    }
 		free(valor);
 	}
+
 	free(catchPokemon->name);
 	free(catchPokemon);
 	closedir(dir);
@@ -1671,8 +1717,6 @@ bool ultimo_bloque_queda_en_cero(int bytes_a_mover, char *path_directorio_pokemo
 
 void cambiar_archivo_a_directorio(char *file_memory, char *path_archivo_pokemon, char *path_directorio_pokemon) {
 
-	//TODO revisar por que diantres no me borra el bloque que resta
-
 	int tamArchivo = fileSize(path_archivo_pokemon);
 
 	munmap(file_memory, tamArchivo);
@@ -1773,7 +1817,13 @@ void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro
 }
 
 void liberar_bloque_bitmap(int nro_bloque_a_liberar) {
+
 	bitarray_clean_bit(bitarray, nro_bloque_a_liberar);
+
+	if(msync(bitmap_memoria, datos_config->blocks / BITS, MS_SYNC) == -1) {
+		log_error(logger, "ERROR MSYNC BITMAP BITARRAY SET");
+		exit(1);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------------------
