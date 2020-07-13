@@ -1,7 +1,7 @@
 #ifndef GAMECARD_H_
 #define GAMECARD_H_
 
-#include "../utils/utils.c"
+//#include "../utils/utils.c"
 #include <commons/bitarray.h>
 #include <commons/string.h>
 #include <commons/config.h>
@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <semaphore.h>
+#include "utils.h"
 //#include "sockets.c"
 
 #define IP_SERVIDOR		 "127.0.0.3"
