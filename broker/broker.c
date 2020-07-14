@@ -14,7 +14,6 @@ mq* cola_appeared;
 
 pthread_t thread_servidor;
 pthread_t thread_ack;
-pthread_t thread_enviar;
 
 int cant_liberadas;
 int inicio;
@@ -111,7 +110,7 @@ void iniciar_servidor(void){
 
     getaddrinfo(datos_config->ip_broker, datos_config->puerto_broker, &hints, &servinfo);
 
-    for (p=servinfo; p != NULL; p = p->ai_next){
+    for(p=servinfo; p != NULL; p = p->ai_next){
         if ((socket_servidor = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
             continue;
 
@@ -148,11 +147,9 @@ void serve_client(int* socket){
 	memset(&cod_op, 0 ,sizeof(int));
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
 		printf("\033[0;31mERROR: socket error\033[0m\n" );
-		pthread_exit(NULL);	
 	}
 	if (cod_op <= 0 ){
 		printf("\033[0;31mSe Desconectó El Socket: %d\033[0m\n", *socket);
-		pthread_exit(NULL);
 	}	
 
 	int cliente_fd = *socket;
@@ -220,8 +217,11 @@ mq* cola_mensaje(uint32_t tipo){
 		case LOCALIZED_POKEMON:
 			return cola_localized;
 			break;
+		default:
+			log_error(logger,"No Corresponde A Una Cola De Mensaje");
+			break;
 	}
-	return 0;
+	return NULL;
 }
 
 void atender_suscripcion(int cliente_fd){
@@ -260,7 +260,7 @@ void atender_suscripcion(int cliente_fd){
 }
 
 void atender_ack(suscriber* sus){
-	sleep(3);
+	sleep(1);
 	int tipo,id;
 	pid_t pid;
 	if(recv(sus->cliente_fd, &tipo, sizeof(int),MSG_WAITALL) == -1)
@@ -277,15 +277,17 @@ void atender_ack(suscriber* sus){
 		}
 
 		mq* cola = cola_mensaje(tipo);
-		mensaje* item = list_find(cola->mensajes,(void*)by_id);
+		if(cola != NULL){
+			mensaje* item = list_find(cola->mensajes,(void*)by_id);
 
-		list_add(item->suscriptors_ack,sus);
+			list_add(item->suscriptors_ack,sus);
 
-		if(confirmado_todos_susciptors_mensaje(item) == 1){
-			printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
-			//borrar_mensaje(item);
+			if(confirmado_todos_susciptors_mensaje(item) == 1){
+				printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
+				//borrar_mensaje(item);
+			}
+			free(msg);
 		}
-		free(msg);
 	}
 }
 

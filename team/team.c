@@ -235,7 +235,7 @@ void ejecutar_equipo(){
 				despertar_entrenador(entre);
 			}
 
-			if(entre != NULL){
+			if(entre != NULL && equipo->exec == NULL){
 				pthread_mutex_lock(&mutexCPU);
 				activar_entrenador(entre);
 				pthread_mutex_unlock(&mutexCPU);
@@ -309,6 +309,19 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 		else if(!cumplir_objetivo_entrenador(entre)){
 			log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
 			bloquear_entrenador(entre);
+			if(!list_is_empty(equipo->poks_requeridos)){
+				bool no_requerido(pokemon* pok){
+					return pok->requerido == 0;
+				}
+				pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
+				if(pok != NULL){
+					algoritmo_largo_plazo(pok);
+					sem_post(&semPoks);
+				}
+				if(equipo->exec == NULL){
+					sem_post(&semExecTeam);
+				}
+			}
 			goto inicio;
 		}
 		else{
@@ -387,6 +400,19 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 		else if(!cumplir_objetivo_entrenador(entre)){
 			log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
 			bloquear_entrenador(entre);
+			if(!list_is_empty(equipo->poks_requeridos)){
+				bool no_requerido(pokemon* pok){
+					return pok->requerido == 0;
+				}
+				pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
+				if(pok != NULL){
+					algoritmo_largo_plazo(pok);
+					sem_post(&semPoks);
+				}
+				if(equipo->exec == NULL){
+					sem_post(&semExecTeam);
+				}
+			}
 			goto inicio;
 		}
 		else{
@@ -406,10 +432,9 @@ void desalojar_entrenador(entrenador* entre){
 	}
 	entre->cant_cambio_contexto++;
 	despertar_entrenador(entre);
+	equipo->exec = NULL;
 	sem_post(&semExecTeam);
-	if(list_size(equipo->poks_requeridos) > 0){
-		sem_post(&semPoks);
-	}
+	sem_post(&semPoks);
 }
 
 void despertar_entrenador(entrenador* entre){
@@ -562,7 +587,7 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 		caso_default = 0;
 	}
 	else{
-		log_error(logger,"DEFAULT: Entrenador%c Atrapa Pokemon %s",entre->tid,pok->name);
+		log_warning(logger,"DEFAULT: Entrenador%c Atrapa Pokemon %s",entre->tid,pok->name);
 		entre->pok_atrapar = NULL;
 		sumar_ciclos(entre,CICLO_ACCION);
 		pthread_rwlock_wrlock(&lockEntrePoks);
@@ -1088,7 +1113,7 @@ void enviar_mensaje_catch_pokemon(char* pokemon,int posx,int posy,int socket_cli
 void enviar_get_pokemon_broker(char* pokemon){
 	conexion_broker->get = crear_conexion(datos_config->ip_broker,datos_config->puerto_broker);
 	if(conexion_broker->get == -1){
-		log_error(logger,"DEFAULT: %s No Existe",pokemon);
+		log_warning(logger,"DEFAULT: %s No Existe",pokemon);
 	}
 	else{
 		enviar_mensaje_get_pokemon(pokemon,conexion_broker->get);
@@ -1114,6 +1139,7 @@ void recibir_appeared_pokemon_gameboy(int cliente_fd){
 	if(requerir_atrapar(pokemon_name)){
 		pokemon* pok = crear_pokemon(pokemon_name);
 		set_pokemon(pok,posx,posy);
+		pok->requerido = 0;
 		pthread_rwlock_wrlock(&lockPoksRequeridos);
 		list_add(equipo->poks_requeridos,pok);
 		pthread_rwlock_unlock(&lockPoksRequeridos);
@@ -1137,7 +1163,7 @@ void recibir_localized_pokemon(){
 			reintento_conectar_broker();
 			t_list* especies = especies_objetivo_team();
 			void no_existe(pokemon* pok){
-				log_error(logger,"DEFAULT: %s No Existe",pok->name);
+				log_warning(logger,"DEFAULT: %s No Existe",pok->name);
 			}
 			list_iterate(especies,(void*)no_existe);
 			list_destroy(especies);
@@ -1255,7 +1281,7 @@ void recibir_caught_pokemon(){
 
 			void atrapar_default(entrenador* aux){
 				void atrapado(pokemon* pok){
-					log_error(logger,"DEFAULT: Entrenador%c Atrapa Pokemon %s\n",aux->tid,pok->name);
+					log_warning(logger,"DEFAULT: Entrenador%c Atrapa Pokemon %s\n",aux->tid,pok->name);
 					aux->pok_atrapar = NULL;
 					list_add(aux->pokemones,pok);
 					sumar_ciclos(aux,CICLO_ACCION);
@@ -1368,7 +1394,6 @@ void recibir_caught_pokemon(){
 							}
 						}
 					}
-					sem_post(&semPoks);
 
 					if(verificar_deadlock_equipo()){
 						log_warning(logger,"EN DEADLOCK");
