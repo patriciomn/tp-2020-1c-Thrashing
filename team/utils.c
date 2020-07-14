@@ -161,8 +161,10 @@ void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
 
 	void* a_enviar = serializar_paquete(paquete, bytes);
 
-	send(cliente_fd, a_enviar, bytes,0);
-	printf("ACK enviado\n");
+	if(check_socket(cliente_fd) == 1){
+		send(cliente_fd, a_enviar, bytes,0);
+		printf("ACK enviado\n");
+	}
 
 	free(a_enviar);
 	free(paquete->buffer->stream);

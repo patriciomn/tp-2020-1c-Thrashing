@@ -147,9 +147,11 @@ void serve_client(int* socket){
 	memset(&cod_op, 0 ,sizeof(int));
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
 		printf("\033[0;31mERROR: socket error\033[0m\n" );
+    	pthread_exit(NULL);
 	}
 	if (cod_op <= 0 ){
 		printf("\033[0;31mSe Desconectó El Socket: %d\033[0m\n", *socket);
+    	pthread_exit(NULL);
 	}	
 
 	int cliente_fd = *socket;
@@ -260,7 +262,7 @@ void atender_suscripcion(int cliente_fd){
 }
 
 void atender_ack(suscriber* sus){
-	sleep(1);
+	sleep(5);
 	int tipo,id;
 	pid_t pid;
 	if(recv(sus->cliente_fd, &tipo, sizeof(int),MSG_WAITALL) == -1)
@@ -280,11 +282,13 @@ void atender_ack(suscriber* sus){
 		if(cola != NULL){
 			mensaje* item = list_find(cola->mensajes,(void*)by_id);
 
-			list_add(item->suscriptors_ack,sus);
+			if(item != NULL){
+				list_add(item->suscriptors_ack,sus);
 
-			if(confirmado_todos_susciptors_mensaje(item) == 1){
-				printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
-				//borrar_mensaje(item);
+				if(confirmado_todos_susciptors_mensaje(item) == 1){
+					printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
+					//borrar_mensaje(item);
+				}
 			}
 			free(msg);
 		}
@@ -1067,7 +1071,9 @@ void consolidar_buddy_system(){
 				}
 			}
 		}
-		aplicar(libre);
+		if(libre != NULL){
+			aplicar(libre);
+		}
 	}
 	else{
 		return;
@@ -1086,18 +1092,10 @@ void algoritmo_reemplazo(){
 		bool by_id(particion* aux1,particion* aux2){
 			return aux1->tiempo_inicial <= aux2->tiempo_inicial;
 		}
-		bool ocupada(particion* aux){
-			return aux->libre == 'X';
-		}
-		if(list_size(ocupadas) >= 2){
-			list_sort(ocupadas,(void*)by_id);
-			victima = list_get(ocupadas,0);
-			delete_particion(victima);
-		}
-		else{
-			victima = list_get(ocupadas,0);
-			delete_particion(victima);
-		}
+
+		list_sort(ocupadas,(void*)by_id);
+		victima = list_get(ocupadas,0);
+		delete_particion(victima);
 	}
 	else{
 		printf("\033[1;37m==========ALGORITMO DE REEMPLAZO:LRU==========\033[0m\n");

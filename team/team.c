@@ -223,7 +223,6 @@ void ejecutar_equipo(){
 				entre = algoritmo_corto_plazo(equipo->cola_ready);
 			}
 			else{
-				log_warning(logger,"Solucionando Deadlock ...");
 				if(equipo->blocked == NULL){
 					equipo->blocked = entrenador_bloqueado_deadlock();
 					bool es_bloqueado(entrenador* aux){
@@ -273,7 +272,7 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 				goto inicio;
 			}
 		}
-		else{//DEADLOCK
+		else{
 			list_remove_by_condition(equipo->cola_deadlock,(void*)by_id);
 			move_entrenador(entre,equipo->blocked->posx,equipo->blocked->posy);
 			intercambiar_pokemon(entre,equipo->blocked);
@@ -358,7 +357,7 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 				goto inicio;
 			}
 		}
-		else{//DEADLOCK
+		else{
 			list_remove_by_condition(equipo->cola_deadlock,(void*)by_id);
 			move_entrenador(entre,equipo->blocked->posx,equipo->blocked->posy);
 			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
@@ -520,7 +519,7 @@ void move_entrenador(entrenador* entre,int posx,int posy){
 				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				return;
 			}
-			printf("\033[1;32mEntrenador%c Moviendose Por El Eje X ...\033[0m\n",entre->tid);
+			//printf("\033[1;32mEntrenador%c Moviendose Por El Eje X ...\033[0m\n",entre->tid);
 			movimiento_ejex_entrenador(entre,posx);
 			entre->quantum--;
 			entre->service_time++;
@@ -532,7 +531,7 @@ void move_entrenador(entrenador* entre,int posx,int posy){
 				(string_equals_ignore_case(datos_config->algoritmo,"SJF-CD") && con_estimacion_menor(entre))){
 				return;
 			}
-			printf("\033[1;32mEntrenador%c Moviendose Por El Eje Y ...\033[0m\n",entre->tid);
+			//printf("\033[1;32mEntrenador%c Moviendose Por El Eje Y ...\033[0m\n",entre->tid);
 			movimiento_ejey_entrenador(entre,posy);
 			entre->quantum--;
 			entre->service_time++;
@@ -551,7 +550,7 @@ void movimiento_ejex_entrenador(entrenador* entre,int posx){
 			entre->posx--;
 		}
 	}
-	printf("Entrenador%c En Posicion:[%d,%d]\n",entre->tid,entre->posx,entre->posy);
+	printf("\033[1;32mEntrenador%c Moviendose Por El Eje X. En Posicion:[%d,%d]\033[0m\n",entre->tid,entre->posx,entre->posy);
 }
 
 void movimiento_ejey_entrenador(entrenador* entre,int posy){
@@ -563,7 +562,7 @@ void movimiento_ejey_entrenador(entrenador* entre,int posy){
 			entre->posy--;
 		}
 	}
-	printf("Entrenador%c En Posicion:[%d,%d]\n",entre->tid,entre->posx,entre->posy);
+	printf("\033[1;32mEntrenador%c Moviendose Por El Eje Y. En Posicion:[%d,%d]\033[0m\n",entre->tid,entre->posx,entre->posy);
 }
 
 bool atrapar_pokemon(entrenador* entre,pokemon* pok){
@@ -603,6 +602,7 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 }
 
 void intercambiar_pokemon(entrenador* entre1,entrenador* entre2){
+	log_warning(logger,"Solucionando Deadlock ...");
 	log_info(logger,"Entrenador%c y Entrenador%c Intercambian Pokemones",entre1->tid,entre2->tid);
 	pokemon* retenido1 = pokemon_retenido_espera(entre1,entre2);
 	pokemon* retenido2 = pokemon_retenido_espera(entre2,entre1);
@@ -1181,6 +1181,7 @@ void recibir_localized_pokemon(){
 					log_info(logger,"[%d,%d]",pos->posx,pos->posy);
 				}
 				list_iterate(localized->posiciones,(void*)show);
+
 				if(check_socket(conexion_broker->localized) == 1){
 					enviar_ack(LOCALIZED_POKEMON,id,equipo->pid,conexion_broker->localized);
 				}
@@ -1189,7 +1190,11 @@ void recibir_localized_pokemon(){
 					return m->tipo_msg == GET_POKEMON && m->id_recibido == id_correlacional;
 				}
 				msg* mensaje = list_find(mensajes,(void*)by_tipo_id);
+
 				if(mensaje != NULL){
+					msg* loc = crear_mensaje(id,LOCALIZED_POKEMON,NULL);
+					list_add(mensajes,loc);
+
 					t_list* poks_localized = list_create();
 					for(int i=0;i<localized->cantidad_posiciones;i++){
 						pokemon* pok = crear_pokemon(localized->name);
@@ -1198,6 +1203,7 @@ void recibir_localized_pokemon(){
 						pok->requerido = 0;
 						list_add(poks_localized,pok);
 					}
+
 					double distance(entrenador* entre){
 						pokemon* elegido;
 						bool mas_cerca_pok(pokemon* aux1,pokemon* aux2){
@@ -1215,6 +1221,7 @@ void recibir_localized_pokemon(){
 								&& !verificar_deadlock_entrenador(aux)
 								&& !verificar_espera_caught(aux);
 					}
+
 					int cant = cant_requerida_pokemon(localized->name);
 					t_list* entrenadores = list_filter(equipo->entrenadores,(void*)by_estado);
 					t_list* cercanos = list_sorted(entrenadores,(void*)mas_cercano);
@@ -1262,6 +1269,7 @@ void recibir_localized_pokemon(){
 				list_destroy_and_destroy_elements(localized->posiciones,(void*)limpiar);
 				free(localized);
 			}
+
 			if(!list_is_empty(paquete)){
 				list_iterate(paquete,(void*)display);
 			}
@@ -1307,7 +1315,6 @@ void recibir_caught_pokemon(){
 						pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
 						if(pok != NULL){
 							algoritmo_largo_plazo(pok);
-							sem_post(&semPoks);
 						}
 					}
 				}
@@ -1322,6 +1329,7 @@ void recibir_caught_pokemon(){
 				return;
 			}
 
+			sem_post(&semPoks);
 			if(equipo->exec == NULL){
 				sem_post(&semExecTeam);
 			}
@@ -1390,11 +1398,11 @@ void recibir_caught_pokemon(){
 							pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
 							if(pok != NULL){
 								algoritmo_largo_plazo(pok);
-								sem_post(&semPoks);
 							}
 						}
 					}
 
+					sem_post(&semPoks);
 					if(verificar_deadlock_equipo()){
 						log_warning(logger,"EN DEADLOCK");
 						equipo->cant_deadlock++;
@@ -1436,21 +1444,28 @@ void recibir_appeared_pokemon(){
 					enviar_ack(APPEARED_POKEMON,id,equipo->pid,conexion_broker->appeared);
 				}
 
-				if(requerir_atrapar(appeared_pokemon->name)){
-					pokemon* pok = crear_pokemon(appeared_pokemon->name);
-					set_pokemon(pok,appeared_pokemon->pos.posx,appeared_pokemon->pos.posy);
-					pok->requerido = 0;
-					pthread_rwlock_wrlock(&lockPoksRequeridos);
-					list_add(equipo->poks_requeridos,pok);
-					printf("%s En Posicion:[%d,%d] Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name,pok->posx,pok->posy);
-					pthread_rwlock_unlock(&lockPoksRequeridos);
-					algoritmo_largo_plazo(pok);
-					sem_post(&semPoks);
+				bool existe_localized(msg* aux){
+					return aux->id_recibido == id && aux->tipo_msg == LOCALIZED_POKEMON;
 				}
-				else{
-					printf("\033[0;31m%s No Es Requerido\033[0m\n",appeared_pokemon->name);
-					free(appeared_pokemon->name);
+
+				if(!list_any_satisfy(mensajes,(void*)existe_localized)){
+					if(requerir_atrapar(appeared_pokemon->name)){
+						pokemon* pok = crear_pokemon(appeared_pokemon->name);
+						set_pokemon(pok,appeared_pokemon->pos.posx,appeared_pokemon->pos.posy);
+						pok->requerido = 0;
+						pthread_rwlock_wrlock(&lockPoksRequeridos);
+						list_add(equipo->poks_requeridos,pok);
+						printf("%s En Posicion:[%d,%d] Es Requerido, Agregado A La Lista De Pokemones Requeridos\n",pok->name,pok->posx,pok->posy);
+						pthread_rwlock_unlock(&lockPoksRequeridos);
+						algoritmo_largo_plazo(pok);
+						sem_post(&semPoks);
+					}
+					else{
+						printf("\033[0;31m%s No Es Requerido\033[0m\n",appeared_pokemon->name);
+						free(appeared_pokemon->name);
+					}
 				}
+
 				free(appeared_pokemon);
 				free(valor);
 			}
