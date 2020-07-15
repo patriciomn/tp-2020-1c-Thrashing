@@ -1082,7 +1082,7 @@ void consolidar_buddy_system(){
 }
 
 void algoritmo_reemplazo(){
-	particion* victima;
+	particion* victima = NULL;
 	bool ocupada(particion* aux){
 		return aux->libre == 'X';
 	}
@@ -1095,7 +1095,9 @@ void algoritmo_reemplazo(){
 
 		list_sort(ocupadas,(void*)by_id);
 		victima = list_get(ocupadas,0);
-		delete_particion(victima);
+		if(victima != NULL){
+			delete_particion(victima);
+		}
 	}
 	else{
 		printf("\033[1;37m==========ALGORITMO DE REEMPLAZO:LRU==========\033[0m\n");
@@ -1109,7 +1111,9 @@ void algoritmo_reemplazo(){
 		}
 		list_sort(ocupadas,(void*)by_intervalo);
 		victima = list_get(ocupadas,0);
-		delete_particion(victima);
+		if(victima != NULL){
+			delete_particion(victima);
+		}
 	}
 	list_destroy(ocupadas);
 }
