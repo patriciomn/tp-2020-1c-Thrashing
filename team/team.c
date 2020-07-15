@@ -22,6 +22,7 @@ pthread_rwlock_t lockPoksRequeridos =  PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockEntrePoks = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockColaReady = PTHREAD_RWLOCK_INITIALIZER;
 pthread_rwlock_t lockEntrenadores = PTHREAD_RWLOCK_INITIALIZER;
+pthread_rwlock_t lockExec = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t mutexCPU = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc,char* argv[]){
@@ -220,7 +221,9 @@ void ejecutar_equipo(){
 		if(!cumplir_objetivo_team()){
 			if(!verificar_deadlock_equipo()){
 				sem_wait(&semPoks);
-				entre = algoritmo_corto_plazo(equipo->cola_ready);
+				if(!list_is_empty(equipo->cola_ready)){
+					entre = algoritmo_corto_plazo(equipo->cola_ready);
+				}
 			}
 			else{
 				if(equipo->blocked == NULL){
@@ -431,7 +434,9 @@ void desalojar_entrenador(entrenador* entre){
 	}
 	entre->cant_cambio_contexto++;
 	despertar_entrenador(entre);
+	pthread_rwlock_wrlock(&lockExec);
 	equipo->exec = NULL;
+	pthread_rwlock_unlock(&lockExec);
 	sem_post(&semExecTeam);
 	sem_post(&semPoks);
 }
@@ -457,7 +462,9 @@ void activar_entrenador(entrenador* entre){
 		printf("\033[1;35mEntrenador%c Sale De Cola Ready\033[0m\n",entre->tid);
 		printf("\033[1;34mEntrenador%c EXEC\033[0m\n",entre->tid);
 		entre->estado = EXEC;
+		pthread_rwlock_wrlock(&lockExec);
 		equipo->exec = entre;
+		pthread_rwlock_unlock(&lockExec);
 		entre->start_time = time(NULL);
 		sem_post(&semExecEntre[entre->tid]);
 	}
@@ -468,7 +475,9 @@ void bloquear_entrenador(entrenador* entre){
 		printf("\033[1;34mEntrenador%c BLOCKED\033[0m\n",entre->tid);
 		entre->estado = BLOCKED;
 		entre->cant_cambio_contexto++;
+		pthread_rwlock_wrlock(&lockExec);
 		equipo->exec = NULL;
+		pthread_rwlock_unlock(&lockExec);
 		sem_post(&semExecTeam);
 	}
 }
@@ -480,7 +489,9 @@ void salir_entrenador(entrenador* entre){
 	entre->cant_cambio_contexto++;
 	entre->finish_time = time(NULL);
 	entre->turnaround_time = entre->finish_time - entre->arrival_time;
+	pthread_rwlock_wrlock(&lockExec);
 	equipo->exec = NULL;
+	pthread_rwlock_unlock(&lockExec);
 
 	for(int i=0;i<list_size(entre->pokemones);i++){
 		pokemon* pok = list_get(entre->pokemones,i);
@@ -1257,6 +1268,10 @@ void recibir_localized_pokemon(){
 					list_destroy(cercanos);
 					list_destroy(entrenadores);
 					list_destroy(poks_localized);
+
+					if(equipo->exec == NULL){
+						sem_post(&semExecTeam);
+					}
 				}
 				else{
 					printf("\033[0;31m%s No Es Requerido\033[0m\n",localized->name);
@@ -1407,6 +1422,7 @@ void recibir_caught_pokemon(){
 						log_warning(logger,"EN DEADLOCK");
 						equipo->cant_deadlock++;
 					}
+
 					if(equipo->exec == NULL){
 						sem_post(&semExecTeam);
 					}
