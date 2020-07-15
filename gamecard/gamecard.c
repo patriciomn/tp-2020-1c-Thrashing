@@ -113,7 +113,7 @@ void iniciar_logger_config() {
 	metadataTxt = malloc(sizeof(struct metadata_info));
 
 	logger = log_create("Tall_Grass_Logger","TG",1,LOG_LEVEL_INFO);
-	config_tall_grass = config_create("tall_grass.config");
+	config_tall_grass = config_create("gamecard.config");
 }
 
 
