@@ -439,9 +439,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		signalSemaforo(newPokemon->name);
 
-    		log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
-
     		LOOP:
+			log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
+
+    		
 
     		waitSemaforo(newPokemon->name);
     		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
@@ -1276,10 +1277,11 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 
 		} else {
 			signalSemaforo(catchPokemon->name);
-	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
+	    	LOOP:
+			log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
 	    	// el archivo existe y hay que verificar si existe la linea
 
-	    	LOOP:
+	    	
 
 	    	waitSemaforo(catchPokemon->name);
 			char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
@@ -1908,9 +1910,10 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 
 			signalSemaforo(getPokemon->name);
 
-	    	log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
+	    		LOOP:
+			log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON",path_directorio_pokemon);
 
-	    	LOOP:
+	    
 
 	    	waitSemaforo(getPokemon->name);
 	    	char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
