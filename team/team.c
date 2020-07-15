@@ -610,7 +610,6 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 		}
 		msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
 		if(borrar != NULL){
-			free(borrar->pok->name);
 			free(borrar);
 		}
 		if(verificar_deadlock_equipo()){
@@ -1327,7 +1326,6 @@ void recibir_caught_pokemon(){
 					}
 					msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
 					if(borrar != NULL){
-						free(borrar->pok->name);
 						free(borrar);
 					}
 				}
@@ -1419,7 +1417,6 @@ void recibir_caught_pokemon(){
 					}
 					msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
 					if(borrar != NULL){
-						free(borrar->pok->name);
 						free(borrar);
 					}
 					free(mensaje);
