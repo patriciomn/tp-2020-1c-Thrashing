@@ -604,6 +604,15 @@ bool atrapar_pokemon(entrenador* entre,pokemon* pok){
 		list_add(entre->pokemones,pok);
 		pthread_rwlock_unlock(&lockEntrePoks);
 		remove_pokemon_requeridos(pok);
+		bool existe_localized_appeared(msg* m){
+			return (m->tipo_msg == LOCALIZED_POKEMON || m->tipo_msg == APPEARED_POKEMON) && string_equals_ignore_case(m->pok->name,pok->name)
+					&& m->pok->posx == pok->posx && m->pok->posy == pok->posy;
+		}
+		msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
+		if(borrar != NULL){
+			free(borrar->pok->name);
+			free(borrar);
+		}
 		if(verificar_deadlock_equipo()){
 			log_warning(logger,"EN DEADLOCK");
 			equipo->cant_deadlock++;
@@ -1203,8 +1212,6 @@ void recibir_localized_pokemon(){
 				msg* mensaje = list_find(mensajes,(void*)by_tipo_id);
 
 				if(mensaje != NULL){
-					msg* loc = crear_mensaje(id,LOCALIZED_POKEMON,NULL);
-					list_add(mensajes,loc);
 
 					t_list* poks_localized = list_create();
 					for(int i=0;i<localized->cantidad_posiciones;i++){
@@ -1213,6 +1220,8 @@ void recibir_localized_pokemon(){
 						set_pokemon(pok,aux->posx,aux->posy);
 						pok->requerido = 0;
 						list_add(poks_localized,pok);
+						msg* loc = crear_mensaje(id,LOCALIZED_POKEMON,pok);
+						list_add(mensajes,loc);
 					}
 
 					double distance(entrenador* entre){
@@ -1312,6 +1321,15 @@ void recibir_caught_pokemon(){
 						return p->name == pok->name;
 					}
 					list_remove_by_condition(aux->espera_caught,(void*)es_caught);
+					bool existe_localized_appeared(msg* m){
+						return (m->tipo_msg == LOCALIZED_POKEMON || m->tipo_msg == APPEARED_POKEMON) && string_equals_ignore_case(m->pok->name,pok->name)
+								&& m->pok->posx == pok->posx && m->pok->posy == pok->posy;
+					}
+					msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
+					if(borrar != NULL){
+						free(borrar->pok->name);
+						free(borrar);
+					}
 				}
 				list_iterate(aux->espera_caught,(void*)atrapado);
 				if(cumplir_objetivo_entrenador(aux)){
@@ -1384,7 +1402,7 @@ void recibir_caught_pokemon(){
 
 					if(res == 1){
 						list_add(entre->pokemones,mensaje->pok);
-						printf("Entrenador%c Atrapa Pokemon %s En Posicion:[%d,%d]\n",entre->tid,mensaje->pok->name,mensaje->pok->posx,mensaje->pok->posy);
+						log_info(logger,"Entrenador%c Atrapa Pokemon %s En Posicion:[%d,%d]\n",entre->tid,mensaje->pok->name,mensaje->pok->posx,mensaje->pok->posy);
 						entre->pok_atrapar = NULL;
 						sumar_ciclos(entre,CICLO_ACCION);
 					}
@@ -1394,6 +1412,15 @@ void recibir_caught_pokemon(){
 
 						free(mensaje->pok->name);
 						free(mensaje->pok);
+					}
+					bool existe_localized_appeared(msg* m){
+						return (m->tipo_msg == LOCALIZED_POKEMON || m->tipo_msg == APPEARED_POKEMON) && string_equals_ignore_case(m->pok->name,mensaje->pok->name)
+								&& m->pok->posx == mensaje->pok->posx && m->pok->posy == mensaje->pok->posy;
+					}
+					msg* borrar = list_remove_by_condition(mensajes,(void*)existe_localized_appeared);
+					if(borrar != NULL){
+						free(borrar->pok->name);
+						free(borrar);
 					}
 					free(mensaje);
 
@@ -1461,7 +1488,8 @@ void recibir_appeared_pokemon(){
 				}
 
 				bool existe_localized(msg* aux){
-					return aux->id_recibido == id && aux->tipo_msg == LOCALIZED_POKEMON;
+					return aux->tipo_msg == LOCALIZED_POKEMON && string_equals_ignore_case(aux->pok->name,appeared_pokemon->name)
+					&& aux->pok->posx == appeared_pokemon->pos.posx && aux->pok->posy == appeared_pokemon->pos.posy;
 				}
 
 				if(!list_any_satisfy(mensajes,(void*)existe_localized)){
