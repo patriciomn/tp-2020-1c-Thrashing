@@ -139,6 +139,7 @@ pokemon* crear_pokemon(char* name);
 void set_pokemon(pokemon* pok,int posx,int posy);
 
 void cantidad_deadlocks();
+void detectar_deadlock();
 bool verificar_pokemon_exceso_no_necesario(entrenador* entre);
 bool verificar_espera_circular();
 bool pokemon_exceso(entrenador* entre,char* name);
