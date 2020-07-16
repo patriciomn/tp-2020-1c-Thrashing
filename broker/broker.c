@@ -33,11 +33,9 @@ pthread_rwlock_t lockEnviados = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t mutexMalloc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexMemcpy = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexCache = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutexReemplazo = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAck = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAsignada = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexConsol = PTHREAD_MUTEX_INITIALIZER;
-sem_t semCache;;
 
 int main(){	
     iniciar_broker();
@@ -337,11 +335,11 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje NEW_POKEMON ID:%d Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockNew);
 		list_add(cola_new->mensajes,item);
 		cola_new->id++;
 		pthread_rwlock_unlock(&lockNew);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -374,11 +372,11 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,APPEARED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje APPEARED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockAppeared);
 		list_add(cola_appeared->mensajes,item);
 		cola_appeared->id++;
 		pthread_rwlock_unlock(&lockAppeared);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -400,11 +398,11 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje CATCH_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockCatch);
 		list_add(cola_catch->mensajes,item);
 		cola_catch->id++;
 		pthread_rwlock_unlock(&lockCatch);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -436,11 +434,11 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,&(caught->caught),sizeof(bool));
 		log_warning(logger,"Mensaje CAUGHT_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockCaught);
 		list_add(cola_caught->mensajes,item);
 		cola_caught->id++;
 		pthread_rwlock_unlock(&lockCaught);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -462,11 +460,11 @@ void mensaje_get_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje GET_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockGet);
 		list_add(cola_get->mensajes,item);
 		cola_get->id++;
 		pthread_rwlock_unlock(&lockGet);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -505,11 +503,11 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje LOCALIZED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockLocalized);
 		list_add(cola_localized->mensajes,item);
 		cola_localized->id++;
 		pthread_rwlock_unlock(&lockLocalized);
-		enviar_id(item,cliente_fd);
 	}
 	else{
 		free(item);
@@ -563,9 +561,9 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 	enviar_paquete(enviar,sus->cliente_fd);
 
 	for(int i=0;i<list_size(particiones_filtradas);i++){
-		sleep(2);
 		pthread_create(&thread_ack,NULL,(void*)atender_ack,sus);
 		pthread_detach(thread_ack);
+		sleep(2);
 	}
 	list_destroy(mensajes);
 	list_destroy(particiones_tipo);
@@ -684,11 +682,9 @@ void iniciar_cache(){
 	//en otra consola: kill -USR1 [pid del broker]
 	signal(SIGUSR1,handler_dump);
 	signal(SIGINT,handler_dump);
-	sem_init(&semCache,0,1);
 }
 
 particion* malloc_cache(uint32_t size){
-
 	pthread_mutex_lock(&mutexMalloc);
 	particion* elegida;
 
@@ -742,19 +738,17 @@ particion* malloc_cache(uint32_t size){
 	elegida->tiempo_actual = time(NULL);
 	elegida->intervalo = 0;
 	pthread_mutex_unlock(&mutexMalloc);
-	sem_post(&semCache);
 
 	return elegida;
 }
 
 void* memcpy_cache(particion* part,uint32_t id_buf,uint32_t tipo_cola,void* destino,void* buf,uint32_t size){
-	sem_wait(&semCache);
-	pthread_mutex_lock(&mutexMemcpy);
 	if(part != NULL){
 		part->id_mensaje = id_buf;
 		part->tipo_cola = tipo_cola;
 		part->libre = 'X';
 	}
+	pthread_mutex_lock(&mutexMemcpy);
 	void* res = memcpy(destino,buf,size);
 	pthread_mutex_unlock(&mutexMemcpy);
 
@@ -1039,16 +1033,20 @@ void consolidar_particiones_dinamicas(){
 					bool next(particion* aux){
 						return aux->start != libre->start && aux->start == libre->end && aux->libre == 'L';
 					}
+					pthread_mutex_lock(&mutexCache);
 					particion* ant = list_find(cache,(void*)anterior);
 					particion* pos = list_find(cache,(void*)next);
+					pthread_mutex_unlock(&mutexCache);
 					if(ant != NULL){
 						log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",ant->start,libre->start);
 						uint32_t size = aux->size;
 						bool by_start(particion* a){
 							return a->start == aux->start;
 						}
+						pthread_mutex_lock(&mutexCache);
 						particion* borrar = list_find(cache,(void*)by_start);
 						list_remove_by_condition(cache,(void*)by_start);
+						pthread_mutex_unlock(&mutexCache);
 						free(borrar);
 						ant->size += size;
 						ant->fin = ant->inicio+ant->size;
@@ -1060,8 +1058,10 @@ void consolidar_particiones_dinamicas(){
 						bool by_start(particion* aux){
 							return aux->start == pos->start;
 						}
+						pthread_mutex_lock(&mutexCache);
 						particion* borrar = list_find(cache,(void*)by_start);
 						list_remove_by_condition(cache,(void*)by_start);
+						pthread_mutex_unlock(&mutexCache);
 						free(borrar);
 						aux->size += size;
 						aux->fin = aux->inicio+aux->size;
@@ -1147,14 +1147,13 @@ void algoritmo_reemplazo(){
 	bool ocupada(particion* aux){
 		return aux->libre == 'X';
 	}
-	pthread_mutex_lock(&mutexReemplazo);
-	t_list* ocupadas = list_filter(cache,(void*)ocupada);
 
+	t_list* ocupadas = list_filter(cache,(void*)ocupada);
 
 	if(string_equals_ignore_case(datos_config->algoritmo_reemplazo,"FIFO")){
 		printf("\033[1;37m==========ALGORITMO DE REEMPLAZO:FIFO==========\033[0m\n");
 		bool by_id(particion* aux1,particion* aux2){
-			return aux1->tiempo_inicial < aux2->tiempo_inicial;
+			return aux1->tiempo_inicial <= aux2->tiempo_inicial;
 		}
 
 		list_sort(ocupadas,(void*)by_id);
@@ -1178,7 +1177,6 @@ void algoritmo_reemplazo(){
 	}
 
 	list_destroy(ocupadas);
-	pthread_mutex_unlock(&mutexReemplazo);
 }
 
 void delete_particion(particion* borrar){
