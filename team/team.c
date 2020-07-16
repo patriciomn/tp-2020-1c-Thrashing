@@ -302,10 +302,10 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 
 		if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
 			log_warning(logger,"Entrenador%c BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
+			bloquear_entrenador(entre);
 			if(!list_any_satisfy(equipo->cola_deadlock,(void*)by_id)){
 				list_add(equipo->cola_deadlock,entre);
 			}
-			bloquear_entrenador(entre);
 			goto inicio;
 		}
 		else if(!cumplir_objetivo_entrenador(entre)){
@@ -318,10 +318,6 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 				pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
 				if(pok != NULL){
 					algoritmo_largo_plazo(pok);
-					sem_post(&semPoks);
-				}
-				if(equipo->exec == NULL){
-					sem_post(&semExecTeam);
 				}
 			}
 			goto inicio;
@@ -329,6 +325,9 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 		else{
 			salir_entrenador(entre);
 			sem_post(&semExecTeam);
+		}
+		if(!list_is_empty(equipo->cola_ready) && equipo->exec == NULL){
+			sem_post(&semPoks);
 		}
 	}
 }
@@ -393,10 +392,10 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 
 		if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
 			log_warning(logger,"Entrenador%c BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
+			bloquear_entrenador(entre);
 			if(!list_any_satisfy(equipo->cola_deadlock,(void*)by_id)){
 				list_add(equipo->cola_deadlock,entre);
 			}
-			bloquear_entrenador(entre);
 			goto inicio;
 		}
 		else if(!cumplir_objetivo_entrenador(entre)){
@@ -409,10 +408,6 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 				pokemon* pok = list_remove_by_condition(equipo->poks_requeridos,(void*)no_requerido);
 				if(pok != NULL){
 					algoritmo_largo_plazo(pok);
-					sem_post(&semPoks);
-				}
-				if(equipo->exec == NULL){
-					sem_post(&semExecTeam);
 				}
 			}
 			goto inicio;
@@ -420,6 +415,9 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 		else{
 			salir_entrenador(entre);
 			sem_post(&semExecTeam);
+		}
+		if(!list_is_empty(equipo->cola_ready) && equipo->exec == NULL){
+			sem_post(&semPoks);
 		}
 	}
 }
@@ -724,8 +722,9 @@ entrenador* algoritmo_corto_plazo(t_list* cola){
 }
 
 entrenador* algoritmo_deadlock(t_list* cola){
-	entrenador* entre = algoritmo_corto_plazo(cola);
-	if(string_equals_ignore_case(datos_config->algoritmo,"RR")){
+	//entrenador* entre = algoritmo_corto_plazo(cola);
+	entrenador* entre = list_get(cola,0);
+	if(entre != NULL && string_equals_ignore_case(datos_config->algoritmo,"RR")){
 		entre->quantum = datos_config->quantum;
 	}
 	return entre;
@@ -1069,7 +1068,7 @@ pokemon* find_pokemon(char* name){
 void enviar_mensajes_get_pokemon(){
 	void get(pokemon* pok){
 		enviar_get_pokemon_broker(pok->name);
-		sleep(1);
+		//sleep(1);
 	}
 	t_list* especies = especies_objetivo_team();
 	list_iterate(especies,(void*)get);
@@ -1332,13 +1331,21 @@ void recibir_caught_pokemon(){
 					}
 					if(cumplir_objetivo_entrenador(aux)){
 						salir_entrenador(aux);
+						sem_post(&semExecTeam);
 					}
 					else if(!cumplir_objetivo_entrenador(aux) && !verificar_cantidad_pokemones(aux)){
 						log_warning(logger,"Entrenador%c BLOCKED En Espera De Solucionar Deadlock!",aux->tid);
-						list_add(equipo->cola_deadlock,aux);
+						bloquear_entrenador(aux);
+						bool by_id(entrenador* e){
+							return aux->tid == e->tid;
+						}
+						if(!list_any_satisfy(equipo->cola_deadlock,(void*)by_id)){
+							list_add(equipo->cola_deadlock,aux);
+						}
 					}
 					else if(!cumplir_objetivo_entrenador(aux)){
 						log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",aux->tid);
+						bloquear_entrenador(aux);
 						if(!list_is_empty(equipo->poks_requeridos)){
 							bool no_requerido(pokemon* pok){
 								return !pok->requerido;
@@ -1349,14 +1356,13 @@ void recibir_caught_pokemon(){
 							}
 						}
 					}
-					sem_post(&semPoks);
 					if(verificar_deadlock_equipo()){
 						log_warning(logger,"EN DEADLOCK");
 						equipo->cant_deadlock++;
-					}
-
-					if(equipo->exec == NULL){
 						sem_post(&semExecTeam);
+					}
+					if(!list_is_empty(equipo->cola_ready) || equipo->exec == NULL){
+						sem_post(&semPoks);
 					}
 				}
 				list_iterate(aux->espera_caught,(void*)atrapado);
@@ -1428,13 +1434,22 @@ void recibir_caught_pokemon(){
 
 					if(cumplir_objetivo_entrenador(entre)){
 						salir_entrenador(entre);
+						sem_post(&semExecTeam);
 					}
 					else if(!cumplir_objetivo_entrenador(entre) && !verificar_cantidad_pokemones(entre)){
 						log_warning(logger,"Entrenador%c BLOCKED En Espera De Solucionar Deadlock!",entre->tid);
-						list_add(equipo->cola_deadlock,entre);
+						bloquear_entrenador(entre);
+						bool by_id(entrenador* e){
+							return entre->tid == e->tid;
+						}
+						if(!list_any_satisfy(equipo->cola_deadlock,(void*)by_id)){
+							list_add(equipo->cola_deadlock,entre);
+						}
+
 					}
 					else if(!cumplir_objetivo_entrenador(entre)){
 						log_warning(logger,"Entrenador%c BLOCKED Finaliza Su Recorrido!",entre->tid);
+						bloquear_entrenador(entre);
 						if(!list_is_empty(equipo->poks_requeridos)){
 							bool no_requerido(pokemon* pok){
 								return !pok->requerido;
@@ -1446,14 +1461,13 @@ void recibir_caught_pokemon(){
 						}
 					}
 
-					sem_post(&semPoks);
 					if(verificar_deadlock_equipo()){
 						log_warning(logger,"EN DEADLOCK");
 						equipo->cant_deadlock++;
-					}
-
-					if(equipo->exec == NULL){
 						sem_post(&semExecTeam);
+					}
+					if(!list_is_empty(equipo->cola_ready) || equipo->exec == NULL){
+						sem_post(&semPoks);
 					}
 				}
 				free(valor);
@@ -1526,19 +1540,17 @@ void recibir_appeared_pokemon(){
 //BROKER---GAMEBOY--------------------------------------------------------------------------------------------------------------------------
 void suscribirse_broker(){
 	suscribirse_localized();
+	pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
+	pthread_detach(suscripcion_localized);
+	suscribirse_caught();
+	pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
+	pthread_detach(suscripcion_caught);
+	suscribirse_appeared();
+	pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
+	pthread_detach(suscripcion_appeared);
 	enviar_mensajes_get_pokemon();
-	if(conexion_broker->localized == -1){
+	if(conexion_broker->localized == -1 || conexion_broker->appeared == -1 || conexion_broker->caught == -1){
 		reintento_conectar_broker();
-	}
-	else{
-		pthread_create(&suscripcion_localized,NULL,(void*)recibir_localized_pokemon,NULL);
-		pthread_detach(suscripcion_localized);
-		suscribirse_caught();
-		suscribirse_appeared();
-		pthread_create(&suscripcion_caught,NULL,(void*)recibir_caught_pokemon,NULL);
-		pthread_detach(suscripcion_caught);
-		pthread_create(&suscripcion_appeared,NULL,(void*)recibir_appeared_pokemon,NULL);
-		pthread_detach(suscripcion_appeared);
 	}
 }
 
