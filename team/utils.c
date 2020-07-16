@@ -148,7 +148,6 @@ localized_pokemon* deserializar_localized(void* buffer) {
 }
 
 void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
-	sleep(2);
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = tipo;
 	paquete->buffer = malloc(sizeof(t_buffer));

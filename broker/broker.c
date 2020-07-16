@@ -36,6 +36,8 @@ pthread_mutex_t mutexCache = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAck = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAsignada = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexConsol = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexDelete = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexCola = PTHREAD_MUTEX_INITIALIZER;
 
 int main(){	
     iniciar_broker();
@@ -267,7 +269,7 @@ void atender_ack(suscriber* sus){
 	if(tipo > -1 && check_socket(sus->cliente_fd) == 1){
 		int id;
 		pid_t pid;
-		pthread_mutex_lock(&mutexAck);
+
 		void* msg = recibir_mensaje(sus->cliente_fd);
 		if(msg != NULL){
 			memcpy(&(id), msg, sizeof(int));
@@ -279,17 +281,18 @@ void atender_ack(suscriber* sus){
 				bool by_id(mensaje* aux){
 					return aux->id == id;
 				}
+
 				mensaje* item = list_find(cola->mensajes,(void*)by_id);
 				if(item != NULL){
 					list_add(item->suscriptors_ack,sus);
 
-					//if(confirmado_todos_susciptors_mensaje(item) == 1){
-						//printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
+					if(confirmado_todos_susciptors_mensaje(item) == 1){
+						printf("\033[1;35mMensaje  Tipo: %s ID: %d Ya Ha Recibido Los ACKs Por Todos Sus Suscriptors\033[0m\n",get_cola(item->tipo_msg),item->id);
 						//borrar_mensaje(item);
-					//}
+					}
 				}
 			}
-			pthread_mutex_unlock(&mutexAck);
+
 			free(msg);
 		}
 	}
@@ -314,9 +317,9 @@ void borrar_mensaje(mensaje* m){
 	bool by_id_tipo(particion* aux){
 		return aux->id_mensaje == m->id && aux->tipo_cola == m->tipo_msg;
 	}
-	pthread_mutex_lock(&mutexCache);
+
 	particion* borrar = list_find(cache,(void*)by_id_tipo);
-	pthread_mutex_unlock(&mutexCache);
+
 	delete_particion(borrar);
 
 }
@@ -335,10 +338,10 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje NEW_POKEMON ID:%d Almacenado En El Cache Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockNew);
 		list_add(cola_new->mensajes,item);
 		cola_new->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockNew);
 	}
 	else{
@@ -372,10 +375,10 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,APPEARED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje APPEARED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockAppeared);
 		list_add(cola_appeared->mensajes,item);
 		cola_appeared->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockAppeared);
 	}
 	else{
@@ -398,10 +401,10 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje CATCH_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockCatch);
 		list_add(cola_catch->mensajes,item);
 		cola_catch->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockCatch);
 	}
 	else{
@@ -434,10 +437,10 @@ void mensaje_caught_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CAUGHT_POKEMON,part_aux->inicio,&(caught->caught),sizeof(bool));
 		log_warning(logger,"Mensaje CAUGHT_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockCaught);
 		list_add(cola_caught->mensajes,item);
 		cola_caught->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockCaught);
 	}
 	else{
@@ -460,10 +463,10 @@ void mensaje_get_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,GET_POKEMON,part_aux->inicio,msg,size);
 		log_warning(logger,"Mensaje GET_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
 		pthread_rwlock_wrlock(&lockGet);
 		list_add(cola_get->mensajes,item);
 		cola_get->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockGet);
 	}
 	else{
@@ -503,10 +506,11 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
 		log_warning(logger,"Mensaje LOCALIZED_POKEMON ID:%d Almacenado En El Cache. Inicio:%d",item->id,part_aux->start);
-		enviar_id(item,cliente_fd);
+
 		pthread_rwlock_wrlock(&lockLocalized);
 		list_add(cola_localized->mensajes,item);
 		cola_localized->id++;
+		enviar_id(item,cliente_fd);
 		pthread_rwlock_unlock(&lockLocalized);
 	}
 	else{
@@ -536,9 +540,9 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 	bool es_tipo(particion* aux){
 		return aux->tipo_cola == tipo_cola;
 	}
-	pthread_mutex_lock(&mutexCache);
+
 	t_list* particiones_tipo  = list_filter(cache,(void*)es_tipo);
-	pthread_mutex_unlock(&mutexCache);
+
 	t_list* particiones_filtradas = list_create();
 
 	for(int i=0;i<list_size(mensajes);i++){
@@ -550,6 +554,7 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 
 		list_add(particiones_filtradas,aux);
 	}
+
 
 	t_paquete* enviar = crear_paquete(tipo_cola);
 	void agregar(particion* aux){
@@ -563,7 +568,6 @@ void enviar_mensajes(suscriber* sus,int tipo_cola){
 	for(int i=0;i<list_size(particiones_filtradas);i++){
 		pthread_create(&thread_ack,NULL,(void*)atender_ack,sus);
 		pthread_detach(thread_ack);
-		sleep(2);
 	}
 	list_destroy(mensajes);
 	list_destroy(particiones_tipo);
@@ -637,7 +641,9 @@ void agregar_paquete(t_paquete* enviar,particion* aux,suscriber* sus,uint32_t ti
 		return m->id == aux->id_mensaje;
 	}
 	mq* cola = cola_mensaje(tipo);
+
 	mensaje* m = list_find(cola->mensajes,(void*)by_id);
+
 	pthread_rwlock_wrlock(&lockEnviados);
 	list_add(m->suscriptors_enviados,sus);
 	pthread_rwlock_unlock(&lockEnviados);
@@ -685,9 +691,8 @@ void iniciar_cache(){
 }
 
 particion* malloc_cache(uint32_t size){
-	pthread_mutex_lock(&mutexMalloc);
 	particion* elegida;
-
+	////pthread_mutex_lock(&mutexMalloc);
 	if(size <= mem_total - datos_config->tamanio_min_particion){
 		if(string_equals_ignore_case(datos_config->algoritmo_memoria,"PD")){
 			bool libre_suficiente(particion* aux){
@@ -702,7 +707,7 @@ particion* malloc_cache(uint32_t size){
 					printf("\033[1;31mNo Hay Suficiente Espacio\033[0m\n");
 					free_cache();
 					cant_liberadas++;
-					printf("Cantidad De Liberadas:%d\n",cant_liberadas);
+					printf("\033[1;34mCantidad De Liberadas:%d\033[0m\n",cant_liberadas);
 					if(cant_liberadas == datos_config->frecuencia_compactacion){
 						compactar_particiones_dinamicas();
 						cant_liberadas = 0;
@@ -733,11 +738,10 @@ particion* malloc_cache(uint32_t size){
 		return 0;
 	}
 
-
 	elegida->tiempo_inicial = time(NULL);
 	elegida->tiempo_actual = time(NULL);
 	elegida->intervalo = 0;
-	pthread_mutex_unlock(&mutexMalloc);
+
 
 	return elegida;
 }
@@ -748,9 +752,9 @@ void* memcpy_cache(particion* part,uint32_t id_buf,uint32_t tipo_cola,void* dest
 		part->tipo_cola = tipo_cola;
 		part->libre = 'X';
 	}
-	pthread_mutex_lock(&mutexMemcpy);
+
 	void* res = memcpy(destino,buf,size);
-	pthread_mutex_unlock(&mutexMemcpy);
+
 
 	return res;
 }
@@ -766,9 +770,9 @@ particion* particiones_dinamicas(uint32_t size){
 		part_size =  datos_config->tamanio_min_particion;
 	}
 	elegida = algoritmo_particion_libre(part_size);
-	pthread_mutex_lock(&mutexCache);
+
 	particion* ultima =  list_get(cache,list_size(cache)-1);
-	pthread_mutex_unlock(&mutexCache);
+
 	if(elegida != NULL && elegida->start == ultima->start){
 		elegida->size = part_size;
 		elegida->fin = elegida->inicio+part_size;
@@ -790,9 +794,7 @@ particion* particiones_dinamicas(uint32_t size){
 			next->end = next->start+next->size;
 			next->id_mensaje = -1;
 			next->tipo_cola = -1;
-			pthread_mutex_lock(&mutexCache);
 			list_add(cache,next);
-			pthread_mutex_unlock(&mutexCache);
 		}
 	}
 	else if(elegida != NULL && elegida->start != ultima->start){
@@ -818,10 +820,10 @@ particion* particiones_dinamicas(uint32_t size){
 			bool posicion(particion* aux){
 				return aux->inicio <= elegida->fin;
 			}
-			pthread_mutex_lock(&mutexCache);
 			int pos = list_count_satisfying(cache,(void*)posicion);
+
 			list_add_in_index(cache,pos,next);
-			pthread_mutex_unlock(&mutexCache);
+
 		}
 	}
 	return elegida;
@@ -838,9 +840,9 @@ particion* buddy_system(uint32_t size){
 	}
 
 	if(size_particion > (mem_total/2)){
-		pthread_mutex_lock(&mutexCache);
+
 		elegida = list_find(cache,(void*)libre_suficiente);
-		pthread_mutex_unlock(&mutexCache);
+
 		if(elegida != NULL){
 			elegida->libre = 'X';
 			elegida->size = size;
@@ -852,18 +854,18 @@ particion* buddy_system(uint32_t size){
 	}
 	else{
 		uint32_t pow_size = log_dos(size_particion);
-		pthread_mutex_lock(&mutexCache);
+
 		particion* primera = list_find(cache,(void*)libre_suficiente);
-		pthread_mutex_unlock(&mutexCache);
+
 		uint32_t pow_pri = log_dos(primera->buddy_size);
 
 		void aplicar(particion* aux){
 			bool libre_suficiente(particion* p){
 				return p->libre == 'L' && p->buddy_size >= size_particion && p->buddy_size >= datos_config->tamanio_min_particion;
 			}
-			pthread_mutex_lock(&mutexCache);
+
 			particion* vic = list_find(cache,(void*)libre_suficiente);
-			pthread_mutex_unlock(&mutexCache);
+
 			particion* ultima = list_get(cache,list_size(cache)-1);
 			if(aux->inicio==vic->inicio){
 				uint32_t s = aux->buddy_size/2;
@@ -883,9 +885,7 @@ particion* buddy_system(uint32_t size){
 				next->id_mensaje = -1;
 				next->tipo_cola = -1;
 				if(aux->fin==ultima->fin){
-					pthread_mutex_lock(&mutexCache);
 					list_add(cache,next);
-					pthread_mutex_unlock(&mutexCache);
 				}
 				else{
 					bool posicion(particion* aux){
@@ -893,9 +893,7 @@ particion* buddy_system(uint32_t size){
 					}
 
 					int pos = list_count_satisfying(cache,(void*)posicion);
-					pthread_mutex_lock(&mutexCache);
 					list_add_in_index(cache,pos,next);
-					pthread_mutex_unlock(&mutexCache);
 				}
 			}
 			else if(aux->inicio==vic->inicio && aux->buddy_size>=size_particion && aux->buddy_size/2<size_particion){
@@ -907,9 +905,7 @@ particion* buddy_system(uint32_t size){
 		for(int i=pow_size;i < pow_pri ;i++){
 			list_iterate(cache,(void*)aplicar);
 		}
-		pthread_mutex_lock(&mutexCache);
 		elegida = list_find(cache,(void*)libre_suficiente);
-		pthread_mutex_unlock(&mutexCache);
 	}
 
 	elegida->id_particion = id_particion;
@@ -931,18 +927,14 @@ particion* algoritmo_particion_libre(uint32_t size){
 	}
 	if(string_equals_ignore_case(datos_config->algoritmo_particion_libre,"FF")){
 		printf("\33[1;37m==========ALGORITEMO DE PARTICION LIBRE:FIRST FIT==========\033[0m\n");
-		pthread_mutex_lock(&mutexCache);
 		elegida = list_find(cache,(void*)libre_suficiente);
-		pthread_mutex_unlock(&mutexCache);
 	}
 	else{
 		printf("\33[1;37m==========ALGORITEMO DE PARTICION LIBRE:BEST FIT==========\033[0m\n");
 		bool espacio_min(particion* aux1,particion* aux2){
 			return aux1->size <= aux2->size;
 		}
-		pthread_mutex_lock(&mutexCache);
 		t_list* aux = list_filter(cache,(void*)libre_suficiente);
-		pthread_mutex_unlock(&mutexCache);
 		list_sort(aux,(void*)espacio_min);
 
 		elegida = list_get(aux,0);
@@ -958,9 +950,7 @@ void compactar_particiones_dinamicas(){
 	}
 
 	while(1){
-		pthread_mutex_lock(&mutexCache);
 		particion* borrar = list_find(cache,(void*)libre_no_ultima);
-		pthread_mutex_unlock(&mutexCache);
 		if(borrar == NULL){
 			break;
 		}
@@ -968,9 +958,7 @@ void compactar_particiones_dinamicas(){
 		bool by_start(particion* aux){
 			return aux->start == borrar->start;
 		}
-		pthread_mutex_lock(&mutexCache);
 		list_remove_by_condition(cache,(void*)by_start);
-		pthread_mutex_unlock(&mutexCache);
 		void compac(particion* aux){
 			if(aux->end == mem_total && aux->libre == 'L'){
 				aux->inicio -= size;
@@ -991,9 +979,7 @@ void compactar_particiones_dinamicas(){
 				next->end = next->start+next->size;
 				next->id_mensaje = -1;
 				next->tipo_cola = -1;
-				pthread_mutex_lock(&mutexCache);
 				list_add(cache,next);
-				pthread_mutex_unlock(&mutexCache);
 			}
 			else if(aux->fin <= borrar->inicio){
 				//No tocar las particiones anteriores de la particion a borrar
@@ -1005,9 +991,7 @@ void compactar_particiones_dinamicas(){
 				aux->end = aux->start+aux->size;
 			}
 		}
-		pthread_mutex_lock(&mutexCache);
 		list_iterate(cache,(void*)compac);
-		pthread_mutex_unlock(&mutexCache);
 		free(borrar);
 	}
 }
@@ -1033,20 +1017,18 @@ void consolidar_particiones_dinamicas(){
 					bool next(particion* aux){
 						return aux->start != libre->start && aux->start == libre->end && aux->libre == 'L';
 					}
-					pthread_mutex_lock(&mutexCache);
 					particion* ant = list_find(cache,(void*)anterior);
 					particion* pos = list_find(cache,(void*)next);
-					pthread_mutex_unlock(&mutexCache);
 					if(ant != NULL){
 						log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",ant->start,libre->start);
 						uint32_t size = aux->size;
 						bool by_start(particion* a){
 							return a->start == aux->start;
 						}
-						pthread_mutex_lock(&mutexCache);
+
 						particion* borrar = list_find(cache,(void*)by_start);
 						list_remove_by_condition(cache,(void*)by_start);
-						pthread_mutex_unlock(&mutexCache);
+
 						free(borrar);
 						ant->size += size;
 						ant->fin = ant->inicio+ant->size;
@@ -1058,19 +1040,17 @@ void consolidar_particiones_dinamicas(){
 						bool by_start(particion* aux){
 							return aux->start == pos->start;
 						}
-						pthread_mutex_lock(&mutexCache);
+
 						particion* borrar = list_find(cache,(void*)by_start);
 						list_remove_by_condition(cache,(void*)by_start);
-						pthread_mutex_unlock(&mutexCache);
+
 						free(borrar);
 						aux->size += size;
 						aux->fin = aux->inicio+aux->size;
 						aux->end = aux->start+aux->size;;
 					}
 				}
-				pthread_mutex_lock(&mutexCache);
 				aplicar(libre);
-				pthread_mutex_unlock(&mutexCache);
 			}
 			else{
 				continue;
@@ -1131,9 +1111,7 @@ void consolidar_buddy_system(){
 						}
 					}
 				}
-				pthread_mutex_lock(&mutexCache);
 				aplicar(libre);
-				pthread_mutex_unlock(&mutexCache);
 			}
 			else{
 				continue;
@@ -1147,7 +1125,6 @@ void algoritmo_reemplazo(){
 	bool ocupada(particion* aux){
 		return aux->libre == 'X';
 	}
-
 	t_list* ocupadas = list_filter(cache,(void*)ocupada);
 
 	if(string_equals_ignore_case(datos_config->algoritmo_reemplazo,"FIFO")){
@@ -1186,13 +1163,15 @@ void delete_particion(particion* borrar){
 	}
 	mensaje* m = list_find(cola->mensajes,(void*)by_id);
 
-	borrar->libre = 'L';
 	log_warning(logger,"Particion:%d De Tipo: %s Eliminada  Inicio: %d",borrar->id_particion,get_cola(borrar->tipo_cola),borrar->start);
+	borrar->libre = 'L';
 
 	bool libre(particion* p){
 		return p->libre == 'L';
 	}
+
 	list_remove_by_condition(cola->mensajes,(void*)by_id);
+
 
 	list_destroy(m->suscriptors_ack);
 	list_destroy(m->suscriptors_enviados);

@@ -12,7 +12,6 @@ void* recibir_mensaje(int socket_cliente){
 		return NULL;
 	}
 	buffer = malloc(size);
-	//memset(buffer,0,size);
 	recv(socket_cliente, buffer,size, MSG_WAITALL);
 	return buffer;
 }
