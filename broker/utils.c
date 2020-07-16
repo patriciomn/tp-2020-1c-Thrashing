@@ -5,10 +5,14 @@ t_config* leer_config(char* config){
 }
 
 void* recibir_mensaje(int socket_cliente){
-	int size;
+	int size = 0;
 	void * buffer;
 	recv(socket_cliente,&size, sizeof(int), MSG_WAITALL);
+	if(size == 0){
+		return NULL;
+	}
 	buffer = malloc(size);
+	//memset(buffer,0,size);
 	recv(socket_cliente, buffer,size, MSG_WAITALL);
 	return buffer;
 }
@@ -148,7 +152,7 @@ localized_pokemon* deserializar_localized(void* buffer) {
 }
 
 void enviar_ack(int tipo,int id,pid_t pid,int cliente_fd){
-	sleep(1);
+	sleep(2);
 	t_paquete* paquete = malloc(sizeof(t_paquete));
 	paquete->codigo_operacion = tipo;
 	paquete->buffer = malloc(sizeof(t_buffer));
