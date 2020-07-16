@@ -133,3 +133,4 @@ void liberar_conexion(int socket_cliente);
 bool check_socket(int sock);
 int recibir_id_mensaje(int cliente_fd);
 char* get_cola(uint32_t);
+void enviar_paquete(t_paquete* paquete, int socket_cliente);
