@@ -198,6 +198,12 @@ void salir_equipo(){
 	}
 	list_destroy_and_destroy_elements(equipo->poks_requeridos,(void*)limpiar);
 
+	void limpiar_mensaje(msg* m){
+		free(m->pok->name);
+		free(m->pok);
+	}
+	list_destroy_and_destroy_elements(mensajes,(void*)limpiar_mensaje);
+
 	free(datos_config->objetivos);
 	free(datos_config->pokemones);
 	log_destroy(logger);
@@ -1437,8 +1443,8 @@ void recibir_caught_pokemon(){
 						printf("Entrenador%c No Pudo Atrapar El Pokemon %s En Posicion:[%d,%d]\n",entre->tid,mensaje->pok->name,mensaje->pok->posx,mensaje->pok->posy);
 						entre->pok_atrapar = NULL;
 
-						free(mensaje->pok->name);
-						free(mensaje->pok);
+						//free(mensaje->pok->name);
+						//free(mensaje->pok);
 					}
 					bool existe_localized_appeared(msg* m){
 						return (m->tipo_msg == LOCALIZED_POKEMON || m->tipo_msg == APPEARED_POKEMON) && string_equals_ignore_case(m->pok->name,mensaje->pok->name)
@@ -1448,7 +1454,7 @@ void recibir_caught_pokemon(){
 					if(borrar != NULL){
 						free(borrar);
 					}
-					free(mensaje);
+					//free(mensaje);
 
 					bool by_id(entrenador* aux){
 						return aux->tid == entre->tid;
