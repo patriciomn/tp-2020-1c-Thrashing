@@ -24,8 +24,8 @@
 #include <semaphore.h>
 #include "utils.h"
 
-#define IP_SERVIDOR		 "127.0.0.3"
-#define PUERTO_SERVIDOR  "4446"
+#define IP_SERVIDOR		 "127.0.0.1"
+#define PUERTO_SERVIDOR  "4445"
 
 #define MAGIC_NUMBER "TALL_GRASS"
 #define METADATA_DIR "/metadata"

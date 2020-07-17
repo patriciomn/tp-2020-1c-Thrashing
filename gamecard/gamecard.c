@@ -352,7 +352,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     char *path_directorio_pokemon = string_new();
     string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", newPokemon->name);
     log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON RUTA <%s>", path_directorio_pokemon);
-
+    LOOP:
     waitSemaforo(newPokemon->name);
     DIR* dir = opendir(path_directorio_pokemon);
 
@@ -382,7 +382,7 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     } else {
 
-    	LOOP:
+    	//LOOP:
 
     	signalSemaforo(newPokemon->name);
 
@@ -1235,6 +1235,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", catchPokemon->name);
 	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
+        LOOP:
 
 	waitSemaforo(catchPokemon->name);
 	DIR* dir = opendir(path_directorio_pokemon);
@@ -1248,7 +1249,7 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 
 	} else {
 
-		LOOP:
+		//LOOP:
 
 		signalSemaforo(catchPokemon->name);
 
@@ -1778,7 +1779,7 @@ void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro
 	strcpy(ruta_metadata_pokemon, ruta_directorio_pokemon);
 	string_append(&ruta_metadata_pokemon, METADATA_FILE);
 
-	log_info(logger, "BORRANDO BLOQUE [%d] EN CAMPO BLOCKS EN LA METADATA <%s>", ruta_metadata_pokemon);
+	log_info(logger, "BORRANDO BLOQUE [%d] EN CAMPO BLOCKS EN LA METADATA <%s>",nro_bloque,  ruta_metadata_pokemon);
 
 	t_config *metadata_pokemon = config_create(ruta_metadata_pokemon);
 
@@ -1877,6 +1878,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", getPokemon->name);
 	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
+        LOOP:
 
 	waitSemaforo(getPokemon->name);
 	DIR* dir = opendir(path_directorio_pokemon);
@@ -1890,7 +1892,7 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 
 	} else {
 
-		LOOP:
+		//LOOP:
 
 		signalSemaforo(getPokemon->name);
 
