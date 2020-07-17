@@ -198,11 +198,11 @@ void salir_equipo(){
 	}
 	list_destroy_and_destroy_elements(equipo->poks_requeridos,(void*)limpiar);
 
-	void limpiar_mensaje(msg* m){
-		free(m->pok->name);
-		free(m->pok);
-	}
-	list_destroy_and_destroy_elements(mensajes,(void*)limpiar_mensaje);
+	//void limpiar_mensaje(msg* m){
+		//free(m->pok->name);
+		//free(m->pok);
+	//}
+	//list_destroy_and_destroy_elements(mensajes,(void*)limpiar_mensaje);
 
 	free(datos_config->objetivos);
 	free(datos_config->pokemones);
