@@ -2128,7 +2128,7 @@ void recibir_mensajes_new_pokemon(){
 			pthread_t hilo_new_pokemon_broker;
 			pthread_create(&hilo_new_pokemon_broker, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 			pthread_detach(hilo_new_pokemon_broker);
-			free(valor);
+			//free(valor);
 		}
 
 		list_iterate(paquete,(void*)display);
