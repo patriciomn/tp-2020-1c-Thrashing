@@ -82,13 +82,10 @@ new_pokemon* deserializar_new(void* buffer) {
 appeared_pokemon* deserializar_appeared(void* buffer) {
     appeared_pokemon* appeared = malloc(sizeof(appeared_pokemon));
     
-    void* stream = buffer+sizeof(int);
-    memcpy(&(appeared->name_size), stream, sizeof(int));
-    stream += sizeof(int);
+    memcpy(&(appeared->name_size), buffer, sizeof(int));
 	appeared->name = malloc(appeared->name_size+1);
-	memcpy(appeared->name, stream, appeared->name_size+1);
-	stream += (appeared->name_size+1);
-    memcpy(&(appeared->pos), stream, sizeof(position));
+	memcpy(appeared->name, buffer+sizeof(int), appeared->name_size+1);
+    memcpy(&(appeared->pos), buffer+sizeof(int)+(appeared->name_size+1), sizeof(position));
 
     return appeared;
 }

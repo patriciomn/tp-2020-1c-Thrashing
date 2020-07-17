@@ -74,8 +74,7 @@ typedef struct{
 	t_list* poks_requeridos;
 	t_list* cola_ready;
 	t_list* cola_deadlock;
-	int cant_deadlock;
-	int cant_deadlock_resuelto;
+	t_list* metrica_deadlock;
 }team;
 
 typedef struct{

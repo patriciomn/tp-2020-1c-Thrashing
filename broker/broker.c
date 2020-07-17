@@ -959,17 +959,19 @@ void compactar_particiones_dinamicas(){
 			return aux->start == borrar->start;
 		}
 		list_remove_by_condition(cache,(void*)by_start);
+		void* inicio = borrar->inicio;
 		void compac(particion* aux){
 			if(aux->end == mem_total && aux->libre == 'L'){
-				aux->inicio -= size;
+				aux->inicio = inicio;
 				aux->start -= size;
 				aux->size += size;
 			}
 			else if(aux->end == mem_total && aux->libre == 'X'){
-				aux->inicio -= size;
+				memmove(inicio,aux->inicio,aux->size);
+				aux->inicio = inicio;
 				aux->start -= size;
-				aux->fin = aux->inicio+aux->size;
 				aux->end = aux->start+aux->size;
+				aux->fin = aux->inicio+aux->size;
 				particion* next = malloc(sizeof(particion));
 				next->libre = 'L';
 				next->size = size;
@@ -980,15 +982,18 @@ void compactar_particiones_dinamicas(){
 				next->id_mensaje = -1;
 				next->tipo_cola = -1;
 				list_add(cache,next);
+				inicio = aux->fin;
 			}
 			else if(aux->fin <= borrar->inicio){
 				//No tocar las particiones anteriores de la particion a borrar
 			}
 			else{
-				aux->inicio -= size;
+				memmove(inicio,aux->inicio,aux->size);
+				aux->inicio = inicio;
 				aux->start -= size;
-				aux->fin = aux->inicio+aux->size;
 				aux->end = aux->start+aux->size;
+				aux->fin = aux->inicio + aux->size;
+				inicio = aux->fin;
 			}
 		}
 		list_iterate(cache,(void*)compac);
@@ -1165,11 +1170,11 @@ void delete_particion(particion* borrar){
 
 	log_warning(logger,"Particion:%d De Tipo: %s Eliminada  Inicio: %d",borrar->id_particion,get_cola(borrar->tipo_cola),borrar->start);
 	borrar->libre = 'L';
+	memset(borrar->inicio,0,borrar->size);
 
 	bool libre(particion* p){
 		return p->libre == 'L';
 	}
-
 	list_remove_by_condition(cola->mensajes,(void*)by_id);
 
 
