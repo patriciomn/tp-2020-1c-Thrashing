@@ -2135,7 +2135,7 @@ void recibir_mensajes_new_pokemon(){
 			newPokemon->id_mensaje = id_mensaje;
 
 			log_info(logger,"Llega Un Mensaje Tipo: NEW_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d CANT:%d\n", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy, newPokemon->cantidad);
-			free(valor);
+
 			enviar_ack(NEW_POKEMON, newPokemon->id_mensaje, datos_config->pid, socket_cliente_np);
 
 			free(valor);
@@ -2144,7 +2144,6 @@ void recibir_mensajes_new_pokemon(){
 			pthread_t hilo_new_pokemon_broker;
 			pthread_create(&hilo_new_pokemon_broker, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 			pthread_detach(hilo_new_pokemon_broker);
-			//free(valor);
 		}
 
 		list_iterate(paquete,(void*)display);
@@ -2238,8 +2237,6 @@ void recibir_mensajes_get_pokemon(){
 			pthread_t hilo_get_pokemon_broker;
 			pthread_create(&hilo_get_pokemon_broker, NULL , (void *) operacion_get_pokemon, (void *) getPokemon);
 			pthread_detach(hilo_get_pokemon_broker);
-
-			//free(valor);
 		}
 
 		list_iterate(paquete,(void*)display);
@@ -2317,11 +2314,11 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 	switch(cod_op) {
 		case NEW_POKEMON:
-			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON");
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION NEW_POKEMON DE GAMEBOY");
 
 			int id_mensaje_new;
 			memcpy(&(id_mensaje_new), stream, sizeof(int));
-			printf("ID MENSAJE: %d\n", id_mensaje_new);
+			//printf("ID MENSAJE: %d\n", id_mensaje_new);
 
 			new_pokemon *newPokemon = deserializar_new(stream + sizeof(int));
 
@@ -2330,7 +2327,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			//printf("PosY: %d | ", newPokemon->pos.posy);
 			//printf("Cantidad: %d | \n", newPokemon->cantidad);
 			newPokemon->id_mensaje = id_mensaje_new;
-			log_info(logger, "LLEGO UN MENSAJE NEW DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy);
+			log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy);
 
 			//free(stream);
 
@@ -2341,11 +2338,11 @@ void atender_peticion(int socket_cliente, int cod_op) {
 		break;
 
 		case CATCH_POKEMON:
-			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON");
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION CATCH_POKEMON DE GAMEBOY");
 
 			int id_mensaje_catch;
 			memcpy(&(id_mensaje_catch), stream, sizeof(int));
-			printf("ID MENSAJE: %d\n", id_mensaje_catch);
+			//printf("ID MENSAJE: %d\n", id_mensaje_catch);
 
 			catch_pokemon *catchPokemon = deserializar_catch(stream + sizeof(int));
 
@@ -2354,7 +2351,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			//printf("PosY: %d\n", catchPokemon->pos.posy);
 			catchPokemon->id_mensaje = id_mensaje_catch;
 
-			log_info(logger, "LLEGO UN MENSAJE CATCH DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
+			log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
 
 			//free(stream);
 
@@ -2365,7 +2362,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 		break;
 
 		case GET_POKEMON:
-			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON");
+			log_info(logger, "SE RECIBIO UN MENSAJE CON OPERACION GET_POKEMON DE GAMEBOY");
 
 			int id_mensaje_get;
 			memcpy(&(id_mensaje_get), stream, sizeof(int));
@@ -2376,7 +2373,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 			//printf("POKEMON: %s\n", getPokemon->name);
 			getPokemon->id_mensaje = id_mensaje_get;
 
-			log_info(logger, "LLEGO UN MENSAJE DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s", getPokemon->id_mensaje, getPokemon->name);
+			log_info(logger, "ID MENSAJE: %d | POKEMON: %s", getPokemon->id_mensaje, getPokemon->name);
 
 			//free(stream);
 
@@ -2390,7 +2387,7 @@ void atender_peticion(int socket_cliente, int cod_op) {
 		break;
 	}
 
-	free(stream);
+	//free(stream);
 }
 
 
