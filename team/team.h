@@ -20,8 +20,8 @@
 #include<semaphore.h>
 #include<sys/time.h>
 
-#define IP "127.0.0.2"
-#define PUERTO "4445"
+#define IP "127.0.0.3"
+#define PUERTO "4446"
 #define CICLO_ACCION 1
 #define CICLOS_INTERCAMBIAR 5
 #define CANT_ENTRE 100

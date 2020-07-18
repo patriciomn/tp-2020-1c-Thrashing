@@ -297,6 +297,9 @@ void actuar_entrenador_sin_desalojo(entrenador* entre){
 				list_add(entre->espera_caught,pok);
 				pok->espera_caught = 1;
 				bloquear_entrenador(entre);
+				if(!list_is_empty(equipo->cola_ready)){
+					sem_post(&semPoks);
+				}
 				goto inicio;
 			}
 		}
@@ -369,6 +372,9 @@ void actuar_entrenador_con_desalojo(entrenador* entre){
 				list_add(entre->espera_caught,pok);
 				pok->espera_caught = 1;
 				bloquear_entrenador(entre);
+				if(!list_is_empty(equipo->cola_ready)){
+					sem_post(&semPoks);
+				}
 				goto inicio;
 			}
 			if((string_equals_ignore_case(datos_config->algoritmo,"RR") && entre->quantum <= 0) ||
