@@ -1070,58 +1070,53 @@ void consolidar_buddy_system(){
 	}
 	for(int i=0;i<list_size(cache);i++){
 		particion* libre = list_get(cache,i);
-		if(!es_libre(libre)){
+		if(!es_libre(libre))
 			continue;
+		bool existe_buddy(particion* aux){
+			return (aux->end == libre->start || aux->start == libre->end) && aux->libre == 'L' && aux->buddy_size == libre->buddy_size;
 		}
-		else{
-			bool existe_buddy(particion* aux){
-				return (aux->end == libre->start || aux->start == libre->end) && aux->libre == 'L' && aux->buddy_size == libre->buddy_size;
-			}
-			if(list_any_satisfy(cache,(void*)existe_buddy)){
-				void aplicar(particion* aux){
-					if(libre != NULL){
-						bool anterior(particion* aux){
-							return aux->start != libre->start && aux->end == libre->start && es_libre(aux) && aux->buddy_size == libre->buddy_size;
-						}
-						bool next(particion* aux){
-							return  aux->start != libre->start && aux->start == libre->end && es_libre(aux) && aux->buddy_size == libre->buddy_size;
-						}
-						particion* ant = list_find(cache,(void*)anterior);
-						particion* pos = list_find(cache,(void*)next);
-						if(ant != NULL){
-							log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",ant->start,libre->start);
-							uint32_t end = aux->end;
-							bool by_start(particion* a){
-								return a->start == aux->start;
-							}
-							particion* borrar = list_find(cache,(void*)by_start);
-							list_remove_by_condition(cache,(void*)by_start);
-							free(borrar);
-							ant->fin = ant->inicio+ant->buddy_size*2;
-							ant->end = end;
-							ant->buddy_size = ant->buddy_size*2;
-						}
-						else if(pos != NULL){
-							log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",libre->start,pos->start);
-							uint32_t end = pos->end;
-							bool by_start(particion* aux){
-								return aux->start == pos->start;
-							}
-							particion* borrar = list_find(cache,(void*)by_start);
-							list_remove_by_condition(cache,(void*)by_start);
-							free(borrar);
-							aux->fin = aux->inicio+aux->buddy_size*2;
-							aux->end = end;
-							aux->buddy_size =aux->buddy_size* 2;
-						}
-					}
+		if(!list_any_satisfy(cache,(void*)existe_buddy))
+			continue;
+		void aplicar(particion* aux){
+			if(libre != NULL){
+				bool anterior(particion* aux){
+					return aux->start != libre->start && aux->end == libre->start && es_libre(aux) && aux->buddy_size == libre->buddy_size;
 				}
-				aplicar(libre);
-			}
-			else{
-				continue;
+				bool next(particion* aux){
+					return  aux->start != libre->start && aux->start == libre->end && es_libre(aux) && aux->buddy_size == libre->buddy_size;
+				}
+				particion* ant = list_find(cache,(void*)anterior);
+				particion* pos = list_find(cache,(void*)next);
+				if(ant != NULL){
+					log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",ant->start,libre->start);
+					uint32_t end = aux->end;
+					bool by_start(particion* a){
+						return a->start == aux->start;
+					}
+					particion* borrar = list_find(cache,(void*)by_start);
+					list_remove_by_condition(cache,(void*)by_start);
+					free(borrar);
+					ant->fin = ant->inicio+ant->buddy_size*2;
+					ant->end = end;
+					ant->buddy_size = ant->buddy_size*2;
+				}
+				else if(pos != NULL){
+					log_warning(logger,"Consolidando El Cache De Las Particiones Con Posiciones Iniciales: %d Y %d ...",libre->start,pos->start);
+					uint32_t end = pos->end;
+					bool by_start(particion* aux){
+						return aux->start == pos->start;
+					}
+					particion* borrar = list_find(cache,(void*)by_start);
+					list_remove_by_condition(cache,(void*)by_start);
+					free(borrar);
+					aux->fin = aux->inicio+aux->buddy_size*2;
+					aux->end = end;
+					aux->buddy_size =aux->buddy_size* 2;
+				}
 			}
 		}
+		aplicar(libre);
+
 	}
 }
 
