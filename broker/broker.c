@@ -149,7 +149,7 @@ void serve_client(int* socket){
 	memset(&cod_op, 0 ,sizeof(int));
 	if(recv(*socket, &cod_op, sizeof(int), MSG_WAITALL) == -1){
 		printf("\033[0;31mERROR: socket error\033[0m\n" );
-    	pthread_exit(NULL);
+    	exit(0);
 	}
 	if (cod_op <= 0 ){
 		printf("\033[0;31mSe Desconectó El Socket: %d\033[0m\n", *socket);
@@ -1124,6 +1124,7 @@ void consolidar_buddy_system(){
 		}
 	}
 }
+
 void algoritmo_reemplazo(){
 	particion* victima;
 	bool ocupada(particion* aux){
