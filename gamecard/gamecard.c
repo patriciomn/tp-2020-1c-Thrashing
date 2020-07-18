@@ -352,71 +352,89 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
     char *path_directorio_pokemon = string_new();
     string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", newPokemon->name);
     log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON RUTA <%s>", path_directorio_pokemon);
-
-    waitSemaforo(newPokemon->name);
     DIR* dir = opendir(path_directorio_pokemon);
+    LOOP:
+    waitSemaforo(newPokemon->name);
 
-    while (true){
-		/* code */
-		if(dir == NULL) {
-			log_warning(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
-			pthread_mutex_lock(&mutexBITMAP);
-			int nro_bloque_libre = obtener_bloque_libre();
-			pthread_mutex_unlock(&mutexBITMAP);
-			if(nro_bloque_libre == -1) {
-				signalSemaforo(newPokemon->name);
-				log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
-				pthread_exit(NULL);
-			} else {
-				log_info(logger, "CREANDO EL DIRECTORIO <%s>", path_directorio_pokemon);
-				mkdir(path_directorio_pokemon,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-				crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
-				signalSemaforo(newPokemon->name);
-			}
+    if(dir == NULL) {
+    	log_warning(logger, "EL DIRECTORIO <%s> NO EXISTE", path_directorio_pokemon);
 
-		} else {
+    	pthread_mutex_lock(&mutexBITMAP);
+    	int nro_bloque_libre = obtener_bloque_libre();
+    	pthread_mutex_unlock(&mutexBITMAP);
 
-			signalSemaforo(newPokemon->name);
+    	if(nro_bloque_libre == -1) {
+    		signalSemaforo(newPokemon->name);
+    		log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
+    		pthread_exit(NULL);
 
-			waitSemaforo(newPokemon->name);
-			char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+    	} else {
 
-			if(string_equals_ignore_case(valor, "Y")) {
+    		log_info(logger, "CREANDO EL DIRECTORIO <%s>", path_directorio_pokemon);
+    		mkdir(path_directorio_pokemon,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
-				log_info(logger, "EL DIRECTORIO <%s> EXISTE Y ES SOLO UN DIRECTORIO", path_directorio_pokemon);
+    		crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
 
-				pthread_mutex_lock(&mutexBITMAP);
-				int nro_bloque_libre = obtener_bloque_libre();
-				pthread_mutex_unlock(&mutexBITMAP);
-				if(nro_bloque_libre == -1) {
-					signalSemaforo(newPokemon->name);
-					log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
-					pthread_exit(NULL);
-				} else {
-					crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
-					signalSemaforo(newPokemon->name);
-				}
-			} else {
-				signalSemaforo(newPokemon->name);
-				log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
-				waitSemaforo(newPokemon->name);
-				char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
-				if(string_equals_ignore_case(valor_open, "N")) {
-					cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
-					signalSemaforo(newPokemon->name);
-					buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
-				} else {
-					signalSemaforo(newPokemon->name);
-					reintentar_operacion(newPokemon);
-					continue;
-				}
-				free(valor_open);
-			}
-			free(valor);
-			break;
-		}
-	}
+    		signalSemaforo(newPokemon->name);
 
+    	}
+
+    } else {
+    	//LOOP:
+
+    	signalSemaforo(newPokemon->name);
+
+    	waitSemaforo(newPokemon->name);
+    	char *valor = get_valor_campo_metadata(path_directorio_pokemon, "DIRECTORY");
+
+    	if(string_equals_ignore_case(valor, "Y")) {
+
+    		log_info(logger, "EL DIRECTORIO <%s> EXISTE Y ES SOLO UN DIRECTORIO", path_directorio_pokemon);
+
+    		pthread_mutex_lock(&mutexBITMAP);
+    		int nro_bloque_libre = obtener_bloque_libre();
+    		pthread_mutex_unlock(&mutexBITMAP);
+
+    		if(nro_bloque_libre == -1) {
+
+    			signalSemaforo(newPokemon->name);
+    		    log_error(logger, "NO HAY SUFICIENTE ESPACIO DISPONIBLE");
+    		    pthread_exit(NULL);
+
+    		} else {
+
+    		    crear_pokemon(newPokemon, path_directorio_pokemon, nro_bloque_libre);
+
+    		    signalSemaforo(newPokemon->name);
+
+    		}
+
+    	} else {
+
+    		signalSemaforo(newPokemon->name);
+
+			log_info(logger, "EL DIRECTORIO <%s> EXISTE JUNTO CON EL ARCHIVO POKEMON", path_directorio_pokemon);
+
+    		waitSemaforo(newPokemon->name);
+    		char *valor_open = get_valor_campo_metadata(path_directorio_pokemon, "OPEN");
+    		if(string_equals_ignore_case(valor_open, "N")) {
+
+    			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "Y");
+    			signalSemaforo(newPokemon->name);
+
+    			buscar_linea_en_el_archivo(newPokemon, path_directorio_pokemon);
+
+    		} else {
+
+
+    			reintentar_operacion(newPokemon);
+      			signalSemaforo(newPokemon->name);
+    			goto LOOP;
+    		}
+    		free(valor_open);
+    	}
+    	free(valor);
+    }
     closedir(dir);
     free(path_directorio_pokemon);
     free(newPokemon->name);
@@ -1221,10 +1239,10 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", catchPokemon->name);
 	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
-        LOOP:
+	DIR* dir = opendir(path_directorio_pokemon);
+	LOOP:
 
 	waitSemaforo(catchPokemon->name);
-	DIR* dir = opendir(path_directorio_pokemon);
 
 	if(dir == NULL) { // si esxiste o no el directorio (FAIL)
 
@@ -1264,9 +1282,8 @@ void operacion_catch_pokemon(catch_pokemon *catchPokemon) {
 	    		buscar_linea_en_el_archivo_catch(catchPokemon, path_directorio_pokemon);
 
 	    	} else {
-
-	    		signalSemaforo(catchPokemon->name);
 	    		reintentar_operacion(catchPokemon);
+	    		signalSemaforo(catchPokemon->name);
 	    		goto LOOP;
 	    	}
 	    	free(valor_open);
@@ -1871,10 +1888,10 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	char *path_directorio_pokemon = string_new();
 	string_append_with_format(&path_directorio_pokemon, "%s%s%s%s",datos_config->pto_de_montaje, FILES_DIR, "/", getPokemon->name);
 	log_info(logger, "EN BUSCA DEL DIRECTORIO DEL POKEMON CON PATH <%s>", path_directorio_pokemon);
-        LOOP:
+	DIR* dir = opendir(path_directorio_pokemon);
+	LOOP:
 
 	waitSemaforo(getPokemon->name);
-	DIR* dir = opendir(path_directorio_pokemon);
 	if(dir == NULL) { // si esxiste o no el directorio (FAIL)
 
 		signalSemaforo(getPokemon->name);
@@ -1916,8 +1933,8 @@ void operacion_get_pokemon(get_pokemon *getPokemon) {
 	    		buscar_lineas_get_pokemon(getPokemon, path_directorio_pokemon);
 
 	    	} else {
-	    		signalSemaforo(getPokemon->name);
 	    		reintentar_operacion(getPokemon);
+	    		signalSemaforo(getPokemon->name);
 	    		goto LOOP;
 	    	}
 	    	free(valor_open);
