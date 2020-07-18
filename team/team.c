@@ -448,6 +448,7 @@ void desalojar_entrenador(entrenador* entre){
 	}
 	entre->cant_cambio_contexto++;
 	despertar_entrenador(entre);
+	entre->service_time = 0;
 	pthread_rwlock_wrlock(&lockExec);
 	equipo->exec = NULL;
 	pthread_rwlock_unlock(&lockExec);
@@ -463,6 +464,7 @@ void despertar_entrenador(entrenador* entre){
 	if(entre->estado == NEW || entre->estado == BLOCKED || entre->estado == EXEC){
 		printf("\033[1;34mEntrenador%c READY\033[0m\n",entre->tid);
 		entre->estado = READY;
+		entre->estimacion_anterior = estimacion(entre);
 		pthread_rwlock_wrlock(&lockColaReady);
 		list_add(equipo->cola_ready,entre);
 		pthread_rwlock_unlock(&lockColaReady);
@@ -534,8 +536,10 @@ void salir_entrenador(entrenador* entre){
 }
 
 bool con_estimacion_menor(entrenador* entre){
+	printf("Entrenador%c Estimacion %lf\n",entre->tid,entre->estimacion_anterior);
 	bool menor(entrenador* aux){
-		return estimacion(aux) < entre->estimacion_anterior;
+		printf("Entrenador%c Estimacion %lf\n",aux->tid,aux->estimacion_anterior);
+		return (aux->tid != entre->tid) && (aux->estimacion_anterior < entre->estimacion_anterior);
 	}
 	return list_any_satisfy(equipo->cola_ready,(void*)menor);
 }
@@ -774,13 +778,12 @@ entrenador* algoritmo_sjf(t_list* cola){
 	if(entre != NULL){
 		bool sjf_sin_desalojo(entrenador* aux1,entrenador* aux2){
 			if(estimacion(aux1) == estimacion(aux2)){
-				return aux1->arrival_time < aux2->arrival_time;
+				return aux1->tid < aux2->tid;
 			}
 			return estimacion(aux1) < estimacion(aux2);
 		}
 		t_list* sorted = list_sorted(cola,(void*)sjf_sin_desalojo);
 		entre = list_get(sorted,0);
-		entre->estimacion_anterior = estimacion(entre);
 		list_destroy(sorted);
 	}
 	return entre;
