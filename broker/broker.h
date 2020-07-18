@@ -106,7 +106,7 @@ void iniciar_memoria();
 void iniciar_config(char* broker_config);
 void iniciar_semaforos();
 void iniciar_cache();
-particion* malloc_cache(size_t);
+particion* malloc_cache(uint32_t size);
 void display_cache();
 void handler_dump(int signo);
 void free_cache();

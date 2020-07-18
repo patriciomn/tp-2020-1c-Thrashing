@@ -40,27 +40,27 @@ typedef struct{
 } t_paquete;
 
 typedef struct{
-	int posx;
-	int posy;
+	uint32_t posx;
+	uint32_t posy;
 }position;
 
 typedef struct{
-	int id_mensaje;
-	int name_size;
+	uint32_t id_mensaje;
+	uint32_t name_size;
 	char* name;
 	position pos;
-	int cantidad;
+	uint32_t cantidad;
 }new_pokemon;
 
 typedef struct{
-	int name_size;
+	uint32_t name_size;
 	char* name;
 	position pos;
 }appeared_pokemon;
 
 typedef struct{
-	int id_mensaje;
-	int name_size;
+	uint32_t id_mensaje;
+	uint32_t name_size;
 	char* name;
 	position pos;
 }catch_pokemon;
@@ -70,15 +70,15 @@ typedef struct{
 }caught_pokemon;
 
 typedef struct{
-	int id_mensaje;
-	int name_size;
+	uint32_t id_mensaje;
+	uint32_t name_size;
 	char* name;
 }get_pokemon;
 
 typedef struct{
-	int name_size;
+	uint32_t name_size;
 	char* name;
-	int cantidad_posiciones;
+	uint32_t cantidad_posiciones;
 	t_list* posiciones;
 }localized_pokemon;
 

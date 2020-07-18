@@ -70,14 +70,14 @@ new_pokemon* deserializar_new(void* buffer) {
     new_pokemon* new = malloc(sizeof(new_pokemon));
 
     void* stream = buffer;
-    memcpy(&(new->name_size), stream, sizeof(int));
-    stream += sizeof(int);
+    memcpy(&(new->name_size), stream, sizeof(uint32_t));
+    stream += sizeof(uint32_t);
 	new->name = malloc(new->name_size+1);
 	memcpy(new->name, stream, new->name_size+1);
 	stream += (new->name_size + 1);
     memcpy(&(new->pos), stream, sizeof(position));
     stream += sizeof(position);
-    memcpy(&(new->cantidad), stream, sizeof(int));
+    memcpy(&(new->cantidad), stream, sizeof(uint32_t));
 	
     return new;
 }
@@ -85,9 +85,9 @@ new_pokemon* deserializar_new(void* buffer) {
 appeared_pokemon* deserializar_appeared(void* buffer) {
     appeared_pokemon* appeared = malloc(sizeof(appeared_pokemon));
     
-    void* stream = buffer+sizeof(int);
-    memcpy(&(appeared->name_size), stream, sizeof(int));
-    stream += sizeof(int);
+    void* stream = buffer+sizeof(uint32_t);
+    memcpy(&(appeared->name_size), stream, sizeof(uint32_t));
+    stream += sizeof(uint32_t);
 	appeared->name = malloc(appeared->name_size+1);
 	memcpy(appeared->name, stream, appeared->name_size+1);
 	stream += (appeared->name_size+1);
@@ -100,8 +100,8 @@ catch_pokemon* deserializar_catch(void* buffer) {
     catch_pokemon* catch = malloc(sizeof(catch_pokemon));
     
     void* stream = buffer;
-    memcpy(&(catch->name_size), stream, sizeof(int));
-    stream += sizeof(int);
+    memcpy(&(catch->name_size), stream, sizeof(uint32_t));
+    stream += sizeof(uint32_t);
 	catch->name = malloc(catch->name_size+1);
 	memcpy(catch->name, stream, catch->name_size+1);
 	stream += (catch->name_size+1);
@@ -112,7 +112,7 @@ catch_pokemon* deserializar_catch(void* buffer) {
 
 caught_pokemon* deserializar_caught(void* buffer) {
     caught_pokemon* caught = malloc(sizeof(caught_pokemon));
-    void* stream = buffer+sizeof(int);
+    void* stream = buffer+sizeof(uint32_t);
     memcpy(&(caught->caught),stream, sizeof(bool));
 		
     return caught;
@@ -121,9 +121,9 @@ caught_pokemon* deserializar_caught(void* buffer) {
 get_pokemon* deserializar_get(void* buffer) {
     get_pokemon* get = malloc(sizeof(get_pokemon));
 
-    memcpy(&(get->name_size),buffer, sizeof(int));
+    memcpy(&(get->name_size),buffer, sizeof(uint32_t));
 	get->name = malloc(get->name_size+1);
-	memcpy(get->name,buffer+sizeof(int), get->name_size+1);
+	memcpy(get->name,buffer+sizeof(uint32_t), get->name_size+1);
 		
     return get;
 }
@@ -132,14 +132,14 @@ localized_pokemon* deserializar_localized(void* buffer) {
     localized_pokemon* localized = malloc(sizeof(localized_pokemon));
     localized->posiciones = list_create();
 
-    void* stream = buffer+sizeof(int);
-    memcpy(&(localized->name_size), stream, sizeof(int));
-    stream += sizeof(int);
+    void* stream = buffer+sizeof(uint32_t);
+    memcpy(&(localized->name_size), stream, sizeof(uint32_t));
+    stream += sizeof(uint32_t);
 	localized->name = malloc(localized->name_size+1);
 	memcpy(localized->name, stream, localized->name_size+1);
 	stream += (localized->name_size+1);
-	memcpy(&localized->cantidad_posiciones,stream,sizeof(int));
-	stream += sizeof(int);
+	memcpy(&localized->cantidad_posiciones,stream,sizeof(uint32_t));
+	stream += sizeof(uint32_t);
 	for(int i=0;i<localized->cantidad_posiciones;i++){
 		position* pc = malloc(sizeof(position));
 		memcpy(pc,stream, sizeof(position));
@@ -193,25 +193,25 @@ void enviar_info_suscripcion(int tipo,int socket_cliente,pid_t pid){
 	free(paquete);
 }
 
-t_list* recibir_paquete(int socket_cliente){
-	int size;
-	uint32_t desplazamiento = 0;
-	void * buffer;
-	t_list* valores = list_create();
-	uint32_t tamanio;
-	buffer = recibir_buffer(socket_cliente,&size);
-	while(desplazamiento < size){
-		memcpy(&tamanio, buffer + desplazamiento, sizeof(uint32_t));
-		desplazamiento+=sizeof(uint32_t);
-		void* valor = malloc(tamanio);
-		memset(valor,0,tamanio);
-		memcpy(valor, buffer+desplazamiento, tamanio);
-		desplazamiento+=tamanio;
-		list_add(valores, valor);
-	}
-	free(buffer);
-	return valores;
-}
+// t_list* recibir_paquete(int socket_cliente){
+// 	int size;
+// 	uint32_t desplazamiento = 0;
+// 	void * buffer;
+// 	t_list* valores = list_create();
+// 	uint32_t tamanio;
+// 	buffer = recibir_buffer(socket_cliente,&size);
+// 	while(desplazamiento < size){
+// 		memcpy(&tamanio, buffer + desplazamiento, sizeof(uint32_t));
+// 		desplazamiento+=sizeof(uint32_t);
+// 		void* valor = malloc(tamanio);
+// 		memset(valor,0,tamanio);
+// 		memcpy(valor, buffer+desplazamiento, tamanio);
+// 		desplazamiento+=tamanio;
+// 		list_add(valores, valor);
+// 	}
+// 	free(buffer);
+// 	return valores;
+// }
 
 void* recibir_buffer(int socket_cliente, int* size){
 	void * buffer;

@@ -333,7 +333,7 @@ void mensaje_new_pokemon(void* msg,int cliente_fd){
 	pthread_rwlock_unlock(&lockNew);
 
 	//almacena
-	size_t size = new->name_size + sizeof(uint32_t)*4;
+	uint32_t size = new->name_size + sizeof(uint32_t)*4;
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,NEW_POKEMON,part_aux->inicio,msg,size);
@@ -370,7 +370,7 @@ void mensaje_appeared_pokemon(void* msg,int cliente_fd){
 	}
 
 	//almacena
-	size_t size = appeared->name_size + sizeof(uint32_t)*3;
+	uint32_t size = appeared->name_size + sizeof(uint32_t)*3;
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,APPEARED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
@@ -396,7 +396,7 @@ void mensaje_catch_pokemon(void* msg,int cliente_fd){
 	pthread_rwlock_unlock(&lockCatch);
 
 	//almacena
-	size_t size = catch->name_size + sizeof(uint32_t)*3;
+	uint32_t size = catch->name_size + sizeof(uint32_t)*3;
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,CATCH_POKEMON,part_aux->inicio,msg,size);
@@ -457,7 +457,7 @@ void mensaje_get_pokemon(void* msg,int cliente_fd){
 	pthread_rwlock_unlock(&lockGet);
 
 	//almacena
-	size_t size = get->name_size + sizeof(uint32_t);
+	uint32_t size = get->name_size + sizeof(uint32_t);
 
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
@@ -501,7 +501,7 @@ void mensaje_localized_pokemon(void* msg,int cliente_fd){
 	}
 
 	//almacena
-	size_t size = localized->name_size+sizeof(uint32_t)*2+sizeof(position)*localized->cantidad_posiciones;
+	uint32_t size = localized->name_size+sizeof(uint32_t)*2+sizeof(position)*localized->cantidad_posiciones;
 	particion* part_aux = malloc_cache(size);
 	if(part_aux != NULL){
 		memcpy_cache(part_aux,item->id,LOCALIZED_POKEMON,part_aux->inicio,msg+sizeof(uint32_t),size);
@@ -1172,9 +1172,7 @@ void delete_particion(particion* borrar){
 	borrar->libre = 'L';
 	memset(borrar->inicio,0,borrar->size);
 
-	bool libre(particion* p){
-		return p->libre == 'L';
-	}
+
 	list_remove_by_condition(cola->mensajes,(void*)by_id);
 
 
