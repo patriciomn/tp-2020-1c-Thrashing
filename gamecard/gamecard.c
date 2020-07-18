@@ -378,11 +378,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		signalSemaforo(newPokemon->name);
 
+
     	}
 
     } else {
-
-    	//LOOP:
 
     	signalSemaforo(newPokemon->name);
 
@@ -429,8 +428,10 @@ void operacion_new_pokemon(new_pokemon *newPokemon) {
 
     		} else {
 
+
     			signalSemaforo(newPokemon->name);
     			reintentar_operacion(newPokemon);
+    			closedir(dir);
     			goto LOOP;
     		}
     		free(valor_open);
