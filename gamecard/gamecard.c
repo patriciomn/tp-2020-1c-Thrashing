@@ -1041,6 +1041,7 @@ char* get_linea_nueva_cantidad(char *linea, char *coordenada, int cantidad_a_agr
 	free(sub);
 	free(viejaCantidad);
 	free(newCantidad);
+
 	return lineaModificada;
 }
 
@@ -1141,6 +1142,8 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 
 		buffer[desplazamiento] = '\0';
 
+		munmap(fileMemory, tamArchivo);
+
 		//log_info(logger, "contenido actualizado:");
 		//log_info(logger, "%s", buffer);
 
@@ -1169,6 +1172,8 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 		desplazamiento += sizeNuevaLinea;
 
 		buffer[desplazamiento] = '\0';
+
+		munmap(fileMemory, tamArchivo);
 
 		//log_info(logger, "contenido actualizado:");
 		//log_info(logger, "%s", buffer);
@@ -1202,6 +1207,8 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 
 		buffer[desplazamiento] = '\0';
 
+		munmap(fileMemory, tamArchivo);
+
 		//log_info(logger, "contenido actualizado:");
 		//log_info(logger, "%s", buffer);
 
@@ -1217,7 +1224,7 @@ void modificar_linea_pokemon(char *fileMemory, char *viejaLinea, char *lineaActu
 		free(aux);
 	}
 
-	munmap(fileMemory, tamArchivo);
+	//munmap(fileMemory, tamArchivo);
 	free(ruta_archivo_pokemon);
 }
 
@@ -1503,6 +1510,7 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 		retardo_operacion();
 		cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
+		free(buffer);
 		free(tam);
 
 	} else if(posicionLinea + sizeViejaLinea == tamArchivo) { // esta en la ultima linea
@@ -1524,6 +1532,7 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 			retardo_operacion();
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 
+			free(buffer);
 			free(tam);
 
 		} else { // esta en el medio
@@ -1548,11 +1557,12 @@ void modificar_archivo_pokemon_catch_sin_linea(char *fileMemory, char *viejaLine
 			retardo_operacion();
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
 			
+			free(buffer);
 			free(tam);
 		}
 
 	free(ruta_archivo_pokemon);
-	free(buffer);
+	//free(buffer);
 }
 
 
@@ -1649,6 +1659,8 @@ void modificar_archivo_pokemon_catch_con_linea(char *fileMemory, char *viejaLine
 			actualizar_contenido_blocks(path_directorio_pokemon, buffer);
 			retardo_operacion();
 			cambiar_valor_metadata(path_directorio_pokemon, "OPEN", "N");
+
+			free(buffer);
 			free(tam);
 		}
 
@@ -1739,8 +1751,8 @@ void borrar_archivo(char *nombre, char flag) {
 		log_info(logger, "BORRANDO ARCHIVO <%s>", ruta_archivo);
 		remove(ruta_archivo);
 	} else {
-		log_info(logger, "BORRANDO ARCHIVO <%s>", ruta_archivo);
 		string_append_with_format(&ruta_archivo, "%s%s%s%s", BLOCKS_DIR, "/", nombre, ".txt");
+		log_info(logger, "BORRANDO ARCHIVO <%s>", ruta_archivo);
 		remove(ruta_archivo);
 	}
 
@@ -1766,6 +1778,8 @@ void cambiar_metadata_archivo_a_directorio(char *path_directorio_pokemon) {
 	config_save_in_file(metadataArchivo, ruta_metadata_pokemon);
 
 	config_destroy(metadataArchivo);
+
+	free(ruta_metadata_pokemon);
 }
 
 
@@ -1816,13 +1830,13 @@ void borrar_ultimo_bloque_metadata_blocks(char *ruta_directorio_pokemon, int nro
 
 void liberar_bloque_bitmap(int nro_bloque_a_liberar) {
 
-	log_info(logger, "ACTUALIZANDO BITARRAY CLEAN");
+	log_info(logger, "ACTUALIZANDO BITARRAY  OPERACION CLEAN");
 
 	bitarray_clean_bit(bitarray, nro_bloque_a_liberar);
 
-	log_info(logger, "ACUTALIZANDO BITMAP CLEAN");
+	log_info(logger, "ACUTALIZANDO BITMAP OPERACION CLEAN");
 	if(msync(bitmap_memoria, datos_config->blocks / BITS, MS_SYNC) == -1) {
-		log_error(logger, "ERROR MSYNC BITMAP BITARRAY SET");
+		log_error(logger, "ERROR MSYNC BITMAP BITARRAY CLEAN");
 		exit(1);
 	}
 }
@@ -2124,6 +2138,8 @@ void recibir_mensajes_new_pokemon(){
 			free(valor);
 			enviar_ack(NEW_POKEMON, newPokemon->id_mensaje, datos_config->pid, socket_cliente_np);
 
+			free(valor);
+
 			// ejecutar hilo new_pokemon
 			pthread_t hilo_new_pokemon_broker;
 			pthread_create(&hilo_new_pokemon_broker, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
@@ -2167,6 +2183,8 @@ void recibir_mensajes_catch_pokemon(){
 			catch_pokemon *catchPokemon = deserializar_catch(valor + desplazamiento);
 			catchPokemon->id_mensaje = id_mensaje;
 
+			free(valor);
+
 			log_info(logger,"Llega Un Mensaje Tipo: CATCH_POKEMON ID:%d POKEMON:%s POSX:%d POSY:%d\n", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
 			enviar_ack(CATCH_POKEMON, catchPokemon->id_mensaje, datos_config->pid, socket_cliente_cp);
 
@@ -2174,7 +2192,6 @@ void recibir_mensajes_catch_pokemon(){
 			pthread_create(&hilo_catch_pokemon_broker, NULL , (void *) operacion_catch_pokemon, (void *) catchPokemon);
 			pthread_detach(hilo_catch_pokemon_broker);
 
-			free(valor);
 		}
 		list_iterate(paquete,(void*)display);
 		list_destroy(paquete);
@@ -2213,6 +2230,8 @@ void recibir_mensajes_get_pokemon(){
 
 			getPokemon->id_mensaje = id_mensaje;
 
+			free(valor);
+
 			log_info(logger,"Llega Un Mensaje Tipo: GET_POKEMON ID:%d POKEMON:%s \n", getPokemon->id_mensaje, getPokemon->name);
 			enviar_ack(GET_POKEMON, getPokemon->id_mensaje, datos_config->pid, socket_cliente_gp);
 
@@ -2220,13 +2239,14 @@ void recibir_mensajes_get_pokemon(){
 			pthread_create(&hilo_get_pokemon_broker, NULL , (void *) operacion_get_pokemon, (void *) getPokemon);
 			pthread_detach(hilo_get_pokemon_broker);
 
-			free(valor);
+			//free(valor);
 		}
 
 		list_iterate(paquete,(void*)display);
 		list_destroy(paquete);
 	}
 }
+
 
 // Funciones del Gamecard como Servidor
 
@@ -2305,16 +2325,19 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 			new_pokemon *newPokemon = deserializar_new(stream + sizeof(int));
 
-			printf("POKEMON: %s | ", newPokemon->name);
-			printf("PosX: %d | ", newPokemon->pos.posx);
-			printf("PosY: %d | ", newPokemon->pos.posy);
-			printf("Cantidad: %d | \n", newPokemon->cantidad);
+			//printf("POKEMON: %s | ", newPokemon->name);
+			//printf("PosX: %d | ", newPokemon->pos.posx);
+			//printf("PosY: %d | ", newPokemon->pos.posy);
+			//printf("Cantidad: %d | \n", newPokemon->cantidad);
 			newPokemon->id_mensaje = id_mensaje_new;
+			log_info(logger, "LLEGO UN MENSAJE NEW DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy);
+
+			//free(stream);
 
 			pthread_t hilo_new_pokemon;
 			pthread_create(&hilo_new_pokemon, NULL, (void *) operacion_new_pokemon, (void *) newPokemon);
 			pthread_detach(hilo_new_pokemon);
-			free(stream);
+			//free(stream);
 		break;
 
 		case CATCH_POKEMON:
@@ -2326,15 +2349,19 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 			catch_pokemon *catchPokemon = deserializar_catch(stream + sizeof(int));
 
-			printf("POKEMON: %s\n", catchPokemon->name);
-			printf("PosX: %d\n", catchPokemon->pos.posx);
-			printf("PosY: %d\n", catchPokemon->pos.posy);
+			//printf("POKEMON: %s\n", catchPokemon->name);
+			//printf("PosX: %d\n", catchPokemon->pos.posx);
+			//printf("PosY: %d\n", catchPokemon->pos.posy);
 			catchPokemon->id_mensaje = id_mensaje_catch;
+
+			log_info(logger, "LLEGO UN MENSAJE CATCH DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s | POS X: %d | POS Y: %d", catchPokemon->id_mensaje, catchPokemon->name, catchPokemon->pos.posx, catchPokemon->pos.posy);
+
+			//free(stream);
 
 			pthread_t hilo_catch_pokemon;
 			pthread_create(&hilo_catch_pokemon, NULL, (void *) operacion_catch_pokemon, (void *) catchPokemon);
 			pthread_detach(hilo_catch_pokemon);
-			free(stream);
+			//free(stream);
 		break;
 
 		case GET_POKEMON:
@@ -2345,20 +2372,25 @@ void atender_peticion(int socket_cliente, int cod_op) {
 
 			get_pokemon *getPokemon = deserializar_get(stream + sizeof(int));
 
-			printf("ID MENSAJE: %d\n", id_mensaje_get);
-			printf("POKEMON: %s\n", getPokemon->name);
+			//printf("ID MENSAJE: %d\n", id_mensaje_get);
+			//printf("POKEMON: %s\n", getPokemon->name);
 			getPokemon->id_mensaje = id_mensaje_get;
+
+			log_info(logger, "LLEGO UN MENSAJE DE GAMEBOY: ID MENSAJE: %d | POKEMON: %s", getPokemon->id_mensaje, getPokemon->name);
+
+			//free(stream);
 
 			pthread_t hilo_get_pokemon;
 			pthread_create(&hilo_get_pokemon, NULL, (void *) operacion_get_pokemon, (void *) getPokemon);
 			pthread_detach(hilo_get_pokemon);
-			free(stream);
 		break;
 
 		default:
 			log_warning(logger, "NO SE RECIBIO NINGUNA DE LAS ANTERIORES");
 		break;
 	}
+
+	free(stream);
 }
 
 
@@ -2416,7 +2448,14 @@ void enviar_respuesta_new_pokemon(new_pokemon *newPokemon) {
 		free(paquete->buffer->stream);
 		free(paquete->buffer);
 		free(paquete);
+	} else {
+
+		log_error(logger, "BROKER NO DISPONIBLE");
+		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICIONES: [%d,%d]", newPokemon->id_mensaje, newPokemon->name, newPokemon->pos.posx, newPokemon->pos.posy);
+
 	}
+
+
 	free(puerto);
 }
 
@@ -2446,6 +2485,11 @@ void enviar_respuesta_catch_pokemon(catch_pokemon *catchPokemon, bool valor) {
 		free(paquete->buffer->stream);
 		free(paquete->buffer);
 		free(paquete);
+	} else {
+
+		log_error(logger, "BROKER NO DISPONIBLE");
+		log_info(logger, "ID MENSAJE: %d | RESULTADO: %d", catchPokemon->id_mensaje, valor);
+
 	}
 	free(puerto);
 }
@@ -2464,6 +2508,7 @@ void enviar_respuesta_get_pokemon(get_pokemon *getPokemon, int valor_rta, t_list
 
 	}
 	else {
+
 		log_info(logger, "ID MENSAJE: %d | POKEMON: %s | POSICIONES: 0", getPokemon->id_mensaje, getPokemon->name);
 	}
 
@@ -2489,6 +2534,7 @@ void enviar_rta_con_exito_get(get_pokemon *getPokemon, t_paquete *paquete, t_lis
 		list_iterate(info_lineas, (void *)display);
 
 	} else {
+
 		int desplazamiento = 0;
 
 		paquete->buffer->size = sizeof(int) * 2 + getPokemon->name_size + 1 + sizeof(int) + list_size(info_lineas) * sizeof(position);
